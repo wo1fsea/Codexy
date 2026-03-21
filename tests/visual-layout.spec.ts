@@ -1,0 +1,117 @@
+import { expect, test } from "@playwright/test";
+
+test("desktop layout follows the codex dock visual contract", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+
+  await expect(page.locator(".dock-shell")).toBeVisible();
+  await expect(page.locator(".dock-left-stack")).toBeVisible();
+  await expect(page.locator(".dock-stage")).toBeVisible();
+  await expect(page.locator(".dock-composer-shell")).toBeVisible();
+  await page.waitForTimeout(3000);
+  await expect(page.getByText("Live stream reconnecting...")).toHaveCount(0);
+
+  const metrics = await page.evaluate(() => {
+    const body = document.body;
+    const html = document.documentElement;
+    const sidebar = document.querySelector(".dock-left-stack");
+    const stage = document.querySelector(".dock-stage");
+    const search = document.querySelector(".dock-search-field");
+    const select = document.querySelector(".dock-sidebar-select .dock-select-trigger");
+    const sidebarTitle = document.querySelector(".dock-sidebar-header strong");
+    const stageTitle = document.querySelector(".dock-stage-title");
+    const stageScroll = document.querySelector(".dock-stage-scroll");
+    const threadList = document.querySelector(".dock-thread-sections");
+    const composer = document.querySelector(".dock-composer-shell");
+    const statusFooter = document.querySelector(".dock-status-footer");
+
+    const sidebarBox = sidebar?.getBoundingClientRect() ?? null;
+    const stageBox = stage?.getBoundingClientRect() ?? null;
+    const composerBox = composer?.getBoundingClientRect() ?? null;
+    const statusBox = statusFooter?.getBoundingClientRect() ?? null;
+
+    return {
+      bodyOverflow: getComputedStyle(body).overflowY,
+      htmlOverflow: getComputedStyle(html).overflowY,
+      sidebarWidth: sidebarBox ? Math.round(sidebarBox.width) : 0,
+      searchHeight: search ? Math.round(search.getBoundingClientRect().height) : 0,
+      selectHeight: select ? Math.round(select.getBoundingClientRect().height) : 0,
+      sidebarTitleFontSize: sidebarTitle ? getComputedStyle(sidebarTitle).fontSize : null,
+      stageTitleFontSize: stageTitle ? getComputedStyle(stageTitle).fontSize : null,
+      stageScrollOverflow: stageScroll ? getComputedStyle(stageScroll).overflowY : null,
+      threadListOverflow: threadList ? getComputedStyle(threadList).overflowY : null,
+      composerBottomGap:
+        composerBox && stageBox
+          ? Math.round(stageBox.bottom - composerBox.bottom)
+          : null,
+      statusBottomGap:
+        statusBox && stageBox
+          ? Math.round(stageBox.bottom - statusBox.bottom)
+          : null,
+      composerStatusGap:
+        composerBox && statusBox
+          ? Math.round(statusBox.top - composerBox.bottom)
+          : null
+    };
+  });
+
+  expect(metrics.bodyOverflow).toBe("hidden");
+  expect(metrics.htmlOverflow).toBe("hidden");
+  expect(metrics.sidebarWidth).toBeGreaterThanOrEqual(248);
+  expect(metrics.sidebarWidth).toBeLessThanOrEqual(480);
+  expect(metrics.searchHeight).toBeGreaterThanOrEqual(40);
+  expect(metrics.selectHeight).toBeGreaterThanOrEqual(38);
+  expect(metrics.sidebarTitleFontSize).toBe("15px");
+  expect(metrics.stageTitleFontSize).toBe("15px");
+  expect(metrics.stageScrollOverflow).toBe("auto");
+  expect(metrics.threadListOverflow).toBe("auto");
+  expect(metrics.composerBottomGap).not.toBeNull();
+  expect(metrics.statusBottomGap).not.toBeNull();
+  expect(metrics.composerStatusGap).not.toBeNull();
+  expect(metrics.composerBottomGap!).toBeLessThanOrEqual(110);
+  expect(metrics.statusBottomGap!).toBeLessThanOrEqual(32);
+  expect(metrics.composerStatusGap!).toBeGreaterThanOrEqual(8);
+  expect(metrics.composerStatusGap!).toBeLessThanOrEqual(20);
+});
+
+test("custom dropdown renders its popup menu", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+
+  const archiveFilter = page.locator(".dock-sidebar-select .dock-select-trigger").first();
+  await expect(archiveFilter).toBeVisible();
+
+  await archiveFilter.click();
+
+  const menu = page.locator(".dock-select-menu").first();
+  await expect(menu).toBeVisible();
+  await expect(menu).toContainText("Live");
+  await expect(menu).toContainText("Archived");
+  await expect(menu).toContainText("All");
+});
+
+test("language switcher persists the browser-local selection", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+
+  const languageSwitch = page.locator(
+    ".dock-stage-language-select .dock-select-trigger"
+  );
+  await expect(languageSwitch).toBeVisible();
+  await languageSwitch.click();
+
+  await page.getByRole("option", { name: "日本語" }).click();
+  await expect(page.locator(".dock-search-input")).toHaveAttribute(
+    "placeholder",
+    "スレッドまたはプロジェクトを検索"
+  );
+
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(
+    page.locator(".dock-stage-language-select .dock-select-value")
+  ).toHaveText("日本語");
+  await expect(page.locator(".dock-search-input")).toHaveAttribute(
+    "placeholder",
+    "スレッドまたはプロジェクトを検索"
+  );
+});
