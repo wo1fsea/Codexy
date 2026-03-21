@@ -333,7 +333,12 @@ class CodexBridge extends EventEmitter {
 
   async resolveServerRequest(
     requestId: string,
-    payload: ResolveRequestPayload
+    payload: ResolveRequestPayload,
+    fallback?: {
+      rpcId?: string | number;
+      threadId?: string;
+      method?: DockServerRequest["method"];
+    }
   ) {
     await this.ensureConnected();
 
@@ -343,16 +348,26 @@ class CodexBridge extends EventEmitter {
       throw new Error("Codex bridge is not connected.");
     }
 
-    if (!request) {
+    const rpcId = request?.rpcId ?? fallback?.rpcId;
+    const threadId = request?.threadId ?? fallback?.threadId;
+
+    if (rpcId === undefined || rpcId === null) {
       throw new Error(
         "This approval request is no longer valid. Refresh the current thread and try again."
       );
     }
 
+    this.pendingServerRequests.delete(requestId);
+    this.emitEvent({
+      type: "server-request-resolved",
+      requestId,
+      threadId
+    });
+
     socket.send(
       JSON.stringify({
         jsonrpc: "2.0",
-        id: request.rpcId,
+        id: rpcId,
         result: payload
       })
     );

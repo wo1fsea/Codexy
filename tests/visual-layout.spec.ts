@@ -1,8 +1,12 @@
 import { expect, test } from "@playwright/test";
 
+import { gotoDock, installDockApiMock } from "./support/dock-api-mock";
+
 test("desktop layout follows the codex dock visual contract", async ({ page }) => {
+  await installDockApiMock(page);
+
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await gotoDock(page);
 
   await expect(page.locator(".dock-shell")).toBeVisible();
   await expect(page.locator(".dock-left-stack")).toBeVisible();
@@ -75,24 +79,27 @@ test("desktop layout follows the codex dock visual contract", async ({ page }) =
 });
 
 test("custom dropdown renders its popup menu", async ({ page }) => {
+  await installDockApiMock(page);
+
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await gotoDock(page);
 
   const archiveFilter = page.locator(".dock-sidebar-select .dock-select-trigger").first();
   await expect(archiveFilter).toBeVisible();
-
   await archiveFilter.click();
 
-  const menu = page.locator(".dock-select-menu").first();
+  const menu = page.getByRole("listbox").first();
   await expect(menu).toBeVisible();
-  await expect(menu).toContainText("Live");
-  await expect(menu).toContainText("Archived");
-  await expect(menu).toContainText("All");
+  await expect(page.getByRole("option", { name: "Live" })).toBeVisible();
+  await expect(page.getByRole("option", { name: "Archived" })).toBeVisible();
+  await expect(page.getByRole("option", { name: "All" })).toBeVisible();
 });
 
 test("language switcher persists the browser-local selection", async ({ page }) => {
+  await installDockApiMock(page);
+
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await gotoDock(page);
 
   const languageSwitch = page.locator(
     ".dock-stage-language-select .dock-select-trigger"

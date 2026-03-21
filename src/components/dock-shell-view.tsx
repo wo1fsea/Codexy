@@ -61,7 +61,9 @@ const MIN_SIDEBAR_WIDTH = 248;
 const MAX_SIDEBAR_WIDTH = 480;
 
 type DockShellViewProps = {
+  archiveConfirmOpen: boolean;
   archiveFilter: ArchiveFilter;
+  archivingThread: boolean;
   attachments: UploadItem[];
   composerApprovalPolicy: DockApprovalPolicy;
   composerCwd: string;
@@ -89,6 +91,8 @@ type DockShellViewProps = {
   threadNameDraft: string;
   workspaceLabel: string;
   onArchiveFilterChange: (value: ArchiveFilter) => void;
+  onArchiveCancel: () => void;
+  onArchiveConfirm: () => void;
   onComposerApprovalPolicyChange: (value: DockApprovalPolicy) => void;
   onComposerCwdChange: (value: string) => void;
   onComposerModelChange: (value: string) => void;
@@ -121,16 +125,56 @@ function getProjectName(cwd: string) {
   return parts[parts.length - 1] || cwd;
 }
 
-function formatReasoningEffortLabel(value: string) {
-  return value
-    .split(/[-_]/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
+function humanizeIdentifier(value: string) {
+  const withSpaces = value
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_./-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!withSpaces) {
+    return value;
+  }
+
+  return withSpaces.charAt(0).toUpperCase() + withSpaces.slice(1);
+}
+
+function formatReasoningEffortLabel(value: string, t: TranslateFn) {
+  const normalized = value.trim().toLowerCase();
+
+  if (normalized === "low") return t("reasoningEffort.low");
+  if (normalized === "medium") return t("reasoningEffort.medium");
+  if (normalized === "high") return t("reasoningEffort.high");
+  if (normalized === "xhigh") return t("reasoningEffort.xhigh");
+
+  return humanizeIdentifier(value);
+}
+
+function formatReasoningEffortDescription(
+  value: string,
+  fallback: string,
+  t: TranslateFn
+) {
+  const normalized = value.trim().toLowerCase();
+
+  if (normalized === "low") return t("reasoningEffort.low.description");
+  if (normalized === "medium") return t("reasoningEffort.medium.description");
+  if (normalized === "high") return t("reasoningEffort.high.description");
+  if (normalized === "xhigh") return t("reasoningEffort.xhigh.description");
+
+  return fallback;
 }
 
 function getThreadLabel(thread: DockThread, t: TranslateFn) {
   return thread.name?.trim() || thread.preview?.trim() || t("thread.untitled");
+}
+
+function getActiveFlagLabel(value: string, t: TranslateFn) {
+  if (value === "waitingOnApproval") {
+    return t("status.waitingOnApproval");
+  }
+
+  return humanizeIdentifier(value);
 }
 
 function getThreadStatusText(thread: DockThread, t: TranslateFn) {
@@ -151,12 +195,17 @@ function getThreadStatusText(thread: DockThread, t: TranslateFn) {
   }
 
   return thread.status.activeFlags.length
-    ? `${t("status.active")} · ${thread.status.activeFlags.join(", ")}`
+    ? `${t("status.active")} · ${thread.status.activeFlags
+        .map((flag) => getActiveFlagLabel(flag, t))
+        .join(", ")}`
     : t("status.active");
 }
 
-function isThreadActive(thread: DockThread | null) {
-  return thread?.status.type === "active";
+function getTurnStatusLabel(status: DockTurn["status"], t: TranslateFn) {
+  if (status === "completed") return t("turn.status.completed");
+  if (status === "interrupted") return t("turn.status.interrupted");
+  if (status === "failed") return t("turn.status.failed");
+  return t("turn.status.inProgress");
 }
 
 function hasMeaningfulTurnText(text: string) {
@@ -222,6 +271,32 @@ function getRenderableTurnItems(turn: DockTurn) {
   return turn.items.filter((item) => isRenderableTurnItem(item, turn.status));
 }
 
+function getRenderableTranscriptItems(turn: DockTurn) {
+  return getRenderableTurnItems(turn).filter((item) => item.type !== "plan");
+}
+
+function getLatestPlanItem(
+  thread: DockThread | null
+): Extract<DockThreadItem, { type: "plan" }> | null {
+  if (!thread) {
+    return null;
+  }
+
+  for (let turnIndex = thread.turns.length - 1; turnIndex >= 0; turnIndex -= 1) {
+    const turn = thread.turns[turnIndex];
+    const items = getRenderableTurnItems(turn);
+
+    for (let itemIndex = items.length - 1; itemIndex >= 0; itemIndex -= 1) {
+      const item = items[itemIndex];
+      if (item.type === "plan") {
+        return item as Extract<DockThreadItem, { type: "plan" }>;
+      }
+    }
+  }
+
+  return null;
+}
+
 export function DockShellView(props: DockShellViewProps) {
   const {
     formatDateTime,
@@ -232,6 +307,18 @@ export function DockShellView(props: DockShellViewProps) {
     setLocale,
     t
   } = useI18n();
+  const selectedThreadArchived = props.selectedThread?.source === "archive";
+  const archiveButtonLabel = props.archivingThread
+    ? t("actions.archiving")
+    : selectedThreadArchived
+      ? t("actions.unarchive")
+      : t("actions.archive");
+  const archiveConfirmTitle = selectedThreadArchived
+    ? t("archive.confirmUnarchiveTitle")
+    : t("archive.confirmArchiveTitle");
+  const archiveConfirmBody = selectedThreadArchived
+    ? t("archive.confirmUnarchiveBody")
+    : t("archive.confirmArchiveBody");
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
@@ -249,10 +336,10 @@ export function DockShellView(props: DockShellViewProps) {
   const primaryActionLabel = primaryActionIsStop
     ? t("actions.stop")
     : t("actions.send");
+  const latestPlanItem = getLatestPlanItem(props.selectedThread);
   const hasBottomPanels =
     props.connectionNotice ||
     props.takeoverPromptOpen ||
-    (isThreadActive(props.selectedThread) && !props.takeoverPromptOpen) ||
     props.currentRequests.length > 0 ||
     Boolean(props.error);
   const archiveFilterOptions: DockSelectOption[] = [
@@ -284,8 +371,12 @@ export function DockShellView(props: DockShellViewProps) {
   const reasoningEffortOptions: DockSelectOption[] =
     selectedModel?.supportedReasoningEfforts.map((effort) => ({
       value: effort.reasoningEffort,
-      label: formatReasoningEffortLabel(effort.reasoningEffort),
-      description: effort.description
+      label: formatReasoningEffortLabel(effort.reasoningEffort, t),
+      description: formatReasoningEffortDescription(
+        effort.reasoningEffort,
+        effort.description,
+        t
+      )
     })) ?? [];
 
   function handleComposerPaste(event: ClipboardEvent<HTMLTextAreaElement>) {
@@ -765,13 +856,52 @@ export function DockShellView(props: DockShellViewProps) {
                   >
                     <AppIcon className="dock-inline-icon" name="rename" />
                   </button>
-                  <button
-                    className="dock-icon-button"
-                    onClick={props.onToggleArchive}
-                    type="button"
+                  <div
+                    className={clsx(
+                      "dock-toolbar-confirm-shell",
+                      props.archiveConfirmOpen && "is-open"
+                    )}
                   >
-                    <AppIcon className="dock-inline-icon" name="archive" />
-                  </button>
+                    <button
+                      className={clsx(
+                        "dock-icon-button",
+                        props.archiveConfirmOpen && "is-armed",
+                        props.archivingThread && "is-busy"
+                      )}
+                      disabled={props.archivingThread}
+                      onClick={props.onToggleArchive}
+                      title={archiveButtonLabel}
+                      type="button"
+                    >
+                      <AppIcon className="dock-inline-icon" name="archive" />
+                    </button>
+                    {props.archiveConfirmOpen ? (
+                      <div className="dock-toolbar-confirm-popover">
+                        <div className="dock-toolbar-confirm-copy">
+                          <strong>{archiveConfirmTitle}</strong>
+                          <span>{archiveConfirmBody}</span>
+                        </div>
+                        <div className="dock-toolbar-confirm-actions">
+                          <button
+                            className="dock-request-action is-primary"
+                            disabled={props.archivingThread}
+                            onClick={props.onArchiveConfirm}
+                            type="button"
+                          >
+                            {archiveButtonLabel}
+                          </button>
+                          <button
+                            className="dock-ghost-action is-muted"
+                            disabled={props.archivingThread}
+                            onClick={props.onArchiveCancel}
+                            type="button"
+                          >
+                            {t("actions.cancel")}
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
                 </>
               ) : null}
               <button
@@ -833,46 +963,55 @@ export function DockShellView(props: DockShellViewProps) {
 
               {props.selectedThread ? (
                 <div className="dock-transcript">
-                  {props.selectedThread.turns.map((turn) => (
-                    <section className="dock-turn" key={turn.id}>
-                      <div className="dock-turn-head">
-                        <span>{turn.status}</span>
-                        <code>{turn.id.slice(0, 8)}</code>
-                      </div>
-                      <div className="dock-turn-items">
-                        {getRenderableTurnItems(turn).map((item) => (
-                          <div
-                            className={clsx(
-                              "dock-turn-item",
-                              item.type === "userMessage" && "is-user",
-                              item.type === "agentMessage" && "is-agent",
-                              item.type === "reasoning" && "is-reasoning"
-                            )}
-                            key={item.id}
-                          >
-                            {props.renderThreadItem(item)}
-                          </div>
-                        ))}
-                      </div>
-                      {shouldShowThinkingState(turn) ? (
-                        <div
-                          aria-live="polite"
-                          className="dock-thinking-status"
-                          role="status"
-                        >
-                          <span className="dock-thinking-label">{t("thinking.label")}</span>
-                          <span
-                            aria-hidden="true"
-                            className="dock-thinking-ellipsis"
-                          >
-                            <span>.</span>
-                            <span>.</span>
-                            <span>.</span>
-                          </span>
+                  {props.selectedThread.turns.map((turn) => {
+                    const transcriptItems = getRenderableTranscriptItems(turn);
+                    const showThinkingState = shouldShowThinkingState(turn);
+
+                    if (!transcriptItems.length && !showThinkingState) {
+                      return null;
+                    }
+
+                    return (
+                      <section className="dock-turn" key={turn.id}>
+                        <div className="dock-turn-head">
+                          <span>{getTurnStatusLabel(turn.status, t)}</span>
+                          <code>{turn.id.slice(0, 8)}</code>
                         </div>
-                      ) : null}
-                    </section>
-                  ))}
+                        <div className="dock-turn-items">
+                          {transcriptItems.map((item) => (
+                            <div
+                              className={clsx(
+                                "dock-turn-item",
+                                item.type === "userMessage" && "is-user",
+                                item.type === "agentMessage" && "is-agent",
+                                item.type === "reasoning" && "is-reasoning"
+                              )}
+                              key={item.id}
+                            >
+                              {props.renderThreadItem(item)}
+                            </div>
+                          ))}
+                        </div>
+                        {showThinkingState ? (
+                          <div
+                            aria-live="polite"
+                            className="dock-thinking-status"
+                            role="status"
+                          >
+                            <span className="dock-thinking-label">{t("thinking.label")}</span>
+                            <span
+                              aria-hidden="true"
+                              className="dock-thinking-ellipsis"
+                            >
+                              <span>.</span>
+                              <span>.</span>
+                              <span>.</span>
+                            </span>
+                          </div>
+                        ) : null}
+                      </section>
+                    );
+                  })}
                 </div>
               ) : null}
             </div>
@@ -926,12 +1065,6 @@ export function DockShellView(props: DockShellViewProps) {
                       </div>
                     ) : null}
 
-                    {isThreadActive(props.selectedThread) && !props.takeoverPromptOpen ? (
-                      <div className="dock-alert-banner is-subtle">
-                        {t("takeover.notice")}
-                      </div>
-                    ) : null}
-
                     {props.currentRequests.length ? (
                       <div className="dock-request-stack">
                         {props.currentRequests.map((request) => props.onResolveRequest(request))}
@@ -939,6 +1072,15 @@ export function DockShellView(props: DockShellViewProps) {
                     ) : null}
 
                     {props.error ? <div className="dock-error">{props.error}</div> : null}
+                  </div>
+                ) : null}
+
+                {latestPlanItem ? (
+                  <div
+                    aria-live="polite"
+                    className="dock-composer-plan-panel"
+                  >
+                    {props.renderThreadItem(latestPlanItem)}
                   </div>
                 ) : null}
 
@@ -1049,7 +1191,7 @@ export function DockShellView(props: DockShellViewProps) {
                   />
                 </div>
                 <div className="dock-status-group">
-                  <span className="dock-status-pill">
+                  <span className="dock-status-pill dock-tailnet-pill">
                     {props.status?.tailscale.dnsName ||
                       props.status?.tailscale.ips[0] ||
                       t("status.tailnet")}

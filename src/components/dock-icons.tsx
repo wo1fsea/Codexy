@@ -154,7 +154,7 @@ export function AppIcon({
     case "send":
       return (
         <svg {...props}>
-          <path d="M12 17V7M7.5 11.5 12 7l4.5 4.5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+          <path d="M12 17V7M7.5 11.5 12 7l4.5 4.5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" />
         </svg>
       );
     case "stop":

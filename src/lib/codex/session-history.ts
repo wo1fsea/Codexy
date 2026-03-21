@@ -13,6 +13,10 @@ type SessionJsonlRecord = {
 };
 
 type SessionTurnItems = Map<string, DockThreadItem[]>;
+type SessionPlanEntry = {
+  step: string;
+  status: unknown;
+};
 
 function getCodexSessionsRoot() {
   const codexHome =
@@ -93,6 +97,74 @@ function createSessionAgentMessage(
       payload.phase === "commentary" || payload.phase === "final_answer"
         ? payload.phase
         : null
+  };
+}
+
+function normalizePlanStepStatus(value: unknown) {
+  if (value === "completed") {
+    return "completed" as const;
+  }
+
+  if (value === "inProgress" || value === "in_progress") {
+    return "inProgress" as const;
+  }
+
+  return "pending" as const;
+}
+
+function createSessionPlanItem(
+  payload: Record<string, unknown>,
+  turnId: string
+): Extract<DockThreadItem, { type: "plan" }> | null {
+  if (payload.type !== "function_call" || payload.name !== "update_plan") {
+    return null;
+  }
+
+  if (typeof payload.arguments !== "string" || !payload.arguments.trim()) {
+    return null;
+  }
+
+  let parsedArguments: unknown;
+  try {
+    parsedArguments = JSON.parse(payload.arguments);
+  } catch {
+    return null;
+  }
+
+  if (!isRecord(parsedArguments) || !Array.isArray(parsedArguments.plan)) {
+    return null;
+  }
+
+  const steps = parsedArguments.plan
+    .filter((entry): entry is SessionPlanEntry => {
+      if (!isRecord(entry)) {
+        return false;
+      }
+
+      const step = entry.step;
+      return typeof step === "string" && step.trim().length > 0;
+    })
+    .map((entry) => ({
+      step: entry.step.trim(),
+      status: normalizePlanStepStatus(entry.status)
+    }));
+
+  if (!steps.length) {
+    return null;
+  }
+
+  return {
+    type: "plan",
+    id:
+      typeof payload.call_id === "string" && payload.call_id
+        ? `session-plan:${payload.call_id}`
+        : `session-plan:${turnId}`,
+    text: steps.map((step, index) => `${index + 1}. ${step.step}`).join("\n"),
+    explanation:
+      typeof parsedArguments.explanation === "string"
+        ? parsedArguments.explanation
+        : null,
+    steps
   };
 }
 
@@ -262,6 +334,7 @@ function pushTurnItem(
 function parseSessionTurnItems(content: string) {
   const turnItems: SessionTurnItems = new Map();
   const messageIndexes = new Map<string, { user: number; agent: number }>();
+  let currentTurnIdHint: string | null = null;
 
   for (const line of content.split(/\r?\n/)) {
     if (!line.trim()) {
@@ -275,13 +348,35 @@ function parseSessionTurnItems(content: string) {
       continue;
     }
 
-    if (record.type !== "event_msg" || !isRecord(record.payload)) {
+    if (!isRecord(record.payload)) {
       continue;
     }
 
     const payload = record.payload;
+    const payloadTurnId =
+      typeof payload.turn_id === "string" ? payload.turn_id : null;
+
+    if (payloadTurnId) {
+      currentTurnIdHint = payloadTurnId;
+    }
+
+    if (record.type === "response_item") {
+      const turnId = payloadTurnId ?? currentTurnIdHint;
+
+      if (!turnId) {
+        continue;
+      }
+
+      pushTurnItem(turnItems, turnId, createSessionPlanItem(payload, turnId));
+      continue;
+    }
+
+    if (record.type !== "event_msg") {
+      continue;
+    }
+
     const eventType = typeof payload.type === "string" ? payload.type : null;
-    const turnId = typeof payload.turn_id === "string" ? payload.turn_id : null;
+    const turnId = payloadTurnId ?? currentTurnIdHint;
 
     if (!eventType || !turnId) {
       continue;
@@ -326,7 +421,10 @@ function parseSessionTurnItems(content: string) {
 
 function mergeTurnWithSessionItems(turn: DockTurn, sessionItems: DockThreadItem[]) {
   const hasAuxiliarySessionItems = sessionItems.some(
-    (item) => item.type === "commandExecution" || item.type === "fileChange"
+    (item) =>
+      item.type === "commandExecution" ||
+      item.type === "fileChange" ||
+      item.type === "plan"
   );
 
   if (!hasAuxiliarySessionItems) {
@@ -344,8 +442,6 @@ function mergeTurnWithSessionItems(turn: DockTurn, sessionItems: DockThreadItem[
       if (nextUser) {
         consumedIds.add(nextUser.id);
         mergedItems.push(nextUser);
-      } else {
-        mergedItems.push(item);
       }
       continue;
     }
@@ -355,8 +451,6 @@ function mergeTurnWithSessionItems(turn: DockTurn, sessionItems: DockThreadItem[
       if (nextAgent) {
         consumedIds.add(nextAgent.id);
         mergedItems.push(nextAgent);
-      } else {
-        mergedItems.push(item);
       }
       continue;
     }
@@ -370,6 +464,7 @@ function mergeTurnWithSessionItems(turn: DockTurn, sessionItems: DockThreadItem[
   const skipServerFileChanges = sessionItems.some(
     (item) => item.type === "fileChange"
   );
+  const skipServerPlans = sessionItems.some((item) => item.type === "plan");
 
   for (const item of turn.items) {
     if (consumedIds.has(item.id)) {
@@ -381,6 +476,10 @@ function mergeTurnWithSessionItems(turn: DockTurn, sessionItems: DockThreadItem[
     }
 
     if (skipServerFileChanges && item.type === "fileChange") {
+      continue;
+    }
+
+    if (skipServerPlans && item.type === "plan") {
       continue;
     }
 

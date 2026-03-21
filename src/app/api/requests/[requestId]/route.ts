@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getCodexBridge } from "@/lib/codex/bridge";
-import type { ResolveRequestPayload } from "@/lib/codex/types";
+import type { ResolveRequestSubmission } from "@/lib/codex/types";
 
 export const runtime = "nodejs";
 
@@ -14,10 +14,14 @@ type Params = {
 export async function POST(request: Request, context: Params) {
   try {
     const { requestId } = await context.params;
-    const body = (await request.json()) as ResolveRequestPayload;
+    const body = (await request.json()) as ResolveRequestSubmission;
 
     const bridge = getCodexBridge();
-    await bridge.resolveServerRequest(requestId, body);
+    await bridge.resolveServerRequest(requestId, body.payload, {
+      rpcId: body.rpcId,
+      threadId: body.threadId,
+      method: body.method
+    });
 
     return NextResponse.json({ ok: true });
   } catch (error) {

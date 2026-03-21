@@ -806,6 +806,62 @@ pre {
   color: var(--text-muted);
 }
 
+.dock-toolbar-confirm-shell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.dock-icon-button.is-armed,
+.dock-icon-button.is-busy {
+  border-color: var(--line);
+  background: rgba(255, 247, 238, 0.055);
+  color: var(--text);
+}
+
+.dock-icon-button.is-busy {
+  cursor: progress;
+}
+
+.dock-toolbar-confirm-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  width: min(260px, calc(100vw - 32px));
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(255, 247, 238, 0.1);
+  border-radius: 14px;
+  background: rgba(30, 26, 27, 0.96);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+  padding: 11px 12px 12px;
+}
+
+.dock-toolbar-confirm-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.dock-toolbar-confirm-copy strong {
+  color: var(--text);
+  font-size: var(--text-13);
+  font-weight: 600;
+}
+
+.dock-toolbar-confirm-copy span {
+  color: var(--text-soft);
+  font-size: var(--text-12);
+  line-height: 1.45;
+}
+
+.dock-toolbar-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .dock-toolbar-pill,
 .dock-status-pill {
   display: inline-flex;
@@ -1232,6 +1288,132 @@ pre {
   line-height: 1.55;
 }
 
+.dock-plan-card {
+  width: min(100%, 720px);
+  border: 1px solid rgba(255, 247, 238, 0.09);
+  border-radius: 18px;
+  background: rgba(255, 247, 238, 0.022);
+  padding: 14px 16px 14px;
+}
+
+.dock-plan-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dock-plan-card-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: var(--text);
+  font-size: var(--text-13);
+}
+
+.dock-plan-card-glyph {
+  display: inline-grid;
+  gap: 3px;
+  width: 13px;
+  flex: none;
+}
+
+.dock-plan-card-glyph span {
+  display: block;
+  width: 100%;
+  height: 1.5px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.46;
+}
+
+.dock-plan-card-explanation {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-12);
+  line-height: 1.55;
+}
+
+.dock-plan-list {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dock-plan-row {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  min-width: 0;
+  color: var(--text);
+}
+
+.dock-plan-row-index {
+  color: rgba(255, 247, 238, 0.58);
+  font-size: var(--text-13);
+  line-height: 1.55;
+  min-width: 1.2rem;
+}
+
+.dock-plan-row-status {
+  width: 9px;
+  height: 9px;
+  margin-top: 5px;
+  border: 1px solid rgba(255, 247, 238, 0.26);
+  border-radius: 999px;
+  background: transparent;
+  flex: none;
+}
+
+.dock-plan-row.is-completed .dock-plan-row-status {
+  border-color: rgba(255, 247, 238, 0.42);
+  background: rgba(255, 247, 238, 0.42);
+  box-shadow: none;
+}
+
+.dock-plan-row.is-inProgress .dock-plan-row-status {
+  border-color: rgba(255, 247, 238, 0.38);
+  background: rgba(255, 247, 238, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(255, 247, 238, 0.04);
+}
+
+.dock-plan-row.is-pending .dock-plan-row-status {
+  border-color: rgba(255, 247, 238, 0.24);
+  background: transparent;
+}
+
+.dock-plan-row-copy {
+  min-width: 0;
+  color: var(--text);
+  font-size: var(--text-14);
+  line-height: 1.58;
+}
+
+.dock-plan-row-copy > :first-child {
+  margin-top: 0;
+}
+
+.dock-plan-row-copy > :last-child {
+  margin-bottom: 0;
+}
+
+.dock-plan-row-copy p {
+  margin: 0;
+}
+
+.dock-plan-row-copy code {
+  border: 1px solid rgba(255, 247, 238, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 247, 238, 0.05);
+  padding: 0.12em 0.38em;
+  color: #f2e6d7;
+  font-size: 0.92em;
+}
+
 .dock-thinking-status,
 .dock-reasoning-status {
   display: inline-flex;
@@ -1650,6 +1832,23 @@ pre {
   padding: 10px;
 }
 
+.dock-composer-plan-panel {
+  margin-bottom: 10px;
+  max-height: min(30vh, 280px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.dock-composer-plan-panel .dock-plan-card {
+  width: 100%;
+  margin: 0;
+  border-color: rgba(255, 247, 238, 0.1);
+  background:
+    linear-gradient(180deg, rgba(255, 247, 238, 0.045), rgba(255, 247, 238, 0.02)),
+    rgba(255, 247, 238, 0.028);
+}
+
 .dock-upload-strip {
   display: flex;
   flex-wrap: wrap;
@@ -1773,8 +1972,8 @@ pre {
 
 .dock-round-action,
 .dock-send-button {
-  width: 38px;
-  height: 38px;
+  width: 26px;
+  height: 26px;
   border-radius: 999px;
 }
 
@@ -1788,6 +1987,9 @@ pre {
   border: 0;
   background: var(--accent);
   color: #1a1718;
+  display: grid;
+  place-items: center;
+  padding: 0;
 }
 
 .dock-send-button.is-stop {
@@ -1796,8 +1998,18 @@ pre {
 }
 
 .dock-send-button .dock-send-icon {
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
+}
+
+.dock-send-button:not(.is-stop) .dock-send-icon {
+  transform: translateY(0.9px);
+  transform-origin: center;
+}
+
+.dock-send-button.is-stop .dock-send-icon {
+  width: 22px;
+  height: 22px;
 }
 
 .dock-send-button:hover {
@@ -1909,6 +2121,13 @@ pre {
 }
 
 @media (max-width: 860px) {
+  html,
+  body,
+  .dock-app,
+  .dock-shell {
+    background: var(--stage-bg);
+  }
+
   .dock-shell {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1936,6 +2155,10 @@ pre {
   .dock-stage {
     min-height: 100vh;
     --stage-inline-pad: 14px;
+  }
+
+  .dock-stage-header {
+    background: var(--stage-bg);
   }
 
   .dock-mobile-only {
@@ -2009,13 +2232,26 @@ pre {
   }
 
   .dock-send-button {
-    width: 34px;
-    height: 34px;
+    width: 24px;
+    height: 24px;
   }
 
   .dock-send-button .dock-send-icon {
-    width: 16px;
-    height: 16px;
+    width: 22px;
+    height: 22px;
+  }
+
+  .dock-send-button:not(.is-stop) .dock-send-icon {
+    transform: translateY(0.8px);
+  }
+
+  .dock-send-button.is-stop .dock-send-icon {
+    width: 22px;
+    height: 22px;
+  }
+
+  .dock-composer-plan-panel {
+    max-height: min(26vh, 220px);
   }
 
   .dock-status-footer {
@@ -2041,6 +2277,10 @@ pre {
     padding-left: 7px;
     padding-right: 7px;
     font-size: 16px;
+  }
+
+  .dock-tailnet-pill {
+    display: none;
   }
 
   .dock-composer-input {

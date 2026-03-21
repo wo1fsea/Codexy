@@ -1,5 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import {
+  DEFAULT_CWD,
+  gotoDock,
+  installDockApiMock
+} from "./support/dock-api-mock";
+
 const VALID_PNG_BYTES = Array.from(
   Buffer.from(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=",
@@ -12,11 +18,9 @@ async function pasteImageIntoComposer(page: Page, fileName: string) {
 
   await composer.evaluate(
     (element, payload: { bytes: number[]; fileName: string }) => {
-      const file = new File(
-        [new Uint8Array(payload.bytes)],
-        payload.fileName,
-        { type: "image/png" }
-      );
+      const file = new File([new Uint8Array(payload.bytes)], payload.fileName, {
+        type: "image/png"
+      });
       const dataTransfer = new DataTransfer();
       dataTransfer.items.add(file);
 
@@ -38,103 +42,13 @@ async function pasteImageIntoComposer(page: Page, fileName: string) {
   );
 }
 
-async function mockThreadShell(
-  page: Page,
-  thread: Record<string, unknown>
-) {
-  await page.route("**/api/status", async (route) => {
-    await route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        bridge: { connected: true, pendingRequests: 0 },
-        tailscale: {
-          connected: true,
-          backendState: "Running",
-          dnsName: "test.tailnet.ts.net",
-          hostName: "test-host",
-          ips: ["100.64.0.1"],
-          serveHint: "tailscale serve --bg 3000",
-          error: null
-        },
-        defaults: {
-          cwd: "C:\\Users\\wo1fsea\\Documents\\codex_mw",
-          approvalPolicy: "on-request",
-          sandbox: "workspace-write"
-        },
-        bridgeUrl: "ws://127.0.0.1:39031"
-      })
-    });
-  });
-
-  await page.route("**/api/models", async (route) => {
-    await route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        data: [
-          {
-            id: "gpt-5.4",
-            model: "gpt-5.4",
-            displayName: "gpt-5.4",
-            description: "Latest frontier agentic coding model.",
-            hidden: false,
-            supportedReasoningEfforts: [],
-            defaultReasoningEffort: "medium",
-            inputModalities: ["text", "image"],
-            supportsPersonality: true,
-            isDefault: true
-          }
-        ]
-      })
-    });
-  });
-
-  await page.route(/.*\/api\/threads(\?.*)?$/, async (route) => {
-    await route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        data: [
-          {
-            ...thread,
-            turns: []
-          }
-        ],
-        nextCursor: null
-      })
-    });
-  });
-
-  await page.route(`**/api/threads/${thread.id}`, async (route) => {
-    await route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        thread
-      })
-    });
-  });
-
-  await page.route("**/api/events*", async (route) => {
-    await route.fulfill({
-      status: 200,
-      headers: {
-        "Content-Type": "text/event-stream"
-      },
-      body: 'data: {"type":"connection","status":"connected"}\n\n'
-    });
-  });
-}
-
 test("sending a prompt enters transcript context immediately", async ({ page }) => {
-  const prompt = process.env.PLAYWRIGHT_SEND_FLOW_PROMPT ?? `playwright send flow ${Date.now()}`;
+  await installDockApiMock(page);
 
-  await page.goto("/", { waitUntil: "domcontentloaded" });
-  await expect(page.locator("input.dock-composer-cwd")).not.toHaveValue("", {
-    timeout: 15000
-  });
-  await expect(
-    page.locator(".dock-composer-select .dock-select-value")
-  ).not.toHaveText("Select", {
-    timeout: 15000
-  });
+  const prompt =
+    process.env.PLAYWRIGHT_SEND_FLOW_PROMPT ?? `composer send flow ${Date.now()}`;
+
+  await gotoDock(page);
   await page.locator("textarea.dock-composer-input").fill(prompt);
   await expect(page.locator("button.dock-send-button")).toBeEnabled();
   await page.locator("button.dock-send-button").click();
@@ -147,9 +61,8 @@ test("sending a prompt enters transcript context immediately", async ({ page }) 
   await expect(page.locator("textarea.dock-composer-input")).toBeVisible();
 
   await page.reload({ waitUntil: "domcontentloaded" });
-  const firstThread = page.locator(".dock-thread-row").first();
-  await expect(firstThread).toBeVisible();
-  await firstThread.click();
+  await expect(page.locator(".dock-thread-row").first()).toBeVisible();
+  await page.locator(".dock-thread-row").first().click();
 
   await expect(page.locator(".dock-stage-title")).not.toHaveText("New thread");
   await expect(page.locator(".dock-composer-shell")).toBeVisible();
@@ -192,10 +105,8 @@ test("sending a prompt enters transcript context immediately", async ({ page }) 
 });
 
 test("pasting an image into composer creates an attachment chip", async ({ page }) => {
-  await page.goto("/", { waitUntil: "domcontentloaded" });
-
-  const composer = page.locator("textarea.dock-composer-input");
-  await expect(composer).toBeVisible();
+  await installDockApiMock(page);
+  await gotoDock(page);
 
   await pasteImageIntoComposer(page, "clipboard-image.png");
 
@@ -203,20 +114,12 @@ test("pasting an image into composer creates an attachment chip", async ({ page 
 });
 
 test("image attachments render as thumbnails without raw data urls", async ({ page }) => {
+  await installDockApiMock(page);
+
   const prompt = `playwright image render ${Date.now()}`;
 
-  await page.goto("/", { waitUntil: "domcontentloaded" });
-  await expect(page.locator("input.dock-composer-cwd")).not.toHaveValue("", {
-    timeout: 15000
-  });
-  await expect(
-    page.locator(".dock-composer-select .dock-select-value")
-  ).not.toHaveText("Select", {
-    timeout: 15000
-  });
-
-  const composer = page.locator("textarea.dock-composer-input");
-  await composer.fill(prompt);
+  await gotoDock(page);
+  await page.locator("textarea.dock-composer-input").fill(prompt);
   await pasteImageIntoComposer(page, "thumbnail-image.png");
 
   await expect(page.locator(".dock-upload-chip")).toContainText("thumbnail-image.png");
@@ -232,66 +135,70 @@ test("image attachments render as thumbnails without raw data urls", async ({ pa
 });
 
 test("file change items render compact edit summaries from raw diffs", async ({ page }) => {
-  await mockThreadShell(page, {
-    id: "thread-filechange-1",
-    preview: "file change summary",
-    ephemeral: false,
-    modelProvider: "openai",
-    createdAt: 1774000000,
-    updatedAt: 1774003600,
-    status: { type: "idle" },
-    path: null,
-    cwd: "C:\\Users\\wo1fsea\\Documents\\codex_mw",
-    cliVersion: "0.112.0",
-    source: "session",
-    agentNickname: null,
-    agentRole: null,
-    gitInfo: null,
-    name: "file change summary",
-    turns: [
+  await installDockApiMock(page, {
+    threads: [
       {
-        id: "turn-filechange-1",
-        status: "completed",
-        error: null,
-        items: [
+        id: "thread-filechange-1",
+        preview: "file change summary",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000000,
+        updatedAt: 1774003600,
+        status: { type: "idle" },
+        path: null,
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "session",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: "file change summary",
+        turns: [
           {
-            type: "userMessage",
-            id: "item-user",
-            content: [
-              {
-                type: "text",
-                text: "show me the edit summary",
-                text_elements: []
-              }
-            ]
-          },
-          {
-            type: "fileChange",
-            id: "item-file-change",
+            id: "turn-filechange-1",
             status: "completed",
-            changes: [
+            error: null,
+            items: [
               {
-                path: "C:\\Users\\wo1fsea\\Documents\\codex_mw\\src\\components\\dock-app.tsx",
-                kind: {
-                  type: "update",
-                  move_path: null
-                },
-                diff: "@@ -1,1 +1,3 @@\n-old line\n+new line\n+another new line\n"
+                type: "userMessage",
+                id: "item-user",
+                content: [
+                  {
+                    type: "text",
+                    text: "show me the edit summary",
+                    text_elements: []
+                  }
+                ]
+              },
+              {
+                type: "fileChange",
+                id: "item-file-change",
+                status: "completed",
+                changes: [
+                  {
+                    path: `${DEFAULT_CWD}\\src\\components\\dock-app.tsx`,
+                    kind: {
+                      type: "update",
+                      move_path: null
+                    },
+                    diff: "@@ -1,1 +1,3 @@\n-old line\n+new line\n+another new line\n"
+                  }
+                ]
+              },
+              {
+                type: "agentMessage",
+                id: "item-agent",
+                text: "done",
+                phase: "final_answer"
               }
             ]
-          },
-          {
-            type: "agentMessage",
-            id: "item-agent",
-            text: "done",
-            phase: "final_answer"
           }
         ]
       }
     ]
   });
 
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await gotoDock(page);
   await page.locator(".dock-thread-row").first().click();
 
   const chip = page.locator(".dock-filechange-chip").first();
@@ -302,32 +209,336 @@ test("file change items render compact edit summaries from raw diffs", async ({ 
   await expect(chip).toContainText("-1");
 });
 
+test("approval buttons submit the matching server request payload", async ({ page }) => {
+  const requestBodies: Array<Record<string, unknown>> = [];
+
+  await installDockApiMock(page, {
+    events: [
+      { type: "connection", status: "connected" },
+      {
+        type: "server-request",
+        request: {
+          requestId: "req-approval-1",
+          rpcId: 32,
+          method: "item/commandExecution/requestApproval",
+          threadId: "thread-approval-1",
+          params: {
+            threadId: "thread-approval-1",
+            turnId: "turn-approval-1",
+            itemId: "cmd-approval-1",
+            command: "\"C:\\\\Program Files\\\\PowerShell\\\\7\\\\pwsh.exe\" -Command Get-Date",
+            cwd: DEFAULT_CWD
+          }
+        }
+      }
+    ],
+    threads: [
+      {
+        id: "thread-approval-1",
+        preview: "approval request",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000000,
+        updatedAt: 1774003600,
+        status: { type: "active", activeFlags: ["waitingOnApproval"] },
+        path: null,
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "session",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: "approval request",
+        turns: [
+          {
+            id: "turn-approval-1",
+            status: "inProgress",
+            error: null,
+            items: [
+              {
+                type: "userMessage",
+                id: "item-user",
+                content: [
+                  {
+                    type: "text",
+                    text: "run Get-Date",
+                    text_elements: []
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  });
+
+  await page.route("**/api/requests/req-approval-1", async (route) => {
+    requestBodies.push((route.request().postDataJSON() ?? {}) as Record<string, unknown>);
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true })
+    });
+  });
+
+  await gotoDock(page);
+  await page.locator(".dock-thread-row").first().click();
+
+  const card = page.locator(".dock-request-card").first();
+  await expect(card).toBeVisible();
+
+  await card.getByRole("button", { name: "Allow once" }).click();
+
+  await expect.poll(() => requestBodies.length).toBe(1);
+  expect(requestBodies[0]).toEqual({
+    payload: {
+      decision: "accept"
+    },
+    rpcId: 32,
+    threadId: "thread-approval-1",
+    method: "item/commandExecution/requestApproval"
+  });
+  await expect(card).toHaveCount(0);
+});
+
+test("latest plan renders above the composer instead of inside the transcript", async ({
+  page
+}) => {
+  await installDockApiMock(page, {
+    threads: [
+      {
+        id: "thread-plan-1",
+        preview: "todo plan",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000000,
+        updatedAt: 1774003600,
+        status: { type: "idle" },
+        path: null,
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "session",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: "todo plan",
+        turns: [
+          {
+            id: "turn-plan-0",
+            status: "completed",
+            error: null,
+            items: [
+              {
+                type: "userMessage",
+                id: "item-user-0",
+                content: [
+                  {
+                    type: "text",
+                    text: "show me the old todo plan",
+                    text_elements: []
+                  }
+                ]
+              },
+              {
+                type: "plan",
+                id: "item-plan-0",
+                text:
+                  "1. Old plan that should stay out of the transcript.\n2. Another stale task.",
+                explanation: "stale",
+                steps: [
+                  {
+                    step: "Old plan that should stay out of the transcript.",
+                    status: "completed"
+                  },
+                  {
+                    step: "Another stale task.",
+                    status: "completed"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            id: "turn-plan-1",
+            status: "inProgress",
+            error: null,
+            items: [
+              {
+                type: "userMessage",
+                id: "item-user",
+                content: [
+                  {
+                    type: "text",
+                    text: "show me the todo plan",
+                    text_elements: []
+                  }
+                ]
+              },
+              {
+                type: "plan",
+                id: "item-plan",
+                text:
+                  "1. Restore gap parity with the current UI and isolate the root cause.\n2. Fix the Playwright startup flow and dev config so the current page can launch.\n3. Run targeted and full verify:e2e, then keep iterating if anything fails.",
+                explanation: null,
+                steps: [
+                  {
+                    step: "Restore gap parity with the current UI and isolate the root cause.",
+                    status: "inProgress"
+                  },
+                  {
+                    step: "Fix the Playwright startup flow and dev config so the current page can launch.",
+                    status: "pending"
+                  },
+                  {
+                    step: "Run targeted and full verify:e2e, then keep iterating if anything fails.",
+                    status: "pending"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  });
+
+  await gotoDock(page);
+  await page.locator(".dock-thread-row").first().click();
+
+  const card = page.locator(".dock-composer-plan-panel .dock-plan-card");
+  await expect(card).toBeVisible();
+  await expect(card).toContainText("3 tasks, 0 completed");
+  await expect(card.locator(".dock-plan-row")).toHaveCount(3);
+  await expect(card).toContainText("Restore gap parity with the current UI");
+  await expect(card).toContainText("Run targeted and full verify:e2e");
+  await expect(card).not.toContainText("Old plan that should stay out of the transcript");
+  await expect(page.locator(".dock-transcript .dock-plan-card")).toHaveCount(0);
+
+  const layout = await page.evaluate(() => {
+    const planPanel = document.querySelector(".dock-composer-plan-panel");
+    const composerInput = document.querySelector(".dock-composer-input");
+    const transcriptPlanCards = document.querySelectorAll(
+      ".dock-transcript .dock-plan-card"
+    ).length;
+    const planRect = planPanel?.getBoundingClientRect() ?? null;
+    const inputRect = composerInput?.getBoundingClientRect() ?? null;
+
+    return {
+      transcriptPlanCards,
+      planTop: planRect ? Math.round(planRect.top) : null,
+      planBottom: planRect ? Math.round(planRect.bottom) : null,
+      inputTop: inputRect ? Math.round(inputRect.top) : null
+    };
+  });
+
+  expect(layout.transcriptPlanCards).toBe(0);
+  expect(layout.planTop).not.toBeNull();
+  expect(layout.planBottom).not.toBeNull();
+  expect(layout.inputTop).not.toBeNull();
+  expect(layout.planBottom!).toBeLessThanOrEqual(layout.inputTop!);
+});
+
 test("scroll to bottom button appears and jumps transcript to the end", async ({ page }) => {
-  const prompt = `scroll-bottom control ${Date.now()}`;
+  const longThreadTurns = Array.from({ length: 18 }, (_, index) => ({
+    id: `turn-scroll-${index + 1}`,
+    status: "completed",
+    error: null,
+    items: [
+      {
+        type: "userMessage",
+        id: `user-scroll-${index + 1}`,
+        content: [
+          {
+            type: "text",
+            text: `Prompt ${index + 1}`,
+            text_elements: []
+          }
+        ]
+      },
+      {
+        type: "agentMessage",
+        id: `agent-scroll-${index + 1}`,
+        text:
+          `Response block ${index + 1}. ` +
+          "This line is intentionally long so the transcript grows and becomes scrollable.",
+        phase: "final_answer"
+      }
+    ]
+  }));
+
+  await installDockApiMock(page, {
+    threads: [
+      {
+        id: "thread-scroll-button",
+        preview: "scroll jump control",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000000,
+        updatedAt: 1774000500,
+        status: { type: "idle" },
+        path: null,
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "session",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: "Scroll Jump Thread",
+        turns: longThreadTurns
+      }
+    ]
+  });
 
   await page.setViewportSize({ width: 1280, height: 720 });
-  await page.goto("/", { waitUntil: "domcontentloaded" });
-  await expect(page.locator("input.dock-composer-cwd")).not.toHaveValue("", {
-    timeout: 15000
-  });
-  await page.locator("textarea.dock-composer-input").fill(prompt);
-  await page.locator("button.dock-send-button").click();
+  await gotoDock(page);
+  await page.locator(".dock-thread-row").first().click();
   await expect(page.locator(".dock-transcript")).toBeVisible();
 
   await page.evaluate(() => {
-    const scroll = document.querySelector(".dock-stage-scroll") as HTMLElement | null;
     const body = document.querySelector(".dock-stage-scroll-body") as HTMLElement | null;
-
-    if (!scroll || !body) {
+    if (!body) {
       return;
     }
 
-    const spacer = document.createElement("div");
-    spacer.setAttribute("data-testid", "scroll-spacer");
-    spacer.style.height = "1400px";
-    body.appendChild(spacer);
-    scroll.scrollTop = 0;
+    if (!body.querySelector('[data-testid="scroll-spacer"]')) {
+      const spacer = document.createElement("div");
+      spacer.setAttribute("data-testid", "scroll-spacer");
+      spacer.style.height = "1400px";
+      body.appendChild(spacer);
+    }
   });
+
+  await expect
+    .poll(async () => {
+      return await page.evaluate(() => {
+        const scroll = document.querySelector(".dock-stage-scroll") as HTMLElement | null;
+        if (!scroll) {
+          return 0;
+        }
+
+        return Math.round(scroll.scrollHeight - scroll.clientHeight);
+      });
+    })
+    .toBeGreaterThan(100);
+
+  await expect
+    .poll(async () => {
+      return await page.evaluate(async () => {
+        const scroll = document.querySelector(".dock-stage-scroll") as HTMLElement | null;
+        if (!scroll) {
+          return false;
+        }
+
+        scroll.scrollTop = 0;
+        scroll.dispatchEvent(new Event("scroll"));
+        await new Promise<void>((resolve) => {
+          window.requestAnimationFrame(() => resolve());
+        });
+        return Boolean(document.querySelector(".dock-scroll-bottom-button"));
+      });
+    })
+    .toBe(true);
 
   const jumpButton = page.getByRole("button", { name: "Jump to bottom" });
   await expect(jumpButton).toBeVisible();
@@ -348,47 +559,45 @@ test("scroll to bottom button appears and jumps transcript to the end", async ({
 });
 
 test("agent messages render markdown links and formatting", async ({ page }) => {
-  const threadId = "test-markdown-thread";
-  const threadBase = {
-    id: threadId,
-    preview: "markdown preview",
-    ephemeral: false,
-    modelProvider: "openai",
-    createdAt: 1774000000,
-    updatedAt: 1774000001,
-    status: { type: "idle" },
-    path: "C:\\Users\\wo1fsea\\.codex\\sessions\\test.jsonl",
-    cwd: "C:\\Users\\wo1fsea\\Documents\\codex_mw",
-    cliVersion: "0.112.0",
-    source: "vscode",
-    agentNickname: null,
-    agentRole: null,
-    gitInfo: null,
-    name: "Markdown Render Test",
-    turns: []
-  };
-
-  await mockThreadShell(page, {
-    ...threadBase,
-    turns: [
+  await installDockApiMock(page, {
+    threads: [
       {
-        id: "turn-markdown",
-        status: "completed",
-        error: null,
-        items: [
+        id: "test-markdown-thread",
+        preview: "markdown preview",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000000,
+        updatedAt: 1774000001,
+        status: { type: "idle" },
+        path: "C:\\Users\\wo1fsea\\.codex\\sessions\\test.jsonl",
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "vscode",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: "Markdown Render Test",
+        turns: [
           {
-            type: "agentMessage",
-            id: "msg-markdown",
-            text:
-              "The latest service is live at [http://localhost:3001](http://localhost:3001).\n\n- First item\n- Second item\n\n`inline code`",
-            phase: "final_answer"
+            id: "turn-markdown",
+            status: "completed",
+            error: null,
+            items: [
+              {
+                type: "agentMessage",
+                id: "msg-markdown",
+                text:
+                  "The latest service is live at [http://localhost:3001](http://localhost:3001).\n\n- First item\n- Second item\n\n`inline code`",
+                phase: "final_answer"
+              }
+            ]
           }
         ]
       }
     ]
   });
 
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await gotoDock(page);
   await page.locator(".dock-thread-row").first().click();
 
   const markdownLink = page.locator('.dock-markdown a[href="http://localhost:3001"]');
@@ -399,47 +608,49 @@ test("agent messages render markdown links and formatting", async ({ page }) => 
 });
 
 test("thinking indicator animates while there is no visible output", async ({ page }) => {
-  const threadId = "test-thinking-visible";
-
-  await mockThreadShell(page, {
-    id: threadId,
-    preview: "thinking",
-    ephemeral: false,
-    modelProvider: "openai",
-    createdAt: 1774000000,
-    updatedAt: 1774000001,
-    status: { type: "active", activeFlags: [] },
-    path: "C:\\Users\\wo1fsea\\.codex\\sessions\\thinking.jsonl",
-    cwd: "C:\\Users\\wo1fsea\\Documents\\codex_mw",
-    cliVersion: "0.112.0",
-    source: "vscode",
-    agentNickname: null,
-    agentRole: null,
-    gitInfo: null,
-    name: "Thinking Visible",
-    turns: [
+  await installDockApiMock(page, {
+    threads: [
       {
-        id: "turn-thinking-visible",
-        status: "inProgress",
-        error: null,
-        items: [
+        id: "test-thinking-visible",
+        preview: "thinking",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000000,
+        updatedAt: 1774000001,
+        status: { type: "active", activeFlags: [] },
+        path: "C:\\Users\\wo1fsea\\.codex\\sessions\\thinking.jsonl",
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "vscode",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: "Thinking Visible",
+        turns: [
           {
-            type: "userMessage",
-            id: "user-thinking",
-            content: [{ type: "text", text: "hey", text_elements: [] }]
-          },
-          {
-            type: "reasoning",
-            id: "reasoning-thinking",
-            summary: [],
-            content: ["thinking"]
+            id: "turn-thinking-visible",
+            status: "inProgress",
+            error: null,
+            items: [
+              {
+                type: "userMessage",
+                id: "user-thinking",
+                content: [{ type: "text", text: "hey", text_elements: [] }]
+              },
+              {
+                type: "reasoning",
+                id: "reasoning-thinking",
+                summary: [],
+                content: ["thinking"]
+              }
+            ]
           }
         ]
       }
     ]
   });
 
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await gotoDock(page);
   await page.locator(".dock-thread-row").first().click();
 
   const thinkingStatus = page.locator(".dock-thinking-status");
@@ -461,53 +672,55 @@ test("thinking indicator animates while there is no visible output", async ({ pa
 });
 
 test("thinking indicator stays visible for punctuation-only streamed output", async ({ page }) => {
-  const threadId = "test-thinking-punctuation";
-
-  await mockThreadShell(page, {
-    id: threadId,
-    preview: "thinking punctuation",
-    ephemeral: false,
-    modelProvider: "openai",
-    createdAt: 1774000000,
-    updatedAt: 1774000001,
-    status: { type: "active", activeFlags: [] },
-    path: "C:\\Users\\wo1fsea\\.codex\\sessions\\thinking-punctuation.jsonl",
-    cwd: "C:\\Users\\wo1fsea\\Documents\\codex_mw",
-    cliVersion: "0.112.0",
-    source: "vscode",
-    agentNickname: null,
-    agentRole: null,
-    gitInfo: null,
-    name: "Thinking Punctuation",
-    turns: [
+  await installDockApiMock(page, {
+    threads: [
       {
-        id: "turn-thinking-punctuation",
-        status: "inProgress",
-        error: null,
-        items: [
+        id: "test-thinking-punctuation",
+        preview: "thinking punctuation",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000000,
+        updatedAt: 1774000001,
+        status: { type: "active", activeFlags: [] },
+        path: "C:\\Users\\wo1fsea\\.codex\\sessions\\thinking-punctuation.jsonl",
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "vscode",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: "Thinking Punctuation",
+        turns: [
           {
-            type: "userMessage",
-            id: "user-thinking-punctuation",
-            content: [{ type: "text", text: "hey", text_elements: [] }]
-          },
-          {
-            type: "reasoning",
-            id: "reasoning-thinking-punctuation",
-            summary: [],
-            content: ["thinking"]
-          },
-          {
-            type: "agentMessage",
-            id: "agent-thinking-punctuation",
-            text: ".",
-            phase: "commentary"
+            id: "turn-thinking-punctuation",
+            status: "inProgress",
+            error: null,
+            items: [
+              {
+                type: "userMessage",
+                id: "user-thinking-punctuation",
+                content: [{ type: "text", text: "hey", text_elements: [] }]
+              },
+              {
+                type: "reasoning",
+                id: "reasoning-thinking-punctuation",
+                summary: [],
+                content: ["thinking"]
+              },
+              {
+                type: "agentMessage",
+                id: "agent-thinking-punctuation",
+                text: ".",
+                phase: "commentary"
+              }
+            ]
           }
         ]
       }
     ]
   });
 
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await gotoDock(page);
   await page.locator(".dock-thread-row").first().click();
 
   await expect(page.locator(".dock-thinking-status")).toBeVisible();
@@ -515,53 +728,55 @@ test("thinking indicator stays visible for punctuation-only streamed output", as
 });
 
 test("thinking indicator hides once visible assistant output exists", async ({ page }) => {
-  const threadId = "test-thinking-hidden";
-
-  await mockThreadShell(page, {
-    id: threadId,
-    preview: "thinking hidden",
-    ephemeral: false,
-    modelProvider: "openai",
-    createdAt: 1774000000,
-    updatedAt: 1774000001,
-    status: { type: "active", activeFlags: [] },
-    path: "C:\\Users\\wo1fsea\\.codex\\sessions\\thinking-hidden.jsonl",
-    cwd: "C:\\Users\\wo1fsea\\Documents\\codex_mw",
-    cliVersion: "0.112.0",
-    source: "vscode",
-    agentNickname: null,
-    agentRole: null,
-    gitInfo: null,
-    name: "Thinking Hidden",
-    turns: [
+  await installDockApiMock(page, {
+    threads: [
       {
-        id: "turn-thinking-hidden",
-        status: "inProgress",
-        error: null,
-        items: [
+        id: "test-thinking-hidden",
+        preview: "thinking hidden",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000000,
+        updatedAt: 1774000001,
+        status: { type: "active", activeFlags: [] },
+        path: "C:\\Users\\wo1fsea\\.codex\\sessions\\thinking-hidden.jsonl",
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "vscode",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: "Thinking Hidden",
+        turns: [
           {
-            type: "userMessage",
-            id: "user-thinking-hidden",
-            content: [{ type: "text", text: "hey", text_elements: [] }]
-          },
-          {
-            type: "reasoning",
-            id: "reasoning-thinking-hidden",
-            summary: [],
-            content: ["thinking"]
-          },
-          {
-            type: "agentMessage",
-            id: "agent-thinking-hidden",
-            text: "Output has started.",
-            phase: "commentary"
+            id: "turn-thinking-hidden",
+            status: "inProgress",
+            error: null,
+            items: [
+              {
+                type: "userMessage",
+                id: "user-thinking-hidden",
+                content: [{ type: "text", text: "hey", text_elements: [] }]
+              },
+              {
+                type: "reasoning",
+                id: "reasoning-thinking-hidden",
+                summary: [],
+                content: ["thinking"]
+              },
+              {
+                type: "agentMessage",
+                id: "agent-thinking-hidden",
+                text: "Output has started.",
+                phase: "commentary"
+              }
+            ]
           }
         ]
       }
     ]
   });
 
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await gotoDock(page);
   await page.locator(".dock-thread-row").first().click();
 
   await expect(page.locator(".dock-thinking-status")).toHaveCount(0);
@@ -570,167 +785,92 @@ test("thinking indicator hides once visible assistant output exists", async ({ p
 });
 
 test("switching threads ignores stale thread detail responses", async ({ page }) => {
-  const threadA = {
-    id: "thread-stale-a",
-    preview: "active thread",
-    ephemeral: false,
-    modelProvider: "openai",
-    createdAt: 1774000000,
-    updatedAt: 1774000200,
-    status: { type: "active", activeFlags: [] },
-    path: "C:\\Users\\wo1fsea\\.codex\\sessions\\thread-a.jsonl",
-    cwd: "C:\\Users\\wo1fsea\\Documents\\codex_mw",
-    cliVersion: "0.112.0",
-    source: "vscode",
-    agentNickname: null,
-    agentRole: null,
-    gitInfo: null,
-    name: "Active Thread",
-    turns: [
+  await installDockApiMock(page, {
+    detailDelaysMs: {
+      "thread-stale-a": 800,
+      "thread-stale-b": 50
+    },
+    threads: [
       {
-        id: "turn-a",
-        status: "inProgress",
-        error: null,
-        items: [
+        id: "thread-stale-a",
+        preview: "active thread",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000000,
+        updatedAt: 1774000200,
+        status: { type: "active", activeFlags: [] },
+        path: "C:\\Users\\wo1fsea\\.codex\\sessions\\thread-a.jsonl",
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "vscode",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: "Active Thread",
+        turns: [
           {
-            type: "userMessage",
-            id: "user-a",
-            content: [{ type: "text", text: "A", text_elements: [] }]
-          },
-          {
-            type: "agentMessage",
-            id: "agent-a",
-            text: "Active thread content",
-            phase: "commentary"
+            id: "turn-a",
+            status: "inProgress",
+            error: null,
+            items: [
+              {
+                type: "userMessage",
+                id: "user-a",
+                content: [{ type: "text", text: "A", text_elements: [] }]
+              },
+              {
+                type: "agentMessage",
+                id: "agent-a",
+                text: "Active thread content",
+                phase: "commentary"
+              }
+            ]
           }
         ]
-      }
-    ]
-  };
-
-  const threadB = {
-    id: "thread-stale-b",
-    preview: "stable thread",
-    ephemeral: false,
-    modelProvider: "openai",
-    createdAt: 1774000001,
-    updatedAt: 1774000100,
-    status: { type: "idle" },
-    path: "C:\\Users\\wo1fsea\\.codex\\sessions\\thread-b.jsonl",
-    cwd: "C:\\Users\\wo1fsea\\Documents\\codex_mw",
-    cliVersion: "0.112.0",
-    source: "vscode",
-    agentNickname: null,
-    agentRole: null,
-    gitInfo: null,
-    name: "Stable Thread",
-    turns: [
-      {
-        id: "turn-b",
-        status: "completed",
-        error: null,
-        items: [
-          {
-            type: "userMessage",
-            id: "user-b",
-            content: [{ type: "text", text: "B", text_elements: [] }]
-          },
-          {
-            type: "agentMessage",
-            id: "agent-b",
-            text: "Stable thread content",
-            phase: "final_answer"
-          }
-        ]
-      }
-    ]
-  };
-
-  await page.route("**/api/status", async (route) => {
-    await route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        bridge: { connected: true, pendingRequests: 0 },
-        tailscale: {
-          connected: true,
-          backendState: "Running",
-          dnsName: "test.tailnet.ts.net",
-          hostName: "test-host",
-          ips: ["100.64.0.1"],
-          serveHint: "tailscale serve --bg 3000",
-          error: null
-        },
-        defaults: {
-          cwd: "C:\\Users\\wo1fsea\\Documents\\codex_mw",
-          approvalPolicy: "on-request",
-          sandbox: "workspace-write"
-        },
-        bridgeUrl: "ws://127.0.0.1:39031"
-      })
-    });
-  });
-
-  await page.route("**/api/models", async (route) => {
-    await route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        data: [
-          {
-            id: "gpt-5.4",
-            model: "gpt-5.4",
-            displayName: "gpt-5.4",
-            description: "Latest frontier agentic coding model.",
-            hidden: false,
-            supportedReasoningEfforts: [],
-            defaultReasoningEffort: "medium",
-            inputModalities: ["text", "image"],
-            supportsPersonality: true,
-            isDefault: true
-          }
-        ]
-      })
-    });
-  });
-
-  await page.route(/.*\/api\/threads(\?.*)?$/, async (route) => {
-    await route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        data: [threadA, threadB],
-        nextCursor: null
-      })
-    });
-  });
-
-  await page.route("**/api/threads/thread-stale-a", async (route) => {
-    await page.waitForTimeout(800);
-    await route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({ thread: threadA })
-    });
-  });
-
-  await page.route("**/api/threads/thread-stale-b", async (route) => {
-    await page.waitForTimeout(50);
-    await route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({ thread: threadB })
-    });
-  });
-
-  await page.route("**/api/events*", async (route) => {
-    await route.fulfill({
-      status: 200,
-      headers: {
-        "Content-Type": "text/event-stream"
       },
-      body: 'data: {"type":"connection","status":"connected"}\n\n'
-    });
+      {
+        id: "thread-stale-b",
+        preview: "stable thread",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000001,
+        updatedAt: 1774000100,
+        status: { type: "idle" },
+        path: "C:\\Users\\wo1fsea\\.codex\\sessions\\thread-b.jsonl",
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "vscode",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: "Stable Thread",
+        turns: [
+          {
+            id: "turn-b",
+            status: "completed",
+            error: null,
+            items: [
+              {
+                type: "userMessage",
+                id: "user-b",
+                content: [{ type: "text", text: "B", text_elements: [] }]
+              },
+              {
+                type: "agentMessage",
+                id: "agent-b",
+                text: "Stable thread content",
+                phase: "final_answer"
+              }
+            ]
+          }
+        ]
+      }
+    ]
   });
 
-  await page.goto("/", { waitUntil: "domcontentloaded" });
-  await page.getByText("active thread", { exact: false }).first().click();
-  await page.getByText("stable thread", { exact: false }).first().click();
+  await gotoDock(page);
+  await page.getByText("Active Thread", { exact: true }).click();
+  await page.getByText("Stable Thread", { exact: true }).click();
 
   await page.waitForTimeout(1200);
 

@@ -9,6 +9,13 @@ export type DockSandboxMode =
   | "workspace-write"
   | "danger-full-access";
 
+export type DockPlanStepStatus = "pending" | "inProgress" | "completed";
+
+export type DockPlanStep = {
+  step: string;
+  status: DockPlanStepStatus;
+};
+
 export type DockUserInput =
   | {
       type: "text";
@@ -55,6 +62,8 @@ export type DockThreadItem =
       type: "plan";
       id: string;
       text: string;
+      explanation?: string | null;
+      steps?: DockPlanStep[] | null;
       [key: string]: unknown;
     }
   | {
@@ -322,3 +331,10 @@ export type ResolveRequestPayload =
   | {
       answers: Record<string, { answers: string[] }>;
     };
+
+export type ResolveRequestSubmission = {
+  payload: ResolveRequestPayload;
+  rpcId?: string | number;
+  threadId?: string;
+  method?: DockServerRequest["method"];
+};

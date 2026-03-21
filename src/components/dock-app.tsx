@@ -22,6 +22,8 @@ import type {
   DockApprovalPolicy,
   DockBridgeEvent,
   DockModel,
+  DockPlanStep,
+  DockPlanStepStatus,
   DockServerRequest,
   DockThread,
   DockThreadItem,
@@ -57,331 +59,16 @@ type UploadItem = {
 
 type ArchiveFilter = "live" | "archived" | "all";
 
-type IconName =
-  | "codex"
-  | "new-thread"
-  | "automation"
-  | "skills"
-  | "settings"
-  | "folder"
-  | "menu"
-  | "search"
-  | "play"
-  | "refresh"
-  | "rename"
-  | "archive"
-  | "image"
-  | "send"
-  | "stop"
-  | "workspace"
-  | "security"
-  | "repo"
-  | "desktop";
-
-const APP_MENU_ITEMS = ["File", "Edit", "View", "Window", "Help"];
-
-const SIDEBAR_ITEMS: Array<{
-  key: string;
-  label: string;
-  icon: IconName;
-  primary?: boolean;
-}> = [
-  { key: "new-thread", label: "New thread", icon: "new-thread", primary: true },
-  { key: "automation", label: "Automation", icon: "automation" },
-  { key: "skills", label: "Skills", icon: "skills" }
-];
-
-function AppIcon({
-  name,
-  className
-}: {
-  name: IconName;
-  className?: string;
-}) {
-  if (name === "codex") {
-    return (
-      <svg
-        aria-hidden="true"
-        className={className}
-        fill="none"
-        viewBox="0 0 24 24"
-      >
-        <path
-          d="M8.2 4.2c1.2 0 2 .6 2.5 1.5.4-.5 1-.9 1.8-.9 1.6 0 2.8 1.3 2.8 2.9 0 .5-.1.9-.3 1.3 1.5.2 2.7 1.5 2.7 3.1 0 1.8-1.4 3.2-3.2 3.2-.3 0-.6 0-.9-.1-.1 1.7-1.5 3.1-3.2 3.1-1.1 0-2-.5-2.6-1.3-.6.6-1.4 1-2.3 1-1.8 0-3.2-1.4-3.2-3.2 0-.4.1-.8.2-1.1-1.4-.3-2.5-1.6-2.5-3.1 0-1.7 1.4-3.1 3.1-3.1.2 0 .3 0 .5.1C5.9 5.4 6.9 4.2 8.2 4.2Z"
-          stroke="currentColor"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="1.6"
-        />
-      </svg>
-    );
-  }
-
-  const props = {
-    "aria-hidden": true,
-    className,
-    fill: "none",
-    viewBox: "0 0 24 24"
-  } as const;
-
-  switch (name) {
-    case "new-thread":
-      return (
-        <svg {...props}>
-          <path
-            d="M4.5 6.5h8m-8 5h15m-15 5h10M17 4.5v5m-2.5-2.5h5"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.7"
-          />
-        </svg>
-      );
-    case "automation":
-      return (
-        <svg {...props}>
-          <path
-            d="M12 4.5v3m0 9v3m7.5-7.5h-3m-9 0h-3m10.8-5.3-2 2m-6.6 6.6-2 2m0-11.2 2 2m6.6 6.6 2 2M12 8.3a3.7 3.7 0 1 1 0 7.4 3.7 3.7 0 0 1 0-7.4Z"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.6"
-          />
-        </svg>
-      );
-    case "skills":
-      return (
-        <svg {...props}>
-          <path
-            d="M7 6.5h3.5v3.5H7zM13.5 6.5H17v3.5h-3.5zM7 13h3.5v3.5H7zM13.5 13H17v3.5h-3.5z"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.6"
-          />
-        </svg>
-      );
-    case "settings":
-      return (
-        <svg {...props}>
-          <path
-            d="M12 8.8a3.2 3.2 0 1 1 0 6.4 3.2 3.2 0 0 1 0-6.4Zm7 3.2-.9.4a6.8 6.8 0 0 1-.4 1l.5.9-1.7 1.7-.9-.5a6.8 6.8 0 0 1-1 .4l-.4.9h-2.4l-.4-.9a6.8 6.8 0 0 1-1-.4l-.9.5-1.7-1.7.5-.9a6.8 6.8 0 0 1-.4-1L5 12l.4-2.4.9-.4c.1-.4.2-.7.4-1l-.5-.9 1.7-1.7.9.5c.3-.2.7-.3 1-.4l.4-.9h2.4l.4.9c.4.1.7.2 1 .4l.9-.5 1.7 1.7-.5.9c.2.3.3.6.4 1l.9.4L19 12Z"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.4"
-          />
-        </svg>
-      );
-    case "folder":
-      return (
-        <svg {...props}>
-          <path
-            d="M4.5 8.5a2 2 0 0 1 2-2h3l1.2 1.4H17.5a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H6.5a2 2 0 0 1-2-2v-7.5Z"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.6"
-          />
-        </svg>
-      );
-    case "menu":
-      return (
-        <svg {...props}>
-          <path
-            d="M5 7h14M5 12h14M5 17h14"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeWidth="1.7"
-          />
-        </svg>
-      );
-    case "search":
-      return (
-        <svg {...props}>
-          <path
-            d="M11 5.5a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11Zm7.5 13.5-3.3-3.3"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.7"
-          />
-        </svg>
-      );
-    case "play":
-      return (
-        <svg {...props}>
-          <path
-            d="m9 7 8 5-8 5V7Z"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.7"
-          />
-        </svg>
-      );
-    case "refresh":
-      return (
-        <svg {...props}>
-          <path
-            d="M18.5 9.2A7 7 0 0 0 6.8 7.1M5.5 4.8v3.5H9M5.5 14.8A7 7 0 0 0 17.2 17m1.3 2.2v-3.5H15"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.6"
-          />
-        </svg>
-      );
-    case "rename":
-      return (
-        <svg {...props}>
-          <path
-            d="m5 16.5 8.8-8.8 2.5 2.5-8.8 8.8L5 19l.2-2.5Z"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.6"
-          />
-        </svg>
-      );
-    case "archive":
-      return (
-        <svg {...props}>
-          <path
-            d="M5.5 6.5h13l-1 11a1.6 1.6 0 0 1-1.6 1.4H8.1a1.6 1.6 0 0 1-1.6-1.4l-1-11Zm-1-2h15m-8 6.2h1"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.6"
-          />
-        </svg>
-      );
-    case "image":
-      return (
-        <svg {...props}>
-          <path
-            d="M6.5 6.5h11a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2Zm2.5 3.2h.01M7 15l3-3 2.2 2.2 2.3-2.7L17 15"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.6"
-          />
-        </svg>
-      );
-    case "send":
-      return (
-        <svg {...props}>
-          <path
-            d="m7 12 10-5-3 10-2.5-3L7 12Z"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.7"
-          />
-        </svg>
-      );
-    case "stop":
-      return (
-        <svg {...props}>
-          <path
-            d="M8 8h8v8H8z"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.7"
-          />
-        </svg>
-      );
-    case "workspace":
-      return (
-        <svg {...props}>
-          <path
-            d="M4.5 6.5h15v9h-15zm5.5 12h4"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.6"
-          />
-        </svg>
-      );
-    case "security":
-      return (
-        <svg {...props}>
-          <path
-            d="M8.2 10.4V8.8a3.8 3.8 0 1 1 7.6 0v1.6m-7 0h6.4a1.6 1.6 0 0 1 1.6 1.6v4a1.6 1.6 0 0 1-1.6 1.6H8.8A1.6 1.6 0 0 1 7.2 16v-4a1.6 1.6 0 0 1 1.6-1.6Z"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.6"
-          />
-        </svg>
-      );
-    case "repo":
-      return (
-        <svg {...props}>
-          <path
-            d="M7.5 6.5a2 2 0 1 1 0 4 2 2 0 0 1 0-4Zm9 7a2 2 0 1 1 0 4 2 2 0 0 1 0-4ZM9 9.5l6 5"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.6"
-          />
-        </svg>
-      );
-    case "desktop":
-      return (
-        <svg {...props}>
-          <path
-            d="M4.5 6.5h15v9h-15zm5.5 12h4"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.6"
-          />
-        </svg>
-      );
-    default:
-      return null;
-  }
-}
-
-function formatRelativeTime(unixSeconds: number) {
-  const diff = Date.now() - unixSeconds * 1000;
-  const minute = 60_000;
-  const hour = minute * 60;
-  const day = hour * 24;
-
-  if (diff < hour) return `${Math.max(1, Math.round(diff / minute))}m ago`;
-  if (diff < day) return `${Math.max(1, Math.round(diff / hour))}h ago`;
-  return `${Math.max(1, Math.round(diff / day))}d ago`;
-}
-
-function formatSidebarTime(unixSeconds: number) {
-  const diff = Date.now() - unixSeconds * 1000;
-  const hour = 60 * 60 * 1000;
-  const day = 24 * hour;
-
-  if (diff < day) {
-    return new Date(unixSeconds * 1000).toLocaleTimeString("zh-CN", {
-      hour: "numeric",
-      minute: "2-digit"
-    });
-  }
-
-  return new Date(unixSeconds * 1000).toLocaleDateString("zh-CN", {
-    month: "numeric",
-    day: "numeric"
-  });
-}
-
-function formatDateTime(unixSeconds: number) {
-  return new Date(unixSeconds * 1000).toLocaleString("zh-CN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    month: "short",
-    day: "numeric"
-  });
-}
+type ConnectionNoticeState =
+  | {
+      kind: "translation";
+      key: "notice.bridgeDisconnected" | "notice.liveReconnect";
+    }
+  | {
+      kind: "message";
+      message: string;
+    }
+  | null;
 
 function getProjectName(cwd: string) {
   const parts = cwd.replace(/\\/g, "/").split("/");
@@ -396,26 +83,86 @@ function getArchiveState(thread: DockThread) {
   return thread.source === "archive";
 }
 
-function getThreadStatusText(thread: DockThread) {
-  const base = thread.status.type;
-  if (thread.status.type !== "active") {
-    return base;
-  }
-
-  return thread.status.activeFlags.length
-    ? `active · ${thread.status.activeFlags.join(", ")}`
-    : "active";
-}
-
-function getApprovalPolicyLabel(policy: DockApprovalPolicy) {
-  if (policy === "untrusted") return "Full access";
-  if (policy === "on-failure") return "Ask on failure";
-  if (policy === "never") return "Never ask";
-  return "Default approval";
-}
-
 function isThreadActive(thread: DockThread | null) {
   return thread?.status.type === "active";
+}
+
+function humanizeIdentifier(value: string) {
+  const withSpaces = value
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_./-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!withSpaces) {
+    return value;
+  }
+
+  return withSpaces.charAt(0).toUpperCase() + withSpaces.slice(1);
+}
+
+function localizeRuntimeMessage(message: string, t: TranslateFn) {
+  const normalized = message.trim();
+
+  switch (normalized) {
+    case "Failed to fetch":
+      return t("error.networkFailed");
+    case "Failed to list models.":
+      return t("error.listModelsFailed");
+    case "Failed to list threads.":
+      return t("error.listThreadsFailed");
+    case "Prompt or image attachment is required.":
+      return t("error.promptOrAttachmentRequired");
+    case "Failed to create thread.":
+      return t("error.createThreadFailed");
+    case "Failed to resolve request.":
+      return t("error.resolveRequestFailed");
+    case "Failed to read thread.":
+      return t("error.readThreadFailed");
+    case "Failed to update thread.":
+      return t("error.updateThreadFailed");
+    case "turnId is required.":
+      return t("error.turnIdRequired");
+    case "Failed to append turn.":
+      return t("error.appendTurnFailed");
+    case "No files uploaded.":
+      return t("error.noFilesUploaded");
+    case "Failed to store files.":
+      return t("error.storeFilesFailed");
+    case "Upload not found.":
+      return t("error.uploadNotFound");
+    case "Invalid upload path.":
+      return t("error.invalidUploadPath");
+    case "Codex bridge is not connected.":
+      return t("error.bridgeNotConnected");
+    case "Codex bridge connection closed.":
+      return t("error.bridgeConnectionClosed");
+    case "Timed out connecting to codex app-server.":
+      return t("error.bridgeConnectTimedOut");
+    case "Codex bridge disconnected.":
+      return t("notice.bridgeDisconnected");
+    case "This approval request is no longer valid. Refresh the current thread and try again.":
+      return t("error.approvalExpired");
+    default: {
+      const requestStatusMatch = normalized.match(/^Request failed: (\d+)$/);
+      if (requestStatusMatch) {
+        return t("error.requestFailedWithStatus", {
+          status: requestStatusMatch[1]
+        });
+      }
+
+      const appServerExitMatch = normalized.match(
+        /^Codex app-server exited with code (.+)\.$/
+      );
+      if (appServerExitMatch) {
+        return t("error.appServerExited", {
+          code: appServerExitMatch[1]
+        });
+      }
+
+      return normalized;
+    }
+  }
 }
 
 function getActiveTurn(thread: DockThread | null) {
@@ -513,6 +260,92 @@ function replaceTurnItem(thread: DockThread, turnId: string, nextItem: DockThrea
   };
 }
 
+function createTurnPlanItem(
+  turnId: string,
+  explanation: string | null,
+  steps: DockPlanStep[]
+): Extract<DockThreadItem, { type: "plan" }> {
+  const numberedText = steps
+    .map((step, index) => `${index + 1}. ${step.step}`)
+    .join("\n");
+
+  return {
+    type: "plan",
+    id: `turn-plan:${turnId}`,
+    text: numberedText,
+    explanation,
+    steps
+  };
+}
+
+function upsertTurnPlan(
+  thread: DockThread,
+  turnId: string,
+  explanation: string | null,
+  plan: Array<{ step: string; status: string }>
+): DockThread {
+  const normalizedSteps = plan
+    .filter(
+      (entry): entry is { step: string; status: string } =>
+        Boolean(entry?.step?.trim())
+    )
+    .map((entry) => ({
+      step: entry.step.trim(),
+      status: normalizePlanStepStatus(entry.status)
+    }));
+  const nextPlanItem = createTurnPlanItem(turnId, explanation, normalizedSteps);
+  let turnMatched = false;
+
+  const turns = thread.turns.map((turn) => {
+    if (turn.id !== turnId) {
+      return turn;
+    }
+
+    turnMatched = true;
+    const items = [...turn.items];
+    const existingPlanIndex = items.findIndex((item) => item.type === "plan");
+
+    if (existingPlanIndex >= 0) {
+      items[existingPlanIndex] = {
+        ...items[existingPlanIndex],
+        ...nextPlanItem
+      };
+    } else {
+      const insertIndex = items.findIndex((item) => item.type !== "userMessage");
+      if (insertIndex < 0) {
+        items.push(nextPlanItem);
+      } else {
+        items.splice(insertIndex, 0, nextPlanItem);
+      }
+    }
+
+    return {
+      ...turn,
+      items
+    };
+  });
+
+  if (turnMatched) {
+    return {
+      ...thread,
+      turns
+    };
+  }
+
+  return {
+    ...thread,
+    turns: [
+      ...turns,
+      {
+        id: turnId,
+        items: [nextPlanItem],
+        status: "inProgress",
+        error: null
+      } satisfies DockTurn
+    ]
+  };
+}
+
 function isNarrativeTurnItem(item: DockThreadItem) {
   return (
     item.type === "userMessage" ||
@@ -540,13 +373,11 @@ function mergeNarrativeTurnItem(
       { type: "agentMessage" }
     >;
 
-    return currentAgentItem.text.length > incomingAgentItem.text.length
-      ? {
-          ...incomingAgentItem,
-          text: currentAgentItem.text,
-          phase: incomingAgentItem.phase ?? currentAgentItem.phase
-        }
-      : incomingAgentItem;
+    return {
+      ...incomingAgentItem,
+      text: incomingAgentItem.text || currentAgentItem.text,
+      phase: incomingAgentItem.phase ?? currentAgentItem.phase
+    };
   }
 
   if (incomingItem.type === "plan") {
@@ -559,12 +390,20 @@ function mergeNarrativeTurnItem(
       { type: "plan" }
     >;
 
-    return currentPlanItem.text.length > incomingPlanItem.text.length
-      ? {
-          ...incomingPlanItem,
-          text: currentPlanItem.text
-        }
-      : incomingPlanItem;
+    const preferredTextItem = {
+      ...incomingPlanItem,
+      text: incomingPlanItem.text || currentPlanItem.text
+    };
+
+    return {
+      ...preferredTextItem,
+      explanation:
+        preferredTextItem.explanation ?? currentPlanItem.explanation ?? null,
+      steps:
+        (Array.isArray(preferredTextItem.steps) && preferredTextItem.steps.length
+          ? preferredTextItem.steps
+          : currentPlanItem.steps) ?? null
+    };
   }
 
   if (incomingItem.type === "reasoning") {
@@ -581,14 +420,13 @@ function mergeNarrativeTurnItem(
     const incomingContentLength = incomingReasoningItem.content.join("").length;
     const currentContentLength = currentReasoningItem.content.join("").length;
 
-    return currentSummaryLength + currentContentLength >
-      incomingSummaryLength + incomingContentLength
-      ? {
+    return incomingSummaryLength + incomingContentLength > 0
+      ? incomingReasoningItem
+      : {
           ...incomingReasoningItem,
           summary: currentReasoningItem.summary,
           content: currentReasoningItem.content
-        }
-      : incomingReasoningItem;
+        };
   }
 
   return incomingItem;
@@ -622,9 +460,14 @@ function mergeTurnPreservingAuxiliaryItems(
     }
 
     if (incomingTurn.status === "inProgress") {
-      if (currentItem.type !== "userMessage") {
+      if (!isNarrativeTurnItem(currentItem)) {
         mergedItems.push(currentItem);
       }
+      continue;
+    }
+
+    if (currentItem.type === "plan") {
+      mergedItems.push(currentItem);
       continue;
     }
 
@@ -1111,6 +954,146 @@ function AgentMessageView({
   );
 }
 
+function normalizePlanStepStatus(value: unknown): DockPlanStepStatus {
+  if (value === "completed") {
+    return "completed";
+  }
+
+  if (value === "inProgress" || value === "in_progress") {
+    return "inProgress";
+  }
+
+  return "pending";
+}
+
+function parsePlanStepsFromText(text: string): DockPlanStep[] {
+  const steps: DockPlanStep[] = [];
+
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || /^plan:\s*$/i.test(line)) {
+      continue;
+    }
+
+    let match = line.match(/^(?:\d+\.\s+|[-*]\s+)?\[(x|X| )\]\s+(.+)$/);
+    if (match) {
+      steps.push({
+        step: match[2].trim(),
+        status: match[1].toLowerCase() === "x" ? "completed" : "pending"
+      });
+      continue;
+    }
+
+    match = line.match(
+      /^(?:\d+\.\s+|[-*]\s+)?\[(completed|done|in[\s_-]?progress|pending)\]\s+(.+)$/i
+    );
+    if (match) {
+      steps.push({
+        step: match[2].trim(),
+        status: normalizePlanStepStatus(match[1].toLowerCase())
+      });
+      continue;
+    }
+
+    match = line.match(/^(?:\d+\.\s+|[-*]\s+)(.+)$/);
+    if (match) {
+      steps.push({
+        step: match[1].trim(),
+        status: "pending"
+      });
+    }
+  }
+
+  if (!steps.length && text.trim()) {
+    steps.push({
+      step: text.trim(),
+      status: "pending"
+    });
+  }
+
+  return steps;
+}
+
+function getPlanSteps(item: Extract<DockThreadItem, { type: "plan" }>) {
+  if (Array.isArray(item.steps) && item.steps.length) {
+    return item.steps
+      .filter(
+        (entry): entry is DockPlanStep =>
+          Boolean(entry) &&
+          typeof entry === "object" &&
+          typeof entry.step === "string" &&
+          entry.step.trim().length > 0
+      )
+      .map((entry) => ({
+        step: entry.step.trim(),
+        status: normalizePlanStepStatus(entry.status)
+      }));
+  }
+
+  return parsePlanStepsFromText(item.text);
+}
+
+function PlanItemView({
+  item
+}: {
+  item: Extract<DockThreadItem, { type: "plan" }>;
+}) {
+  const { t } = useI18n();
+  const steps = getPlanSteps(item);
+  const completedCount = steps.filter((step) => step.status === "completed").length;
+  const explanation =
+    typeof item.explanation === "string" && item.explanation.trim()
+      ? item.explanation.trim()
+      : null;
+
+  return (
+    <section className="dock-plan-card">
+      <div className="dock-plan-card-head">
+        <div className="dock-plan-card-summary">
+          <span aria-hidden="true" className="dock-plan-card-glyph">
+            <span />
+            <span />
+            <span />
+          </span>
+          <strong>{t("plan.summary", { count: steps.length, completed: completedCount })}</strong>
+        </div>
+      </div>
+      {explanation ? <p className="dock-plan-card-explanation">{explanation}</p> : null}
+      <ol className="dock-plan-list">
+        {steps.map((step, index) => (
+          <li
+            className={clsx("dock-plan-row", `is-${step.status}`)}
+            key={`${step.status}-${step.step}-${index}`}
+          >
+            <span className="dock-plan-row-index">{index + 1}.</span>
+            <span aria-hidden="true" className="dock-plan-row-status" />
+            <div className="dock-plan-row-copy">
+              <ReactMarkdown
+                components={{
+                  a: ({ ...props }) => (
+                    <a
+                      {...props}
+                      rel="noreferrer"
+                      target="_blank"
+                    />
+                  ),
+                  p: ({ children }) => <>{children}</>,
+                  ul: ({ children }) => <>{children}</>,
+                  ol: ({ children }) => <>{children}</>,
+                  li: ({ children }) => <>{children}</>
+                }}
+                remarkPlugins={[remarkGfm, remarkBreaks]}
+              >
+                {step.step}
+              </ReactMarkdown>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 function ThreadItemView({ item }: { item: DockThreadItem }) {
   const { t } = useI18n();
 
@@ -1131,12 +1114,10 @@ function ThreadItemView({ item }: { item: DockThreadItem }) {
   }
 
   if (item.type === "plan") {
-    const planItem = item as Extract<DockThreadItem, { type: "plan" }>;
     return (
-      <div className="dock-artifact">
-        <div className="dock-artifact-head">{t("generic.plan")}</div>
-        <pre>{planItem.text}</pre>
-      </div>
+      <PlanItemView
+        item={item as Extract<DockThreadItem, { type: "plan" }>}
+      />
     );
   }
 
@@ -1194,7 +1175,7 @@ function ThreadItemView({ item }: { item: DockThreadItem }) {
 
   return (
     <div className="dock-artifact">
-      <div className="dock-artifact-head">{item.type}</div>
+      <div className="dock-artifact-head">{humanizeIdentifier(item.type)}</div>
       <pre>{JSON.stringify(item, null, 2)}</pre>
     </div>
   );
@@ -1236,7 +1217,11 @@ function getRequestTitle(method: DockServerRequest["method"], t: TranslateFn) {
     return t("request.fileApproval");
   }
 
-  return method;
+  if (method === "item/tool/requestUserInput") {
+    return t("request.userInput");
+  }
+
+  return humanizeIdentifier(method);
 }
 
 function getCommandApprovalText(request: DockServerRequest, t: TranslateFn) {
@@ -1294,16 +1279,25 @@ export function DockApp() {
   const [loadingThread, setLoadingThread] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [renamingThread, setRenamingThread] = useState(false);
+  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
+  const [archivingThread, setArchivingThread] = useState(false);
   const [threadNameDraft, setThreadNameDraft] = useState("");
   const [takeoverPromptOpen, setTakeoverPromptOpen] = useState(false);
-  const [connectionNotice, setConnectionNotice] = useState<string | null>(null);
+  const [connectionNotice, setConnectionNotice] =
+    useState<ConnectionNoticeState>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitScrollToken, setSubmitScrollToken] = useState(0);
   const reconnectNoticeTimerRef = useRef<number | null>(null);
   const backgroundSyncInFlightRef = useRef(false);
   const selectedThreadIdRef = useRef<string | null>(null);
+  const resolvedRequestIdsRef = useRef<Set<string>>(new Set());
 
   selectedThreadIdRef.current = selectedThreadId;
+
+  useEffect(() => {
+    setArchiveConfirmOpen(false);
+    setArchivingThread(false);
+  }, [selectedThreadId]);
 
   const deferredSearch = useDeferredValue(search.trim().toLowerCase());
   const selectedModel =
@@ -1313,7 +1307,12 @@ export function DockApp() {
     const response = await fetch(url, init);
     const data = (await response.json()) as T & { error?: string };
     if (!response.ok) {
-      throw new Error(data.error || `Request failed: ${response.status}`);
+      throw new Error(
+        localizeRuntimeMessage(
+          data.error || `Request failed: ${response.status}`,
+          t
+        )
+      );
     }
     return data;
   }
@@ -1367,7 +1366,9 @@ export function DockApp() {
         }
       } catch (cause) {
         const message =
-          cause instanceof Error ? cause.message : t("error.failedLoadThread");
+          cause instanceof Error
+            ? localizeRuntimeMessage(cause.message, t)
+            : t("error.failedLoadThread");
 
         if (message.includes("not materialized yet") && fallbackThread) {
           if (selectedThreadIdRef.current !== threadId) {
@@ -1419,12 +1420,24 @@ export function DockApp() {
       setConnectionNotice(
         event.status === "connected"
           ? null
-          : event.message || t("notice.bridgeDisconnected")
+          : event.message
+            ? {
+                kind: "message",
+                message: event.message
+              }
+            : {
+                kind: "translation",
+                key: "notice.bridgeDisconnected"
+              }
       );
       return;
     }
 
     if (event.type === "server-request") {
+      if (resolvedRequestIdsRef.current.has(event.request.requestId)) {
+        return;
+      }
+
       setResolvingRequestIds((current) =>
         current.filter((requestId) => requestId !== event.request.requestId)
       );
@@ -1439,6 +1452,7 @@ export function DockApp() {
     }
 
     if (event.type === "server-request-resolved") {
+      resolvedRequestIdsRef.current.add(event.requestId);
       setResolvingRequestIds((current) =>
         current.filter((requestId) => requestId !== event.requestId)
       );
@@ -1470,6 +1484,25 @@ export function DockApp() {
       setTakeoverPromptOpen(false);
       setSelectedThread((current) =>
         current ? upsertTurn(current, params.turn) : current
+      );
+      return;
+    }
+
+    if (event.method === "turn/plan/updated") {
+      const params = event.params as {
+        turnId: string;
+        explanation: string | null;
+        plan: Array<{ step: string; status: string }>;
+      };
+      setSelectedThread((current) =>
+        current
+          ? upsertTurnPlan(
+              current,
+              params.turnId,
+              params.explanation ?? null,
+              Array.isArray(params.plan) ? params.plan : []
+            )
+          : current
       );
       return;
     }
@@ -1672,7 +1705,7 @@ export function DockApp() {
         const firstFailure = failures[0]?.reason;
         setError(
           firstFailure instanceof Error
-            ? firstFailure.message
+            ? localizeRuntimeMessage(firstFailure.message, t)
             : t("error.initializationFailed")
         );
       }
@@ -1682,7 +1715,9 @@ export function DockApp() {
   useEffect(() => {
     void refreshThreads().catch((cause) => {
       setError(
-        cause instanceof Error ? cause.message : t("error.refreshThreadsFailed")
+        cause instanceof Error
+          ? localizeRuntimeMessage(cause.message, t)
+          : t("error.refreshThreadsFailed")
       );
     });
   }, [archiveFilter, t]);
@@ -1739,7 +1774,10 @@ export function DockApp() {
       }
 
       reconnectNoticeTimerRef.current = window.setTimeout(() => {
-        setConnectionNotice(t("notice.liveReconnect"));
+        setConnectionNotice({
+          kind: "translation",
+          key: "notice.liveReconnect"
+        });
         reconnectNoticeTimerRef.current = null;
       }, 2500);
     };
@@ -1893,7 +1931,11 @@ export function DockApp() {
       });
       await refreshThreads();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : t("error.sendFailed"));
+      setError(
+        cause instanceof Error
+          ? localizeRuntimeMessage(cause.message, t)
+          : t("error.sendFailed")
+      );
     } finally {
       setSubmitting(false);
     }
@@ -1922,7 +1964,11 @@ export function DockApp() {
         }))
       ]);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : t("error.uploadFailed"));
+      setError(
+        cause instanceof Error
+          ? localizeRuntimeMessage(cause.message, t)
+          : t("error.uploadFailed")
+      );
     }
   }
 
@@ -1943,9 +1989,15 @@ export function DockApp() {
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          payload,
+          rpcId: request.rpcId,
+          threadId: request.threadId ?? null,
+          method: request.method
+        })
       });
 
+      resolvedRequestIdsRef.current.add(request.requestId);
       setPendingRequests((current) =>
         current.filter((entry) => entry.requestId !== request.requestId)
       );
@@ -1956,7 +2008,11 @@ export function DockApp() {
         void refreshThreads();
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : t("error.requestFailed"));
+      setError(
+        cause instanceof Error
+          ? localizeRuntimeMessage(cause.message, t)
+          : t("error.requestFailed")
+      );
     } finally {
       setResolvingRequestIds((current) =>
         current.filter((requestId) => requestId !== request.requestId)
@@ -1987,7 +2043,11 @@ export function DockApp() {
       setRenamingThread(false);
       await refreshThreads();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : t("error.renameFailed"));
+      setError(
+        cause instanceof Error
+          ? localizeRuntimeMessage(cause.message, t)
+          : t("error.renameFailed")
+      );
     }
   }
 
@@ -1997,6 +2057,8 @@ export function DockApp() {
     }
 
     const nextArchived = !getArchiveState(selectedThread);
+    setArchivingThread(true);
+    setError(null);
 
     try {
       const data = await fetchJson<{ thread: DockThread }>(
@@ -2013,13 +2075,21 @@ export function DockApp() {
       );
 
       setSelectedThread(data.thread);
+      setArchiveConfirmOpen(false);
       await refreshThreads();
 
       if (nextArchived && archiveFilter === "live") {
         setSelectedThreadId(null);
+        setSelectedThread(null);
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : t("error.archiveFailed"));
+      setError(
+        cause instanceof Error
+          ? localizeRuntimeMessage(cause.message, t)
+          : t("error.archiveFailed")
+      );
+    } finally {
+      setArchivingThread(false);
     }
   }
 
@@ -2029,6 +2099,7 @@ export function DockApp() {
     setSidebarOpen(false);
     setPrompt("");
     setTakeoverPromptOpen(false);
+    setArchiveConfirmOpen(false);
   }
 
   function renderRequestCard(request: DockServerRequest) {
@@ -2298,6 +2369,12 @@ export function DockApp() {
   const workspaceLabel = getProjectName(
     selectedThread?.cwd || composerCwd || status?.defaults.cwd || t("generic.workspace")
   );
+  const connectionNoticeText =
+    connectionNotice?.kind === "translation"
+      ? t(connectionNotice.key)
+      : connectionNotice?.kind === "message"
+        ? localizeRuntimeMessage(connectionNotice.message, t)
+        : null;
   const groupedThreads = Object.entries(
     visibleThreads.reduce<Record<string, DockThread[]>>((accumulator, thread) => {
       const key = thread.cwd;
@@ -2316,15 +2393,17 @@ export function DockApp() {
     }))
     .sort((left, right) => right.updatedAt - left.updatedAt);
 
-  return (
-    <DockShellView
+    return (
+      <DockShellView
+      archiveConfirmOpen={archiveConfirmOpen}
       archiveFilter={archiveFilter}
+      archivingThread={archivingThread}
       attachments={attachments}
       composerApprovalPolicy={composerApprovalPolicy}
       composerCwd={composerCwd}
       composerModel={composerModel}
       composerReasoningEffort={composerReasoningEffort}
-      connectionNotice={connectionNotice}
+      connectionNotice={connectionNoticeText}
       currentActiveTurn={currentActiveTurn}
       currentRequests={currentRequests}
       error={error}
@@ -2332,6 +2411,8 @@ export function DockApp() {
       loadingThread={loadingThread}
       models={models}
       onArchiveFilterChange={setArchiveFilter}
+      onArchiveCancel={() => setArchiveConfirmOpen(false)}
+      onArchiveConfirm={() => void toggleArchiveSelectedThread()}
       onComposerApprovalPolicyChange={setComposerApprovalPolicy}
       onComposerCwdChange={setComposerCwd}
       onComposerModelChange={setComposerModel}
@@ -2347,7 +2428,11 @@ export function DockApp() {
             turnId: currentActiveTurn.id
           })
         }).catch((cause) =>
-          setError(cause instanceof Error ? cause.message : t("error.interruptFailed"))
+          setError(
+            cause instanceof Error
+              ? localizeRuntimeMessage(cause.message, t)
+              : t("error.interruptFailed")
+          )
         );
       }}
       onNewThread={handleNewThread}
@@ -2373,6 +2458,8 @@ export function DockApp() {
       onResolveRequest={renderRequestCard}
       onSearchChange={setSearch}
       onSelectThread={(threadId) => {
+        setArchiveConfirmOpen(false);
+        setRenamingThread(false);
         setSelectedThreadId(threadId);
         setSidebarOpen(false);
       }}
@@ -2381,8 +2468,17 @@ export function DockApp() {
       onTakeoverCancel={() => setTakeoverPromptOpen(false)}
       onTakeoverConfirm={() => void submitPrompt({ takeoverConfirmed: true })}
       onThreadNameDraftChange={setThreadNameDraft}
-      onToggleArchive={() => void toggleArchiveSelectedThread()}
-      onToggleRename={() => setRenamingThread((current) => !current)}
+      onToggleArchive={() => {
+        if (archivingThread) {
+          return;
+        }
+        setRenamingThread(false);
+        setArchiveConfirmOpen((current) => !current);
+      }}
+      onToggleRename={() => {
+        setArchiveConfirmOpen(false);
+        setRenamingThread((current) => !current);
+      }}
       onUploadFiles={(files) => {
         void uploadFiles(files);
       }}

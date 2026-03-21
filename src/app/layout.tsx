@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 
 import "@/app/globals.css";
@@ -6,6 +6,11 @@ import "@/app/globals.css";
 export const metadata: Metadata = {
   title: "Codex Dock",
   description: "Tailscale-first remote control plane for Codex."
+};
+
+export const viewport: Viewport = {
+  colorScheme: "dark",
+  themeColor: "#141416"
 };
 
 export default function RootLayout({

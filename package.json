@@ -6,6 +6,7 @@
     "dev": "next dev --hostname 0.0.0.0 --port 3000",
     "build": "next build --webpack",
     "start": "next start --hostname 0.0.0.0 --port 3000",
+    "restart:3001": "node scripts/restart-3001.mjs",
     "typecheck": "tsc --noEmit",
     "test:e2e": "playwright test",
     "verify": "node scripts/verify.mjs",
