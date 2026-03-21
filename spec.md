@@ -1,8 +1,8 @@
-# Codex Dock Specification
+# Codexy Specification
 
 ## Product Goal
 
-Codex Dock is a Tailscale-first web control plane for Codex on a host machine. It should feel visually close to Codex Desktop while remaining usable on desktop, iPad, and phone. The first working release must support:
+Codexy is a Tailscale-first web control plane for Codex on a host machine. It should feel visually close to Codex Desktop while remaining usable on desktop, iPad, and phone. The first working release must support:
 
 - listing all threads across projects
 - opening any thread and reading full history
@@ -62,7 +62,7 @@ The canonical UI contract lives in [visual-spec.md](C:\Users\wo1fsea\Documents\c
 ## Directory Framework
 
 ```text
-codex-dock/
+codexy/
 ├─ agents.md
 ├─ spec.md
 ├─ package.json

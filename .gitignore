@@ -4,6 +4,7 @@ node_modules
 *.log
 .DS_Store
 .codex-dock
+.codexy
 uploads
 .tmp-appschema
 .tmp-appts
@@ -15,5 +16,6 @@ output
 .threads.json
 .tmp-*
 .codex-dock-home*.png
+.codexy-home*.png
 .playwright-*.png
 output-playwright-*.png

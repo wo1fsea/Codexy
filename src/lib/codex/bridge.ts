@@ -421,8 +421,8 @@ class CodexBridge extends EventEmitter {
 
     await this.sendRpc("initialize", {
       clientInfo: {
-        name: "codex-dock",
-        title: "Codex Dock",
+        name: "codexy",
+        title: "Codexy",
         version: "0.1.0"
       },
       capabilities: {

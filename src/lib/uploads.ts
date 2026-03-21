@@ -31,15 +31,20 @@ export function getUploadUrl(uploadId: string) {
   return `/api/uploads/${encodeURIComponent(uploadId)}`;
 }
 
+function getCandidateUploadRoots() {
+  return [...new Set([dockEnv.uploadRoot, ...dockEnv.legacyUploadRoots].map((root) => path.resolve(root)))];
+}
+
 export function getUploadPublicUrl(uploadPath: string) {
-  const normalizedRoot = path.resolve(dockEnv.uploadRoot);
   const normalizedPath = path.resolve(uploadPath);
 
-  if (!normalizedPath.startsWith(normalizedRoot)) {
-    return null;
+  for (const normalizedRoot of getCandidateUploadRoots()) {
+    if (normalizedPath.startsWith(normalizedRoot)) {
+      return getUploadUrl(path.basename(normalizedPath));
+    }
   }
 
-  return getUploadUrl(path.basename(normalizedPath));
+  return null;
 }
 
 export function getContentTypeForPath(filePath: string) {
@@ -56,15 +61,20 @@ export function getContentTypeForPath(filePath: string) {
 
 export async function resolveUploadPath(uploadId: string) {
   const safeName = path.basename(uploadId);
-  const resolvedPath = path.resolve(dockEnv.uploadRoot, safeName);
-  const normalizedRoot = path.resolve(dockEnv.uploadRoot);
+  for (const normalizedRoot of getCandidateUploadRoots()) {
+    const resolvedPath = path.resolve(normalizedRoot, safeName);
 
-  if (!resolvedPath.startsWith(normalizedRoot)) {
-    throw new Error("Invalid upload path.");
+    if (!resolvedPath.startsWith(normalizedRoot)) {
+      continue;
+    }
+
+    try {
+      await stat(resolvedPath);
+      return resolvedPath;
+    } catch {}
   }
 
-  await stat(resolvedPath);
-  return resolvedPath;
+  throw new Error("Upload not found.");
 }
 
 export async function storeFiles(files: File[]): Promise<StoredUpload[]> {

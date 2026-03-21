@@ -343,7 +343,7 @@ export async function installDockApiMock(page: Page, options: MockOptions = {}) 
         const upload = {
           id,
           name,
-          path: `${DEFAULT_CWD}\\.codex-dock\\uploads\\${id}`,
+          path: `${DEFAULT_CWD}\\.codexy\\uploads\\${id}`,
           size: VALID_PNG_BUFFER.length,
           type: "image/png",
           url: `/api/uploads/${id}`

@@ -1,8 +1,8 @@
-# Codex Dock Visual Specification
+# Codexy Visual Specification
 
 ## Intent
 
-Codex Dock must feel like a web-native extension of Codex Desktop, not a generic dashboard. The reference is the current Codex desktop shell: restrained, dense, warm-dark, and utility-first.
+Codexy must feel like a web-native extension of Codex Desktop, not a generic dashboard. The reference is the current Codex desktop shell: restrained, dense, warm-dark, and utility-first.
 
 The UI contract in this document is normative for desktop and serves as the baseline for tablet and phone adaptations.
 

@@ -91,7 +91,7 @@ npm run verify:e2e
 ## 项目说明
 
 - Web 客户端只通过 HTTP API 和事件流与服务端交互。
-- Dock API Server 负责对接 Codex bridge，并对浏览器暴露稳定接口。
+- Codexy API Server 负责对接 Codex bridge，并对浏览器暴露稳定接口。
 - 实时执行与审批流都必须经过 Codex 协议，不走自定义 shell 包装层。
 
 更细的架构边界见 [agents.md](./agents.md)，产品规格见 [spec.md](./spec.md)。

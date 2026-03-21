@@ -546,19 +546,24 @@ function updateItem(
 
 function getUploadAssetUrl(path: string) {
   const normalized = path.replace(/\\/g, "/");
-  const marker = "/.codex-dock/uploads/";
-  const markerIndex = normalized.lastIndexOf(marker);
+  const markers = ["/.codexy/uploads/", "/.codex-dock/uploads/"];
 
-  if (markerIndex === -1) {
-    return null;
+  for (const marker of markers) {
+    const markerIndex = normalized.lastIndexOf(marker);
+
+    if (markerIndex === -1) {
+      continue;
+    }
+
+    const uploadId = normalized.slice(markerIndex + marker.length);
+    if (!uploadId) {
+      return null;
+    }
+
+    return `/api/uploads/${encodeURIComponent(uploadId)}`;
   }
 
-  const uploadId = normalized.slice(markerIndex + marker.length);
-  if (!uploadId) {
-    return null;
-  }
-
-  return `/api/uploads/${encodeURIComponent(uploadId)}`;
+  return null;
 }
 
 type UserAttachmentPreview = {
@@ -1302,6 +1307,12 @@ export function DockApp() {
   const deferredSearch = useDeferredValue(search.trim().toLowerCase());
   const selectedModel =
     models.find((model) => model.model === composerModel) ?? models[0] ?? null;
+  const effectiveComposerModel = composerModel || selectedModel?.model || "";
+  const effectiveComposerReasoningEffort =
+    composerReasoningEffort ||
+    selectedModel?.defaultReasoningEffort ||
+    selectedModel?.supportedReasoningEfforts[0]?.reasoningEffort ||
+    "";
 
   async function fetchJson<T>(url: string, init?: RequestInit) {
     const response = await fetch(url, init);
@@ -1860,8 +1871,8 @@ export function DockApp() {
       const payload = {
         prompt,
         cwd: composerCwd || status?.defaults.cwd || "",
-        model: composerModel || null,
-        reasoningEffort: composerReasoningEffort || null,
+        model: effectiveComposerModel || null,
+        reasoningEffort: effectiveComposerReasoningEffort || null,
         approvalPolicy: composerApprovalPolicy,
         attachmentPaths: attachments.map((attachment) => attachment.path)
       };
@@ -2401,8 +2412,8 @@ export function DockApp() {
       attachments={attachments}
       composerApprovalPolicy={composerApprovalPolicy}
       composerCwd={composerCwd}
-      composerModel={composerModel}
-      composerReasoningEffort={composerReasoningEffort}
+      composerModel={effectiveComposerModel}
+      composerReasoningEffort={effectiveComposerReasoningEffort}
       connectionNotice={connectionNoticeText}
       currentActiveTurn={currentActiveTurn}
       currentRequests={currentRequests}

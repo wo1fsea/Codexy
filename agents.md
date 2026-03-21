@@ -1,22 +1,22 @@
-# Codex Dock Agents
+# Codexy Agents
 
-Codex Dock is organized around a small set of runtime agents and ownership boundaries. This file defines what each agent is allowed to do and where it should stop.
+Codexy is organized around a small set of runtime agents and ownership boundaries. This file defines what each agent is allowed to do and where it should stop.
 
-## 1. Dock Web Client
+## 1. Codexy Web Client
 
 - Owns responsive rendering for desktop, iPad, and phone.
 - Renders thread lists, live turn output, approval cards, image attachments, and model controls.
 - Does not talk to `codex` directly.
-- Only uses HTTP APIs and the bridge event stream exposed by the Dock server.
+- Only uses HTTP APIs and the bridge event stream exposed by the Codexy server.
 
-## 2. Dock API Server
+## 2. Codexy API Server
 
 - Owns the public web surface under Tailscale.
 - Validates request payloads, handles file uploads, shapes UI data, and exposes SSE for live session updates.
 - Is the only layer allowed to call the Codex bridge.
 - Must keep browser-facing payloads stable even if Codex protocol details change underneath.
 
-## 3. Codex Bridge
+## 3. Codexy Bridge
 
 - Owns the connection to `codex app-server`.
 - Starts `codex app-server` on demand when configured to do so, or attaches to an already-running bridge endpoint.

@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { gotoDock, installDockApiMock } from "./support/dock-api-mock";
 
-test("desktop layout follows the codex dock visual contract", async ({ page }) => {
+test("desktop layout follows the codexy visual contract", async ({ page }) => {
   await installDockApiMock(page);
 
   await page.setViewportSize({ width: 1440, height: 900 });

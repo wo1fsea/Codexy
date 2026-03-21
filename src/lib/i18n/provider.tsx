@@ -11,6 +11,7 @@ import {
 
 import {
   DEFAULT_LOCALE,
+  LEGACY_LOCALE_STORAGE_KEY,
   LOCALE_OPTIONS,
   LOCALE_STORAGE_KEY,
   getIntlLocale,
@@ -111,7 +112,9 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<DockLocale>(DEFAULT_LOCALE);
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(LOCALE_STORAGE_KEY);
+    const stored =
+      window.localStorage.getItem(LOCALE_STORAGE_KEY) ??
+      window.localStorage.getItem(LEGACY_LOCALE_STORAGE_KEY);
     const nextLocale = stored
       ? resolveLocale(stored)
       : resolveLocaleFromNavigator(window.navigator.languages);

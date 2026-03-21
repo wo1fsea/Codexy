@@ -1,7 +1,8 @@
 export type DockLocale = "en" | "zh-CN" | "ja" | "es" | "fr";
 
 export const DEFAULT_LOCALE: DockLocale = "en";
-export const LOCALE_STORAGE_KEY = "codex-dock.locale";
+export const LOCALE_STORAGE_KEY = "codexy.locale";
+export const LEGACY_LOCALE_STORAGE_KEY = "codex-dock.locale";
 
 export const LOCALE_OPTIONS = [
   { value: "en", nativeLabel: "English" },

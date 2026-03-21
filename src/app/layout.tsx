@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import "@/app/globals.css";
 
 export const metadata: Metadata = {
-  title: "Codex Dock",
+  title: "Codexy",
   description: "Tailscale-first remote control plane for Codex."
 };
 

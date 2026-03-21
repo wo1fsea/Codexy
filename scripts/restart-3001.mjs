@@ -43,7 +43,7 @@ try {
   }
 } catch {}
 
-const logFd = openSync(path.join(cwd, `codex-dock-start-${port}-${Date.now()}.log`), "w");
+const logFd = openSync(path.join(cwd, `codexy-start-${port}-${Date.now()}.log`), "w");
 
 const child = spawn("cmd.exe", ["/d", "/s", "/c", `npx next start --hostname 0.0.0.0 --port ${port}`], {
   cwd,
