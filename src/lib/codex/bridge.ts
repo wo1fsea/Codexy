@@ -653,13 +653,13 @@ class CodexBridge extends EventEmitter {
 }
 
 declare global {
-  var __codexDockBridge: CodexBridge | undefined;
+  var __codexyBridge: CodexBridge | undefined;
 }
 
 export function getCodexBridge() {
-  if (!globalThis.__codexDockBridge) {
-    globalThis.__codexDockBridge = new CodexBridge();
+  if (!globalThis.__codexyBridge) {
+    globalThis.__codexyBridge = new CodexBridge();
   }
 
-  return globalThis.__codexDockBridge;
+  return globalThis.__codexyBridge;
 }

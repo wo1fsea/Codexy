@@ -256,7 +256,7 @@ pre {
   flex-direction: column;
   align-items: stretch;
   gap: var(--space-4);
-  padding: 10px 10px 8px;
+  padding: 8px 8px 6px;
   background: transparent;
 }
 
@@ -269,7 +269,7 @@ pre {
 .dock-nav-items {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .dock-nav-item,
@@ -291,8 +291,8 @@ pre {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 44px;
-  padding: 11px 12px;
+  min-height: 42px;
+  padding: 10px 10px;
   color: var(--text-muted);
   font-size: var(--text-14);
   font-weight: 600;
@@ -312,9 +312,21 @@ pre {
 
 .dock-nav-item.is-primary,
 .dock-nav-item.is-active {
-  background: rgba(255, 247, 238, 0.05);
+  color: var(--text);
+}
+
+.dock-nav-item:focus-visible {
+  background: rgba(255, 247, 238, 0.04);
   border-color: var(--line);
   color: var(--text);
+  outline: none;
+}
+
+.dock-nav-item:active {
+  background: rgba(255, 247, 238, 0.06);
+  border-color: var(--line-strong);
+  color: var(--text);
+  transform: translateY(1px);
 }
 
 .dock-nav-item-icon,

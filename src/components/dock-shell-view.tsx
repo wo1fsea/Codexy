@@ -60,7 +60,6 @@ const DEFAULT_SIDEBAR_WIDTH = 296;
 const MIN_SIDEBAR_WIDTH = 248;
 const MAX_SIDEBAR_WIDTH = 480;
 const SIDEBAR_WIDTH_STORAGE_KEY = "codexy-sidebar-width";
-const LEGACY_SIDEBAR_WIDTH_STORAGE_KEY = "codex-dock-sidebar-width";
 
 type DockShellViewProps = {
   archiveConfirmOpen: boolean;
@@ -397,9 +396,7 @@ export function DockShellView(props: DockShellViewProps) {
   }
 
   useEffect(() => {
-    const savedWidth =
-      window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY) ??
-      window.localStorage.getItem(LEGACY_SIDEBAR_WIDTH_STORAGE_KEY);
+    const savedWidth = window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
     if (!savedWidth) {
       return;
     }

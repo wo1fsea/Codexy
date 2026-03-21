@@ -209,6 +209,76 @@ test("file change items render compact edit summaries from raw diffs", async ({ 
   await expect(chip).toContainText("-1");
 });
 
+test("archiving the current thread jumps back to new thread and removes it from the live list", async ({
+  page
+}) => {
+  const archivedThreadName = `archive target ${Date.now()}`;
+
+  await installDockApiMock(page, {
+    threads: [
+      {
+        id: "thread-archive-1",
+        preview: archivedThreadName,
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000000,
+        updatedAt: 1774003600,
+        status: { type: "idle" },
+        path: null,
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "session",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: archivedThreadName,
+        turns: [
+          {
+            id: "turn-archive-1",
+            status: "completed",
+            error: null,
+            items: [
+              {
+                type: "userMessage",
+                id: "item-user",
+                content: [
+                  {
+                    type: "text",
+                    text: "archive this thread",
+                    text_elements: []
+                  }
+                ]
+              },
+              {
+                type: "agentMessage",
+                id: "item-agent",
+                text: "ready",
+                phase: "final_answer"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  });
+
+  await gotoDock(page);
+  await expect(page.locator(".dock-thread-row")).toHaveCount(1);
+  await page.locator(".dock-thread-row").first().click();
+  await expect(page.locator(".dock-stage-title")).toHaveText(archivedThreadName);
+
+  await page.locator(".dock-toolbar-confirm-shell > button.dock-icon-button").click();
+  await expect(page.locator(".dock-toolbar-confirm-popover")).toBeVisible();
+  await page
+    .locator(".dock-toolbar-confirm-popover .dock-request-action.is-primary")
+    .click();
+
+  await expect(page.locator(".dock-stage-title")).toHaveText("New thread");
+  await expect(page.locator(".dock-hero")).toBeVisible();
+  await expect(page.locator(".dock-thread-row")).toHaveCount(0);
+  await expect(page.locator(".dock-empty-sidebar")).toContainText("No matching threads");
+});
+
 test("approval buttons submit the matching server request payload", async ({ page }) => {
   const requestBodies: Array<Record<string, unknown>> = [];
 

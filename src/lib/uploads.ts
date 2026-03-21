@@ -32,7 +32,7 @@ export function getUploadUrl(uploadId: string) {
 }
 
 function getCandidateUploadRoots() {
-  return [...new Set([dockEnv.uploadRoot, ...dockEnv.legacyUploadRoots].map((root) => path.resolve(root)))];
+  return [path.resolve(dockEnv.uploadRoot)];
 }
 
 export function getUploadPublicUrl(uploadPath: string) {

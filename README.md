@@ -1,97 +1,112 @@
 # Codexy
 
-Codexy 是一个面向 Codex 主机的 Web 控制台，提供线程列表、线程阅读、继续对话、图片输入、实时输出流和审批处理能力。
+Codexy is a web control console for a Codex host. It provides thread lists, thread reading, continued conversations, image input, live output streaming, and approval handling.
 
-当前仓库中的运行时实现基于 Next.js，默认监听 `0.0.0.0:3000`，适合本机运行后再通过 Tailscale 暴露给其他设备访问。
+The runtime in this repository is built on Next.js and listens on `0.0.0.0:3000` by default. It is intended to run on the host machine and then be exposed to other devices through Tailscale.
 
-## 环境要求
+## Interface Preview
+
+<table>
+  <tr>
+    <td valign="top" width="68%">
+      <strong>Desktop</strong><br />
+      <img src="./docs/images/codexy-desktop.png" alt="Codexy desktop preview" width="100%" />
+    </td>
+    <td valign="top" width="32%">
+      <strong>Mobile</strong><br />
+      <img src="./docs/images/codexy-mobile.png" alt="Codexy mobile preview" width="100%" />
+    </td>
+  </tr>
+</table>
+
+## Requirements
 
 - Node.js 20+
 - npm 10+
 
-## 安装依赖
+## Install Dependencies
 
 ```bash
 npm install
 ```
 
-## 入口说明
+## Entrypoints
 
-### 1. Build 入口
+### 1. Build
 
-构建生产包：
+Build the production bundle:
 
 ```bash
 npm run build
 ```
 
-Windows 快捷入口：
+Windows shortcut:
 
 ```bat
 build.cmd
 ```
 
-### 2. 开发环境运行入口
+### 2. Development Runtime
 
-默认以开发模式启动在 `3000` 端口：
+Start the development server on port `3000` by default:
 
 ```bash
 npm run dev
 ```
 
-Windows 快捷入口：
+Windows shortcut:
 
 ```bat
 dev.cmd
 ```
 
-如果需要自定义端口，可以直接传端口号，或者用 `--port`：
+To use a custom port, pass the port directly or use `--port`:
 
 ```bat
 dev.cmd 3100
 dev.cmd --port 3100
 ```
 
-### 3. 正式使用环境运行入口
+### 3. Production Runtime
 
-先完成构建，再启动正式运行服务：
+Build first, then start the production server:
 
 ```bash
 npm run build
 npm run start
 ```
 
-Windows 快捷入口：
+Windows shortcut:
 
 ```bat
 start.cmd
 ```
 
-同样支持指定端口：
+Custom ports are also supported:
 
 ```bat
 start.cmd 3100
 start.cmd --port 3100
 ```
 
-## 常用验证命令
+## Common Verification Commands
 
-基础验证：
+Baseline verification:
 
 ```bash
 npm run verify
 ```
 
-包含端到端验证：
+Verification including end-to-end tests:
 
 ```bash
 npm run verify:e2e
 ```
 
-## 项目说明
+## Project Notes
 
-- Web 客户端只通过 HTTP API 和事件流与服务端交互。
-- Codexy API Server 负责对接 Codex bridge，并对浏览器暴露稳定接口。
-- 实时执行与审批流都必须经过 Codex 协议，不走自定义 shell 包装层。
+- The web client talks to the server only through HTTP APIs and the event stream.
+- The Codexy API Server connects to the Codex bridge and exposes stable browser-facing interfaces.
+- Live execution and approval flows must go through the Codex protocol, not ad hoc shell wrappers.
 
-更细的架构边界见 [agents.md](./agents.md)，产品规格见 [spec.md](./spec.md)。
+For detailed runtime ownership boundaries, see [agents.md](./agents.md). For product requirements, see [spec.md](./spec.md).

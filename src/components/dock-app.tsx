@@ -83,6 +83,32 @@ function getArchiveState(thread: DockThread) {
   return thread.source === "archive";
 }
 
+function matchesArchiveFilter(thread: DockThread, archiveFilter: ArchiveFilter) {
+  if (archiveFilter === "all") {
+    return true;
+  }
+
+  return archiveFilter === "archived"
+    ? getArchiveState(thread)
+    : !getArchiveState(thread);
+}
+
+function updateThreadListWithArchiveState(
+  threads: DockThread[],
+  nextThread: DockThread,
+  archiveFilter: ArchiveFilter
+) {
+  const nextThreads = threads.filter((thread) => thread.id !== nextThread.id);
+
+  if (!matchesArchiveFilter(nextThread, archiveFilter)) {
+    return nextThreads;
+  }
+
+  return [...nextThreads, nextThread].sort(
+    (left, right) => right.updatedAt - left.updatedAt
+  );
+}
+
 function isThreadActive(thread: DockThread | null) {
   return thread?.status.type === "active";
 }
@@ -546,7 +572,7 @@ function updateItem(
 
 function getUploadAssetUrl(path: string) {
   const normalized = path.replace(/\\/g, "/");
-  const markers = ["/.codexy/uploads/", "/.codex-dock/uploads/"];
+  const markers = ["/.codexy/uploads/"];
 
   for (const marker of markers) {
     const markerIndex = normalized.lastIndexOf(marker);
@@ -2085,14 +2111,26 @@ export function DockApp() {
         }
       );
 
-      setSelectedThread(data.thread);
+      startTransition(() => {
+        setThreads((current) =>
+          updateThreadListWithArchiveState(current, data.thread, archiveFilter)
+        );
+      });
       setArchiveConfirmOpen(false);
-      await refreshThreads();
 
-      if (nextArchived && archiveFilter === "live") {
-        setSelectedThreadId(null);
-        setSelectedThread(null);
+      if (nextArchived || !matchesArchiveFilter(data.thread, archiveFilter)) {
+        handleNewThread(data.thread.cwd);
+      } else {
+        setSelectedThread(data.thread);
       }
+
+      void refreshThreads().catch((refreshCause) => {
+        setError(
+          refreshCause instanceof Error
+            ? localizeRuntimeMessage(refreshCause.message, t)
+            : t("error.refreshThreadsFailed")
+        );
+      });
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -2104,13 +2142,18 @@ export function DockApp() {
     }
   }
 
-  function handleNewThread() {
+  function handleNewThread(nextCwd?: string) {
     setSelectedThreadId(null);
     setSelectedThread(null);
     setSidebarOpen(false);
     setPrompt("");
     setTakeoverPromptOpen(false);
     setArchiveConfirmOpen(false);
+    setRenamingThread(false);
+    setThreadNameDraft("");
+    if (nextCwd) {
+      setComposerCwd(nextCwd);
+    }
   }
 
   function renderRequestCard(request: DockServerRequest) {

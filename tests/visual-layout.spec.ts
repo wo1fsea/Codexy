@@ -95,6 +95,43 @@ test("custom dropdown renders its popup menu", async ({ page }) => {
   await expect(page.getByRole("option", { name: "All" })).toBeVisible();
 });
 
+test("new thread nav button stays frameless at rest and gains chrome on hover", async ({
+  page
+}) => {
+  await installDockApiMock(page);
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await gotoDock(page);
+
+  const newThreadButton = page.getByRole("button", { name: "New thread" });
+  await expect(newThreadButton).toBeVisible();
+
+  const restingStyles = await newThreadButton.evaluate((element) => {
+    const styles = getComputedStyle(element);
+    return {
+      backgroundColor: styles.backgroundColor,
+      borderColor: styles.borderColor
+    };
+  });
+
+  expect(restingStyles.backgroundColor).toBe("rgba(0, 0, 0, 0)");
+  expect(restingStyles.borderColor).toBe("rgba(0, 0, 0, 0)");
+
+  await newThreadButton.hover();
+  await page.waitForTimeout(220);
+
+  const hoverStyles = await newThreadButton.evaluate((element) => {
+    const styles = getComputedStyle(element);
+    return {
+      backgroundColor: styles.backgroundColor,
+      borderColor: styles.borderColor
+    };
+  });
+
+  expect(hoverStyles.backgroundColor).toBe("rgba(255, 247, 238, 0.04)");
+  expect(hoverStyles.borderColor).toBe("rgba(255, 247, 238, 0.08)");
+});
+
 test("language switcher persists the browser-local selection", async ({ page }) => {
   await installDockApiMock(page);
 
