@@ -1950,6 +1950,10 @@ pre {
   pointer-events: none;
 }
 
+.dock-composer-plan-panel .dock-plan-card.is-collapsed::after {
+  height: 0;
+}
+
 .dock-composer-plan-panel .dock-plan-card-summary strong {
   color: var(--text);
   font-weight: 500;

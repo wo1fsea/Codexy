@@ -88,6 +88,33 @@ test("latest plan card above the composer can collapse and expand", async ({
   await expect(card.locator(".dock-plan-card-explanation")).toHaveCount(0);
   await expect(card).toContainText("3 tasks, 1 completed");
 
+  const collapsedLayout = await page.evaluate(() => {
+    const card = document.querySelector(".dock-composer-plan-panel .dock-plan-card");
+    const composer = document.querySelector(".dock-composer-panel");
+    const cardRect = card?.getBoundingClientRect() ?? null;
+    const composerRect = composer?.getBoundingClientRect() ?? null;
+    const spacerStyle = card ? getComputedStyle(card, "::after") : null;
+
+    return {
+      cardBottom: cardRect ? Math.round(cardRect.bottom) : null,
+      composerTop: composerRect ? Math.round(composerRect.top) : null,
+      gap:
+        cardRect && composerRect
+          ? Math.round(composerRect.top - cardRect.bottom)
+          : null,
+      collapsedSpacerHeight: spacerStyle
+        ? Math.round(parseFloat(spacerStyle.height || "0"))
+        : null
+    };
+  });
+
+  expect(collapsedLayout.cardBottom).not.toBeNull();
+  expect(collapsedLayout.composerTop).not.toBeNull();
+  expect(collapsedLayout.gap).not.toBeNull();
+  expect(collapsedLayout.collapsedSpacerHeight).not.toBeNull();
+  expect(collapsedLayout.collapsedSpacerHeight!).toBe(0);
+  expect(collapsedLayout.gap!).toBeLessThanOrEqual(12);
+
   await toggle.click();
 
   await expect(card.locator(".dock-plan-row")).toHaveCount(3);
