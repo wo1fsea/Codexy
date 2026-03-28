@@ -18,6 +18,6 @@ export async function GET() {
       approvalPolicy: dockEnv.defaultApprovalPolicy,
       sandbox: dockEnv.defaultSandboxMode
     },
-    bridgeUrl: dockEnv.codexAppServerUrl
+    bridgeUrl: bridge.getEndpointUrl()
   });
 }

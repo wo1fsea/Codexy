@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { spawn, type ChildProcess } from "node:child_process";
+import { createServer } from "node:net";
+import { execFile, spawn, type ChildProcess } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
+import { promisify } from "node:util";
 import { WebSocket, type RawData } from "ws";
 
 import { dockEnv } from "@/lib/codex/env";
@@ -43,6 +45,269 @@ type RpcMethod =
   | "turn/start"
   | "turn/interrupt"
   | "model/list";
+
+const SOCKET_CONNECT_TIMEOUT_MS = 5_000;
+const INITIALIZE_TIMEOUT_MS = 5_000;
+const RPC_TIMEOUT_MS = 10_000;
+const APP_SERVER_READY_TIMEOUT_MS = 8_000;
+const APP_SERVER_READY_POLL_MS = 200;
+const APP_SERVER_HEALTH_TIMEOUT_MS = 1_500;
+const PROCESS_TERMINATION_TIMEOUT_MS = 5_000;
+
+const execFileAsync = promisify(execFile);
+
+function normalizeWsUrl(wsUrl: string) {
+  const url = new URL(wsUrl);
+  return `${url.protocol}//${url.host}`;
+}
+
+function toHttpUrl(wsUrl: string, pathname: string) {
+  const url = new URL(wsUrl);
+  url.protocol = url.protocol === "wss:" ? "https:" : "http:";
+  url.pathname = pathname;
+  url.search = "";
+  url.hash = "";
+  return url.toString();
+}
+
+function isLoopbackHostname(hostname: string) {
+  return (
+    hostname === "127.0.0.1" ||
+    hostname === "localhost" ||
+    hostname === "::1"
+  );
+}
+
+function getPortFromWsUrl(wsUrl: string) {
+  const url = new URL(wsUrl);
+  return Number(url.port || (url.protocol === "wss:" ? 443 : 80));
+}
+
+function getHostFromWsUrl(wsUrl: string) {
+  const url = new URL(wsUrl);
+  return url.hostname === "localhost" ? "127.0.0.1" : url.hostname;
+}
+
+async function canBindWsUrl(wsUrl: string) {
+  const url = new URL(wsUrl);
+  if (!isLoopbackHostname(url.hostname)) {
+    return true;
+  }
+
+  return new Promise<boolean>((resolve) => {
+    const server = createServer();
+    let settled = false;
+
+    const finish = (result: boolean) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      resolve(result);
+    };
+
+    server.once("error", () => finish(false));
+    server.listen(getPortFromWsUrl(wsUrl), getHostFromWsUrl(wsUrl), () => {
+      server.close((error) => finish(!error));
+    });
+  });
+}
+
+async function findAvailableLocalPort() {
+  return new Promise<number>((resolve, reject) => {
+    const server = createServer();
+
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      if (!address || typeof address === "string") {
+        server.close(() => reject(new Error("Failed to allocate a local app-server port.")));
+        return;
+      }
+
+      const { port } = address;
+      server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve(port);
+      });
+    });
+  });
+}
+
+async function waitForAppServerReady(wsUrl: string, timeoutMs: number) {
+  const deadline = Date.now() + timeoutMs;
+  const readyUrl = toHttpUrl(wsUrl, "/readyz");
+  let lastError: Error | null = null;
+
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(readyUrl, {
+        cache: "no-store"
+      });
+      if (response.ok) {
+        return;
+      }
+
+      lastError = new Error(
+        `Codex app-server readiness check failed with status ${response.status}.`
+      );
+    } catch (error) {
+      lastError =
+        error instanceof Error
+          ? error
+          : new Error("Codex app-server readiness check failed.");
+    }
+
+    await delay(APP_SERVER_READY_POLL_MS);
+  }
+
+  throw lastError ?? new Error("Codex app-server did not become ready.");
+}
+
+async function isAppServerReady(wsUrl: string, timeoutMs: number) {
+  try {
+    const response = await fetch(toHttpUrl(wsUrl, "/readyz"), {
+      cache: "no-store",
+      signal: AbortSignal.timeout(timeoutMs)
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function listListeningPidsForUrl(wsUrl: string) {
+  const url = new URL(wsUrl);
+  if (!isLoopbackHostname(url.hostname)) {
+    return [];
+  }
+
+  const port = getPortFromWsUrl(wsUrl);
+
+  if (process.platform === "win32") {
+    try {
+      const { stdout } = await execFileAsync(
+        "powershell",
+        [
+          "-NoProfile",
+          "-Command",
+          `Get-NetTCPConnection -LocalPort ${port} -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique`
+        ],
+        {
+          encoding: "utf8",
+          maxBuffer: 1024 * 1024,
+          windowsHide: true
+        }
+      );
+
+      return stdout
+        .split(/\r?\n/)
+        .map((value) => value.trim())
+        .filter(Boolean)
+        .map((value) => Number(value))
+        .filter((value) => Number.isInteger(value) && value > 0);
+    } catch {
+      return [];
+    }
+  }
+
+  try {
+    const { stdout } = await execFileAsync(
+      "sh",
+      ["-lc", `lsof -tiTCP:${port} -sTCP:LISTEN || true`],
+      {
+        encoding: "utf8",
+        maxBuffer: 1024 * 1024
+      }
+    );
+
+    return stdout
+      .split(/\r?\n/)
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .map((value) => Number(value))
+      .filter((value) => Number.isInteger(value) && value > 0);
+  } catch {
+    return [];
+  }
+}
+
+async function terminatePidTree(pid: number) {
+  if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) {
+    return;
+  }
+
+  if (process.platform === "win32") {
+    await execFileAsync(
+      "taskkill",
+      ["/PID", String(pid), "/T", "/F"],
+      {
+        windowsHide: true,
+        maxBuffer: 1024 * 1024
+      }
+    ).catch(() => {});
+    return;
+  }
+
+  try {
+    process.kill(pid, "SIGTERM");
+  } catch {}
+
+  await delay(250);
+
+  try {
+    process.kill(pid, "SIGKILL");
+  } catch {}
+}
+
+async function waitForListenerRelease(
+  wsUrl: string,
+  timeoutMs: number,
+  excludedPids: number[] = []
+) {
+  const deadline = Date.now() + timeoutMs;
+  const excluded = new Set(excludedPids);
+
+  while (Date.now() < deadline) {
+    const pids = await listListeningPidsForUrl(wsUrl);
+    if (!pids.some((pid) => !excluded.has(pid))) {
+      return;
+    }
+
+    await delay(150);
+  }
+
+  throw new Error(`Timed out waiting for listener release on ${wsUrl}.`);
+}
+
+async function waitForPortAvailability(wsUrl: string, timeoutMs: number) {
+  const url = new URL(wsUrl);
+  if (!isLoopbackHostname(url.hostname)) {
+    return;
+  }
+
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    if (await canBindWsUrl(wsUrl)) {
+      return;
+    }
+
+    await delay(150);
+  }
+
+  throw new Error(`Timed out waiting for port availability on ${wsUrl}.`);
+}
+
+function appendProcessOutput(current: string, chunk: Buffer | string) {
+  const next = `${current}${chunk.toString()}`;
+  return next.slice(-4_000);
+}
 
 function createPromptInput(
   prompt: string,
@@ -170,6 +435,49 @@ class CodexBridge extends EventEmitter {
 
   private loadedThreads = new Set<string>();
 
+  private activeAppServerUrl = normalizeWsUrl(dockEnv.codexAppServerUrl);
+
+  private ownedAppServerUrl: string | null = null;
+
+  private async terminateOwnedBridgeProcess() {
+    const child = this.child;
+    if (!child) {
+      return;
+    }
+
+    this.child = null;
+
+    const childPid = child.pid ?? null;
+    if (childPid) {
+      await terminatePidTree(childPid);
+    }
+
+    await waitForListenerRelease(
+      this.ownedAppServerUrl ?? this.activeAppServerUrl,
+      PROCESS_TERMINATION_TIMEOUT_MS,
+      childPid ? [childPid] : []
+    ).catch(() => {});
+    await waitForPortAvailability(
+      this.ownedAppServerUrl ?? this.activeAppServerUrl,
+      PROCESS_TERMINATION_TIMEOUT_MS
+    ).catch(() => {});
+  }
+
+  private async terminateStaleLocalListener(wsUrl: string) {
+    const pids = await listListeningPidsForUrl(wsUrl);
+    if (!pids.length) {
+      return false;
+    }
+
+    for (const pid of pids) {
+      await terminatePidTree(pid);
+    }
+
+    await waitForListenerRelease(wsUrl, PROCESS_TERMINATION_TIMEOUT_MS);
+    await waitForPortAvailability(wsUrl, PROCESS_TERMINATION_TIMEOUT_MS);
+    return true;
+  }
+
   async ensureConnected(): Promise<void> {
     if (this.socket?.readyState === WebSocket.OPEN) {
       return;
@@ -189,8 +497,13 @@ class CodexBridge extends EventEmitter {
   getState() {
     return {
       connected: this.socket?.readyState === WebSocket.OPEN,
-      pendingRequests: this.pendingServerRequests.size
+      pendingRequests: this.pendingServerRequests.size,
+      bridgeUrl: this.activeAppServerUrl
     };
+  }
+
+  getEndpointUrl() {
+    return this.activeAppServerUrl;
   }
 
   getPendingServerRequests(threadId?: string): DockServerRequest[] {
@@ -313,12 +626,14 @@ class CodexBridge extends EventEmitter {
   }
 
   async archiveThread(threadId: string) {
+    await this.ensureThreadLoaded(threadId);
     await this.request("thread/archive", {
       threadId
     });
   }
 
   async unarchiveThread(threadId: string) {
+    await this.ensureThreadLoaded(threadId);
     await this.request("thread/unarchive", {
       threadId
     });
@@ -408,43 +723,82 @@ class CodexBridge extends EventEmitter {
   }
 
   private async connectInternal(): Promise<void> {
+    const preferredUrl = this.ownedAppServerUrl ?? normalizeWsUrl(dockEnv.codexAppServerUrl);
+
+    if (!dockEnv.hasCodexAppServerUrlOverride && dockEnv.autoSpawnBridge) {
+      const configuredIsReady = await isAppServerReady(
+        preferredUrl,
+        APP_SERVER_HEALTH_TIMEOUT_MS
+      );
+
+      if (!configuredIsReady) {
+        await this.terminateStaleLocalListener(preferredUrl);
+        const url = await this.ensureOwnedBridgeProcess(preferredUrl);
+        await this.connectAndInitialize(url);
+        this.emitConnected();
+        return;
+      }
+    }
+
     try {
-      await this.openSocket();
+      await this.connectAndInitialize(preferredUrl);
+      this.emitConnected();
+      return;
     } catch (error) {
       if (!dockEnv.autoSpawnBridge) {
         throw error;
       }
-
-      await this.spawnBridgeProcess();
-      await this.openSocket();
     }
 
-    await this.sendRpc("initialize", {
-      clientInfo: {
-        name: "codexy",
-        title: "Codexy",
-        version: "0.1.0"
-      },
-      capabilities: {
-        experimentalApi: true
-      }
-    });
-    this.sendNotification("initialized");
+    if (!dockEnv.hasCodexAppServerUrlOverride) {
+      await this.terminateStaleLocalListener(preferredUrl);
+      const url = await this.ensureOwnedBridgeProcess(preferredUrl);
+      await this.connectAndInitialize(url);
+      this.emitConnected();
+      return;
+    }
 
+    const url = await this.spawnBridgeProcess();
+    await this.connectAndInitialize(url);
+    this.emitConnected();
+  }
+
+  private emitConnected() {
     this.emitEvent({
       type: "connection",
       status: "connected"
     });
   }
 
-  private async openSocket() {
+  private async connectAndInitialize(url: string) {
+    await this.openSocket(url);
+
+    await this.sendRpc(
+      "initialize",
+      {
+        clientInfo: {
+          name: "codexy",
+          title: "Codexy",
+          version: "0.1.0"
+        },
+        capabilities: {
+          experimentalApi: true
+        }
+      },
+      INITIALIZE_TIMEOUT_MS
+    );
+    this.sendNotification("initialized");
+    this.activeAppServerUrl = url;
+  }
+
+  private async openSocket(url: string) {
     await new Promise<void>((resolve, reject) => {
-      const socket = new WebSocket(dockEnv.codexAppServerUrl);
+      const socket = new WebSocket(url);
 
       const timeout = setTimeout(() => {
-        socket.terminate();
+        this.resetSocket(socket, "Timed out connecting to codex app-server.", false);
         reject(new Error("Timed out connecting to codex app-server."));
-      }, 5000);
+      }, SOCKET_CONNECT_TIMEOUT_MS);
 
       socket.once("open", () => {
         clearTimeout(timeout);
@@ -491,6 +845,218 @@ class CodexBridge extends EventEmitter {
         message: "Codex bridge disconnected."
       });
     });
+  }
+
+  private resetSocket(socket: WebSocket | null, message: string, emitEvent: boolean) {
+    if (!socket) {
+      return;
+    }
+
+    if (this.socket === socket) {
+      this.socket = null;
+    }
+
+    this.loadedThreads.clear();
+
+    for (const pending of this.pending.values()) {
+      pending.reject(new Error(message));
+    }
+    this.pending.clear();
+
+    socket.removeAllListeners();
+
+    try {
+      socket.terminate();
+    } catch {}
+
+    if (emitEvent) {
+      this.emitEvent({
+        type: "connection",
+        status: "disconnected",
+        message
+      });
+    }
+  }
+
+  private async ensureOwnedBridgeProcess(preferredUrl?: string) {
+    const targetUrl =
+      preferredUrl ?? this.ownedAppServerUrl ?? dockEnv.codexAppServerUrl;
+
+    if (
+      this.child &&
+      this.child.exitCode === null &&
+      !this.child.killed &&
+      this.ownedAppServerUrl === targetUrl
+    ) {
+      if (await isAppServerReady(targetUrl, APP_SERVER_HEALTH_TIMEOUT_MS)) {
+        return targetUrl;
+      }
+
+      await this.terminateOwnedBridgeProcess();
+    }
+
+    return this.spawnBridgeProcess(targetUrl);
+  }
+
+  private async spawnBridgeProcess(preferredUrl?: string) {
+    let resolvedUrl: string;
+
+    if (preferredUrl) {
+      const targetUrl = new URL(preferredUrl);
+
+      if (!isLoopbackHostname(targetUrl.hostname)) {
+        targetUrl.protocol = "ws:";
+        targetUrl.hostname = "127.0.0.1";
+        targetUrl.port = String(await findAvailableLocalPort());
+      } else if (!targetUrl.port) {
+        targetUrl.port = String(await findAvailableLocalPort());
+      }
+
+      resolvedUrl = normalizeWsUrl(targetUrl.toString());
+      await this.terminateStaleLocalListener(resolvedUrl);
+      await waitForPortAvailability(resolvedUrl, PROCESS_TERMINATION_TIMEOUT_MS);
+    } else {
+      resolvedUrl = `ws://127.0.0.1:${await findAvailableLocalPort()}`;
+    }
+
+    if (
+      this.child &&
+      this.child.exitCode === null &&
+      !this.child.killed &&
+      this.ownedAppServerUrl &&
+      this.ownedAppServerUrl !== resolvedUrl
+    ) {
+      await this.terminateOwnedBridgeProcess();
+    }
+
+    this.ownedAppServerUrl = resolvedUrl;
+    this.activeAppServerUrl = resolvedUrl;
+
+    const child = spawn(
+      dockEnv.codexBinary,
+      ["app-server", "--listen", resolvedUrl],
+      {
+        shell: process.platform === "win32",
+        stdio: ["ignore", "pipe", "pipe"]
+      }
+    );
+
+    this.child = child;
+    let stdoutBuffer = "";
+    let stderrBuffer = "";
+
+    child.stdout?.on("data", (chunk) => {
+      stdoutBuffer = appendProcessOutput(stdoutBuffer, chunk);
+    });
+    child.stderr?.on("data", (chunk) => {
+      stderrBuffer = appendProcessOutput(stderrBuffer, chunk);
+    });
+
+    child.on("exit", (code) => {
+      if (this.child === child) {
+        this.child = null;
+        this.emitEvent({
+          type: "connection",
+          status: "disconnected",
+          message: `Codex app-server exited with code ${code ?? "unknown"}.`
+        });
+      }
+    });
+
+    try {
+      await waitForAppServerReady(resolvedUrl, APP_SERVER_READY_TIMEOUT_MS);
+    } catch (error) {
+      if (this.child === child) {
+        await this.terminateOwnedBridgeProcess();
+      }
+
+      const detail = stderrBuffer.trim() || stdoutBuffer.trim();
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Codex app-server did not become ready.";
+
+      throw new Error(detail ? `${message} ${detail}` : message);
+    }
+
+    return resolvedUrl;
+  }
+
+  private sendRpc<TResult = unknown>(
+    method: RpcMethod | "initialize",
+    params: unknown,
+    timeoutMs = RPC_TIMEOUT_MS
+  ): Promise<TResult> {
+    const socket = this.socket;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      throw new Error("Codex bridge is not connected.");
+    }
+
+    const id = `${Date.now()}-${this.requestCounter++}-${randomUUID()}`;
+    const request: JsonRpcRequest = {
+      jsonrpc: "2.0",
+      id,
+      method,
+      params
+    };
+
+    return new Promise<TResult>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.pending.delete(id);
+        this.resetSocket(
+          socket,
+          `Codex bridge request ${method} timed out after ${timeoutMs}ms.`,
+          true
+        );
+        reject(
+          new Error(`Codex bridge request ${method} timed out after ${timeoutMs}ms.`)
+        );
+      }, timeoutMs);
+
+      this.pending.set(id, {
+        resolve: (value) => {
+          clearTimeout(timeout);
+          resolve(value);
+        },
+        reject: (error) => {
+          clearTimeout(timeout);
+          reject(error);
+        }
+      });
+
+      socket.send(JSON.stringify(request), (error?: Error) => {
+        if (!error) {
+          return;
+        }
+
+        clearTimeout(timeout);
+        this.pending.delete(id);
+        reject(error);
+      });
+    });
+  }
+
+  private sendNotification(method: string, params?: unknown) {
+    const socket = this.socket;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    socket.send(
+      JSON.stringify({
+        jsonrpc: "2.0",
+        method,
+        ...(typeof params === "undefined" ? {} : { params })
+      })
+    );
+  }
+
+  private async request<TResult = unknown>(
+    method: RpcMethod,
+    params: unknown
+  ): Promise<TResult> {
+    await this.ensureConnected();
+    return this.sendRpc(method, params);
   }
 
   private handleIncomingMessage(message: unknown) {
@@ -571,85 +1137,6 @@ class CodexBridge extends EventEmitter {
     this.emit("event", event);
   }
 
-  private async spawnBridgeProcess() {
-    if (this.child && this.child.exitCode === null && !this.child.killed) {
-      return;
-    }
-
-    this.child = spawn(
-      dockEnv.codexBinary,
-      ["app-server", "--listen", dockEnv.codexAppServerUrl],
-      {
-        shell: process.platform === "win32",
-        stdio: ["ignore", "pipe", "pipe"]
-      }
-    );
-
-    this.child.on("exit", (code) => {
-      if (this.child?.exitCode === code) {
-        this.emitEvent({
-          type: "connection",
-          status: "disconnected",
-          message: `Codex app-server exited with code ${code ?? "unknown"}.`
-        });
-      }
-    });
-
-    await delay(1200);
-  }
-
-  private sendRpc<TResult = unknown>(
-    method: RpcMethod | "initialize",
-    params: unknown
-  ): Promise<TResult> {
-    const socket = this.socket;
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
-      throw new Error("Codex bridge is not connected.");
-    }
-
-    const id = `${Date.now()}-${this.requestCounter++}-${randomUUID()}`;
-    const request: JsonRpcRequest = {
-      jsonrpc: "2.0",
-      id,
-      method,
-      params
-    };
-
-    return new Promise<TResult>((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
-      socket.send(JSON.stringify(request), (error?: Error) => {
-        if (!error) {
-          return;
-        }
-
-        this.pending.delete(id);
-        reject(error);
-      });
-    });
-  }
-
-  private sendNotification(method: string, params?: unknown) {
-    const socket = this.socket;
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
-      return;
-    }
-
-    socket.send(
-      JSON.stringify({
-        jsonrpc: "2.0",
-        method,
-        ...(typeof params === "undefined" ? {} : { params })
-      })
-    );
-  }
-
-  private async request<TResult = unknown>(
-    method: RpcMethod,
-    params: unknown
-  ): Promise<TResult> {
-    await this.ensureConnected();
-    return this.sendRpc(method, params);
-  }
 }
 
 declare global {

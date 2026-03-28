@@ -1312,6 +1312,7 @@ pre {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
 }
 
@@ -1322,6 +1323,48 @@ pre {
   min-width: 0;
   color: var(--text);
   font-size: var(--text-13);
+}
+
+.dock-plan-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 247, 238, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 247, 238, 0.03);
+  color: var(--text-muted);
+  font-size: var(--text-12);
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    color 140ms ease;
+}
+
+.dock-plan-toggle:hover {
+  border-color: rgba(255, 247, 238, 0.12);
+  background: rgba(255, 247, 238, 0.05);
+  color: var(--text);
+}
+
+.dock-plan-toggle:focus-visible {
+  outline: none;
+  border-color: rgba(255, 247, 238, 0.18);
+  box-shadow: 0 0 0 3px rgba(255, 247, 238, 0.05);
+}
+
+.dock-plan-toggle-icon {
+  width: 13px;
+  height: 13px;
+  transform: rotate(90deg);
+  transition: transform 140ms ease;
+}
+
+.dock-plan-toggle.is-collapsed .dock-plan-toggle-icon {
+  transform: rotate(0deg);
 }
 
 .dock-plan-card-glyph {

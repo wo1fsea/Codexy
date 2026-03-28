@@ -15,6 +15,8 @@ Before editing files, write down:
 
 - the goal of the task
 - the files or subsystems expected to change
+- the ownership boundary that must remain intact
+- the source-of-truth docs that may need updates
 - the verification steps that will be used
 - the completion criteria
 
@@ -26,7 +28,10 @@ Implementation must stay inside the approved plan.
 
 - avoid opportunistic refactors unless they are required to complete the task safely
 - keep runtime ownership boundaries from [agents.md](../agents.md)
+- keep engineering rules from [engineering-governance.md](./engineering-governance.md)
 - prefer changes that preserve stable browser-facing contracts
+- prefer local, explicit code over cross-layer abstractions created only to remove small duplication
+- normalize boundary data close to the boundary instead of leaking raw upstream shapes through the stack
 
 ## 3. Verify
 
@@ -68,6 +73,7 @@ A task is complete only when all of the following are true:
 - implementation is finished
 - required verification steps passed
 - verification artifacts were written
+- relevant source-of-truth docs were updated when the change introduced new invariants or boundary shifts
 - known failures are either fixed or explicitly called out as unresolved blockers
 
 If any verification step is skipped, the task remains incomplete.

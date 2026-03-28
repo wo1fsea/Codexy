@@ -17,6 +17,7 @@ import {
   DockSelect,
   type DockSelectOption
 } from "@/components/dock-select";
+import { AppIcon } from "@/components/dock-icons";
 import { DockShellView } from "@/components/dock-shell-view";
 import type {
   DockApprovalPolicy,
@@ -1076,9 +1077,17 @@ function PlanItemView({
     typeof item.explanation === "string" && item.explanation.trim()
       ? item.explanation.trim()
       : null;
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const toggleLabel = isCollapsed
+    ? t("actions.showTasks")
+    : t("actions.hideTasks");
+
+  useEffect(() => {
+    setIsCollapsed(false);
+  }, [item.id]);
 
   return (
-    <section className="dock-plan-card">
+    <section className={clsx("dock-plan-card", isCollapsed && "is-collapsed")}>
       <div className="dock-plan-card-head">
         <div className="dock-plan-card-summary">
           <span aria-hidden="true" className="dock-plan-card-glyph">
@@ -1088,39 +1097,53 @@ function PlanItemView({
           </span>
           <strong>{t("plan.summary", { count: steps.length, completed: completedCount })}</strong>
         </div>
+        <button
+          aria-expanded={!isCollapsed}
+          aria-label={t("aria.toggleTasks")}
+          className={clsx("dock-plan-toggle", isCollapsed && "is-collapsed")}
+          onClick={() => setIsCollapsed((current) => !current)}
+          type="button"
+        >
+          <span>{toggleLabel}</span>
+          <AppIcon className="dock-plan-toggle-icon" name="chevron" />
+        </button>
       </div>
-      {explanation ? <p className="dock-plan-card-explanation">{explanation}</p> : null}
-      <ol className="dock-plan-list">
-        {steps.map((step, index) => (
-          <li
-            className={clsx("dock-plan-row", `is-${step.status}`)}
-            key={`${step.status}-${step.step}-${index}`}
-          >
-            <span className="dock-plan-row-index">{index + 1}.</span>
-            <span aria-hidden="true" className="dock-plan-row-status" />
-            <div className="dock-plan-row-copy">
-              <ReactMarkdown
-                components={{
-                  a: ({ ...props }) => (
-                    <a
-                      {...props}
-                      rel="noreferrer"
-                      target="_blank"
-                    />
-                  ),
-                  p: ({ children }) => <>{children}</>,
-                  ul: ({ children }) => <>{children}</>,
-                  ol: ({ children }) => <>{children}</>,
-                  li: ({ children }) => <>{children}</>
-                }}
-                remarkPlugins={[remarkGfm, remarkBreaks]}
+      {!isCollapsed ? (
+        <>
+          {explanation ? <p className="dock-plan-card-explanation">{explanation}</p> : null}
+          <ol className="dock-plan-list">
+            {steps.map((step, index) => (
+              <li
+                className={clsx("dock-plan-row", `is-${step.status}`)}
+                key={`${step.status}-${step.step}-${index}`}
               >
-                {step.step}
-              </ReactMarkdown>
-            </div>
-          </li>
-        ))}
-      </ol>
+                <span className="dock-plan-row-index">{index + 1}.</span>
+                <span aria-hidden="true" className="dock-plan-row-status" />
+                <div className="dock-plan-row-copy">
+                  <ReactMarkdown
+                    components={{
+                      a: ({ ...props }) => (
+                        <a
+                          {...props}
+                          rel="noreferrer"
+                          target="_blank"
+                        />
+                      ),
+                      p: ({ children }) => <>{children}</>,
+                      ul: ({ children }) => <>{children}</>,
+                      ol: ({ children }) => <>{children}</>,
+                      li: ({ children }) => <>{children}</>
+                    }}
+                    remarkPlugins={[remarkGfm, remarkBreaks]}
+                  >
+                    {step.step}
+                  </ReactMarkdown>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </>
+      ) : null}
     </section>
   );
 }

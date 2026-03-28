@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { getCodexBridge } from "@/lib/codex/bridge";
-import { enrichThreadWithSessionHistory } from "@/lib/codex/session-history";
+import {
+  enrichThreadWithSessionHistory,
+  readThreadFromSessionHistory
+} from "@/lib/codex/session-history";
 
 export const runtime = "nodejs";
 
@@ -15,9 +18,18 @@ export async function GET(_: Request, context: Params) {
   try {
     const { threadId } = await context.params;
     const bridge = getCodexBridge();
-    const thread = await enrichThreadWithSessionHistory(
-      await bridge.readThread(threadId)
-    );
+    let thread;
+
+    try {
+      thread = await enrichThreadWithSessionHistory(await bridge.readThread(threadId));
+    } catch (error) {
+      const fallbackThread = await readThreadFromSessionHistory(threadId);
+      if (!fallbackThread) {
+        throw error;
+      }
+
+      thread = fallbackThread;
+    }
 
     return NextResponse.json({ thread });
   } catch (error) {

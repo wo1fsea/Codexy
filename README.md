@@ -108,5 +108,6 @@ npm run verify:e2e
 - The web client talks to the server only through HTTP APIs and the event stream.
 - The Codexy API Server connects to the Codex bridge and exposes stable browser-facing interfaces.
 - Live execution and approval flows must go through the Codex protocol, not ad hoc shell wrappers.
+- Engineering rules for orthogonality, simplicity, and context discipline live in [docs/engineering-governance.md](./docs/engineering-governance.md).
 
 For detailed runtime ownership boundaries, see [agents.md](./agents.md). For product requirements, see [spec.md](./spec.md).

@@ -54,6 +54,29 @@ Codexy is organized around a small set of runtime agents and ownership boundarie
 - Mobile approvals are enabled, but every destructive or privileged action must remain explicit in the UI.
 - When desktop and web both touch the same thread, the web client warns and offers a visible "take over" action instead of silently racing.
 
+## Engineering Governance
+
+- Keep dependency direction strict:
+  - `src/components/**` renders UI and client state only. It must not call the bridge, filesystem, upload storage, or Tailscale adapters directly.
+  - `src/app/api/**` owns HTTP parsing, validation, response shaping, and orchestration across backend adapters.
+  - `src/lib/codex/**` owns Codex protocol, bridge lifecycle, and normalized runtime events. It must not depend on React components or browser-only formatting concerns.
+  - `src/lib/uploads.ts` and `src/lib/tailscale.ts` stay as isolated host adapters rather than becoming general utility sinks.
+- Favor orthogonal code:
+  - Give each module one primary reason to change.
+  - Prefer explicit boundary mappers instead of leaking raw upstream payloads through multiple layers.
+  - If a helper needs knowledge of both UI concerns and bridge concerns, it belongs in a clearer boundary layer or should stay duplicated locally until a stable abstraction exists.
+- Favor simple code over clever code:
+  - Prefer thin route handlers, cohesive bridge methods, and focused components.
+  - A small amount of local duplication is better than a shared abstraction that couples unrelated layers.
+  - Do not introduce a reusable helper unless at least two real call sites share the same concept and lifecycle.
+- Govern context explicitly:
+  - Load only the code and docs required for the task at hand.
+  - Keep plans narrow and update them before expanding scope.
+  - Do not mix behavior changes, refactors, and documentation rewrites in one patch unless the plan is updated first.
+- Keep docs aligned with reality:
+  - When ownership boundaries, invariants, or contracts change, update the relevant source-of-truth docs in the same patch.
+  - Use [docs/engineering-governance.md](./docs/engineering-governance.md) for the expanded engineering rules, [spec.md](./spec.md) for product behavior, and [visual-spec.md](./visual-spec.md) for UI contract changes.
+
 ## Required Change Workflow
 
 Every repository change must follow this sequence:

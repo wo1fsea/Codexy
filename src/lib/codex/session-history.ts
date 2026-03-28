@@ -6,6 +6,16 @@ import path from "node:path";
 import type { DockThread, DockThreadItem, DockTurn, DockUserInput } from "@/lib/codex/types";
 
 const SESSION_FILE_CACHE = new Map<string, string | null>();
+const SESSION_SUMMARY_CACHE_TTL_MS = 5_000;
+const SESSION_ID_PATTERN =
+  /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i;
+
+let sessionSummaryCache:
+  | {
+      expiresAt: number;
+      threads: DockThread[];
+    }
+  | null = null;
 
 type SessionJsonlRecord = {
   type?: unknown;
@@ -13,6 +23,17 @@ type SessionJsonlRecord = {
 };
 
 type SessionTurnItems = Map<string, DockThreadItem[]>;
+type SessionThreadMetadata = {
+  threadId: string;
+  cwd: string;
+  cliVersion: string;
+  modelProvider: string;
+  createdAt: number;
+  preview: string;
+  gitInfo: DockThread["gitInfo"];
+  agentNickname: string | null;
+  agentRole: string | null;
+};
 type SessionPlanEntry = {
   step: string;
   status: unknown;
@@ -26,6 +47,75 @@ function getCodexSessionsRoot() {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function getString(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function getTimestampMs(value: unknown, fallback: number) {
+  const stringValue = getString(value);
+  if (!stringValue) {
+    return fallback;
+  }
+
+  const parsed = Date.parse(stringValue);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function getSessionIdFromFilePath(filePath: string) {
+  const match = path.basename(filePath).match(SESSION_ID_PATTERN);
+  return match?.[1] ?? null;
+}
+
+function normalizePreviewText(text: string) {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return "";
+  }
+
+  return normalized.length > 160 ? `${normalized.slice(0, 157)}...` : normalized;
+}
+
+function createThreadFromSessionMetadata(
+  metadata: SessionThreadMetadata,
+  filePath: string,
+  updatedAt: number,
+  turns: DockTurn[]
+): DockThread {
+  return {
+    id: metadata.threadId,
+    preview: metadata.preview || path.basename(filePath, ".jsonl"),
+    ephemeral: false,
+    modelProvider: metadata.modelProvider,
+    createdAt: metadata.createdAt,
+    updatedAt,
+    status: { type: "idle" as const },
+    path: filePath,
+    cwd: metadata.cwd,
+    cliVersion: metadata.cliVersion,
+    source: "session",
+    agentNickname: metadata.agentNickname,
+    agentRole: metadata.agentRole,
+    gitInfo: metadata.gitInfo,
+    name: null,
+    turns
+  };
+}
+
+function cloneThreadSummary(thread: DockThread): DockThread {
+  return {
+    ...thread,
+    status:
+      thread.status.type === "active"
+        ? {
+            type: "active",
+            activeFlags: [...thread.status.activeFlags]
+          }
+        : { type: thread.status.type },
+    gitInfo: thread.gitInfo ? { ...thread.gitInfo } : null,
+    turns: []
+  };
 }
 
 function createTextInput(text: string): DockUserInput {
@@ -419,6 +509,208 @@ function parseSessionTurnItems(content: string) {
   return turnItems;
 }
 
+function buildTurnsFromSessionContent(content: string) {
+  const turnItems = parseSessionTurnItems(content);
+  const turns = new Map<
+    string,
+    {
+      order: number;
+      status: DockTurn["status"];
+      error: DockTurn["error"];
+    }
+  >();
+  let currentTurnIdHint: string | null = null;
+  let nextOrder = 0;
+
+  const ensureTurn = (turnId: string) => {
+    const existing = turns.get(turnId);
+    if (existing) {
+      return existing;
+    }
+
+    const created = {
+      order: nextOrder++,
+      status: "completed" as const,
+      error: null
+    };
+    turns.set(turnId, created);
+    return created;
+  };
+
+  for (const line of content.split(/\r?\n/)) {
+    if (!line.trim()) {
+      continue;
+    }
+
+    let record: SessionJsonlRecord;
+    try {
+      record = JSON.parse(line) as SessionJsonlRecord;
+    } catch {
+      continue;
+    }
+
+    if (!isRecord(record.payload)) {
+      continue;
+    }
+
+    const payload = record.payload;
+    const payloadTurnId =
+      typeof payload.turn_id === "string" ? payload.turn_id : null;
+
+    if (payloadTurnId) {
+      currentTurnIdHint = payloadTurnId;
+    }
+
+    if (record.type === "turn_context" && payloadTurnId) {
+      ensureTurn(payloadTurnId);
+      continue;
+    }
+
+    if (record.type !== "event_msg") {
+      continue;
+    }
+
+    const eventType = getString(payload.type);
+    const turnId = payloadTurnId ?? currentTurnIdHint;
+    if (!eventType || !turnId) {
+      continue;
+    }
+
+    const turn = ensureTurn(turnId);
+
+    if (eventType === "task_started") {
+      turn.status = "inProgress";
+      continue;
+    }
+
+    if (eventType === "task_complete" || eventType === "task_completed") {
+      turn.status = "completed";
+      turn.error = null;
+      continue;
+    }
+
+    if (eventType === "task_interrupted") {
+      turn.status = "interrupted";
+      continue;
+    }
+
+    if (eventType === "task_failed") {
+      turn.status = "failed";
+      turn.error =
+        typeof payload.message === "string" && payload.message.trim()
+          ? { message: payload.message }
+          : null;
+    }
+  }
+
+  for (const turnId of turnItems.keys()) {
+    ensureTurn(turnId);
+  }
+
+  return [...turns.entries()]
+    .sort((left, right) => left[1].order - right[1].order)
+    .map(([turnId, turn]) => ({
+      id: turnId,
+      items: turnItems.get(turnId) ?? [],
+      status: turn.status,
+      error: turn.error
+    }));
+}
+
+function extractThreadMetadataFromSessionContent(
+  content: string,
+  filePath: string,
+  updatedAt: number
+): SessionThreadMetadata | null {
+  let threadId = getSessionIdFromFilePath(filePath);
+  let cwd = "";
+  let cliVersion = "";
+  let modelProvider = "openai";
+  let createdAt = updatedAt;
+  let preview = "";
+  let gitInfo: DockThread["gitInfo"] = null;
+  let agentNickname: string | null = null;
+  let agentRole: string | null = null;
+  let sawRootSessionMeta = false;
+
+  for (const line of content.split(/\r?\n/)) {
+    if (!line.trim()) {
+      continue;
+    }
+
+    let record: SessionJsonlRecord;
+    try {
+      record = JSON.parse(line) as SessionJsonlRecord;
+    } catch {
+      continue;
+    }
+
+    if (!isRecord(record.payload)) {
+      continue;
+    }
+
+    const payload = record.payload;
+
+    if (record.type === "session_meta" && !sawRootSessionMeta) {
+      sawRootSessionMeta = true;
+      threadId = getString(payload.id) ?? threadId;
+      cwd = getString(payload.cwd) ?? cwd;
+      cliVersion = getString(payload.cli_version) ?? cliVersion;
+      modelProvider = getString(payload.model_provider) ?? modelProvider;
+      createdAt = getTimestampMs(payload.timestamp, createdAt);
+      agentNickname = getString(payload.agent_nickname);
+      agentRole = getString(payload.agent_role);
+
+      if (isRecord(payload.git)) {
+        gitInfo = {
+          branch: getString(payload.git.branch),
+          sha: getString(payload.git.commit_hash),
+          originUrl: getString(payload.git.repository_url)
+        };
+      }
+
+      continue;
+    }
+
+    if (preview || record.type !== "event_msg") {
+      continue;
+    }
+
+    const payloadType = getString(payload.type);
+
+    if (payloadType === "user_message") {
+      preview = normalizePreviewText(getString(payload.message) ?? "");
+
+      if (!preview) {
+        const localImages = Array.isArray(payload.local_images)
+          ? payload.local_images
+          : [];
+        const images = Array.isArray(payload.images) ? payload.images : [];
+
+        if (localImages.length || images.length) {
+          preview = "Image attachment";
+        }
+      }
+    }
+  }
+
+  if (!threadId || !cwd) {
+    return null;
+  }
+
+  return {
+    threadId,
+    cwd,
+    cliVersion,
+    modelProvider,
+    createdAt,
+    preview,
+    gitInfo,
+    agentNickname,
+    agentRole
+  };
+}
+
 function mergeTurnWithSessionItems(turn: DockTurn, sessionItems: DockThreadItem[]) {
   const hasAuxiliarySessionItems = sessionItems.some(
     (item) =>
@@ -497,8 +789,7 @@ async function findSessionFile(threadId: string): Promise<string | null> {
     return SESSION_FILE_CACHE.get(threadId) ?? null;
   }
 
-  const sessionsRoot = getCodexSessionsRoot();
-  const pending = [sessionsRoot];
+  const pending = [getCodexSessionsRoot()];
   let match: string | null = null;
 
   while (pending.length) {
@@ -543,6 +834,121 @@ async function findSessionFile(threadId: string): Promise<string | null> {
   return match;
 }
 
+async function listSessionFiles() {
+  const pending = [getCodexSessionsRoot()];
+  const files: string[] = [];
+
+  while (pending.length) {
+    const currentDir = pending.pop();
+    if (!currentDir) {
+      continue;
+    }
+
+    let entries: Dirent[];
+    try {
+      entries = await fs.readdir(currentDir, {
+        withFileTypes: true
+      });
+    } catch {
+      continue;
+    }
+
+    for (const entry of entries) {
+      const entryPath = path.join(currentDir, entry.name);
+
+      if (entry.isDirectory()) {
+        pending.push(entryPath);
+        continue;
+      }
+
+      if (entry.isFile() && entry.name.endsWith(".jsonl")) {
+        files.push(entryPath);
+      }
+    }
+  }
+
+  return files;
+}
+
+async function readThreadSummaryFromSessionFile(
+  filePath: string
+): Promise<DockThread | null> {
+  let content: string;
+  let stats: Awaited<ReturnType<typeof fs.stat>>;
+
+  try {
+    [content, stats] = await Promise.all([
+      fs.readFile(filePath, "utf8"),
+      fs.stat(filePath)
+    ]);
+  } catch {
+    return null;
+  }
+
+  const metadata = extractThreadMetadataFromSessionContent(
+    content,
+    filePath,
+    stats.mtimeMs
+  );
+  if (!metadata) {
+    return null;
+  }
+
+  return createThreadFromSessionMetadata(metadata, filePath, stats.mtimeMs, []);
+}
+
+async function getCachedSessionThreadSummaries() {
+  if (sessionSummaryCache && sessionSummaryCache.expiresAt > Date.now()) {
+    return sessionSummaryCache.threads.map(cloneThreadSummary);
+  }
+
+  const files = await listSessionFiles();
+  const threads = (
+    await Promise.all(files.map((filePath) => readThreadSummaryFromSessionFile(filePath)))
+  )
+    .filter((thread): thread is DockThread => Boolean(thread))
+    .sort((left, right) => right.updatedAt - left.updatedAt);
+
+  sessionSummaryCache = {
+    expiresAt: Date.now() + SESSION_SUMMARY_CACHE_TTL_MS,
+    threads
+  };
+
+  return threads.map(cloneThreadSummary);
+}
+
+export async function listThreadSummariesFromSessionHistory(input: {
+  limit?: number | null;
+  searchTerm?: string | null;
+  cwd?: string | null;
+  archived?: boolean | null;
+}) {
+  if (input.archived) {
+    return [];
+  }
+
+  const searchTerm = getString(input.searchTerm)?.toLowerCase() ?? null;
+  const cwd = getString(input.cwd);
+  const limit = input.limit ?? 200;
+  const threads = await getCachedSessionThreadSummaries();
+
+  return threads
+    .filter((thread) => {
+      if (cwd && thread.cwd !== cwd) {
+        return false;
+      }
+
+      if (!searchTerm) {
+        return true;
+      }
+
+      const haystack =
+        `${thread.name ?? ""} ${thread.preview} ${thread.cwd}`.toLowerCase();
+      return haystack.includes(searchTerm);
+    })
+    .slice(0, limit);
+}
+
 export async function enrichThreadWithSessionHistory(thread: DockThread) {
   const sessionFile = await findSessionFile(thread.id);
   if (!sessionFile) {
@@ -568,4 +974,38 @@ export async function enrichThreadWithSessionHistory(thread: DockThread) {
       return items ? mergeTurnWithSessionItems(turn, items) : turn;
     })
   };
+}
+
+export async function readThreadFromSessionHistory(threadId: string) {
+  const sessionFile = await findSessionFile(threadId);
+  if (!sessionFile) {
+    return null;
+  }
+
+  let content: string;
+  let stats: Awaited<ReturnType<typeof fs.stat>>;
+  try {
+    [content, stats] = await Promise.all([
+      fs.readFile(sessionFile, "utf8"),
+      fs.stat(sessionFile)
+    ]);
+  } catch {
+    return null;
+  }
+
+  const metadata = extractThreadMetadataFromSessionContent(
+    content,
+    sessionFile,
+    stats.mtimeMs
+  );
+  if (!metadata) {
+    return null;
+  }
+
+  return createThreadFromSessionMetadata(
+    metadata,
+    sessionFile,
+    stats.mtimeMs,
+    buildTurnsFromSessionContent(content)
+  );
 }
