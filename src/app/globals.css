@@ -1922,6 +1922,7 @@ pre {
 }
 
 .dock-composer-plan-panel {
+  --dock-plan-overlap-clearance: 30px;
   position: relative;
   z-index: 0;
   margin-bottom: -18px;
@@ -1936,6 +1937,17 @@ pre {
   background: rgba(255, 247, 238, 0.024);
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
+}
+
+.dock-composer-plan-panel .dock-plan-card-body {
+  max-height: max(96px, calc(min(26vh, 180px) - var(--dock-plan-overlap-clearance)));
+}
+
+.dock-composer-plan-panel .dock-plan-card::after {
+  content: "";
+  display: block;
+  height: var(--dock-plan-overlap-clearance);
+  pointer-events: none;
 }
 
 .dock-composer-plan-panel .dock-plan-card-summary strong {
@@ -2366,6 +2378,7 @@ pre {
   }
 
   .dock-composer-plan-panel {
+    --dock-plan-overlap-clearance: calc(82px + env(safe-area-inset-bottom));
     max-height: min(24vh, 180px);
   }
 

@@ -206,3 +206,121 @@ test("plan header stays pinned while task content scrolls", async ({ page }) => 
   expect(headerAfter).not.toBeNull();
   expect(Math.abs(headerAfter!.y - headerBefore!.y)).toBeLessThanOrEqual(1);
 });
+
+test("mobile task panel keeps the last task above the overlapping composer shell", async ({
+  page
+}) => {
+  const mobileSteps = Array.from({ length: 12 }, (_, index) => ({
+    step:
+      index === 11
+        ? "Final mobile clearance step with enough copy to wrap across multiple lines and expose bottom overlap if the scroll body ends too close to the composer shell."
+        : `Mobile clearance step ${index + 1}`,
+    status: index < 2 ? "completed" : index === 2 ? "inProgress" : "pending"
+  }));
+
+  await installDockApiMock(page, {
+    threads: [
+      {
+        id: "thread-plan-mobile-clearance",
+        preview: "Plan mobile clearance",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774003200,
+        updatedAt: 1774003205,
+        status: { type: "idle" },
+        path: null,
+        cwd: "C:\\Users\\wo1fsea\\Documents\\codex_mw",
+        cliVersion: "0.112.0",
+        source: "session",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: "Plan mobile clearance thread",
+        turns: [
+          {
+            id: "turn-plan-mobile-clearance",
+            status: "completed",
+            error: null,
+            items: [
+              {
+                type: "userMessage",
+                id: "user-plan-mobile-clearance",
+                content: [
+                  {
+                    type: "text",
+                    text: "Keep the mobile task body readable above the composer.",
+                    text_elements: []
+                  }
+                ]
+              },
+              {
+                type: "plan",
+                id: "plan-mobile-clearance",
+                text: mobileSteps.map((step, index) => `${index + 1}. ${step.step}`).join("\n"),
+                explanation:
+                  "The last visible task should stop above the overlapped composer shell on mobile.",
+                steps: mobileSteps
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  });
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await gotoDock(page);
+  await page.locator(".dock-thread-row").first().click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator(".dock-sidebar-tools .dock-mobile-only").evaluate((element) => {
+    (element as HTMLButtonElement).click();
+  });
+
+  const panel = page.locator(".dock-composer-plan-panel");
+  const card = panel.locator(".dock-plan-card");
+  const body = panel.locator(".dock-plan-card-body");
+
+  await expect(panel).toBeVisible();
+  await expect(card).toBeVisible();
+  await expect(body).toBeVisible();
+
+  const metrics = await body.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+
+    const card = document.querySelector(".dock-composer-plan-panel .dock-plan-card");
+    const composer = document.querySelector(".dock-composer-panel");
+    const lastStep = document.querySelector(
+      ".dock-composer-plan-panel .dock-plan-row:last-child .dock-plan-row-copy"
+    );
+    const composerRect = composer?.getBoundingClientRect() ?? null;
+    const lastStepRect = lastStep?.getBoundingClientRect() ?? null;
+    const bodyStyle = getComputedStyle(element);
+    const spacerStyle = card ? getComputedStyle(card, "::after") : null;
+
+    return {
+      scrollTop: Math.round(element.scrollTop),
+      maxScroll: Math.round(element.scrollHeight - element.clientHeight),
+      bodyPaddingBottom: Math.round(parseFloat(bodyStyle.paddingBottom || "0")),
+      spacerHeight: spacerStyle
+        ? Math.round(parseFloat(spacerStyle.height || "0"))
+        : null,
+      composerTop: composerRect ? Math.round(composerRect.top) : null,
+      lastStepBottom: lastStepRect ? Math.round(lastStepRect.bottom) : null,
+      clearance:
+        composerRect && lastStepRect
+          ? Math.round(composerRect.top - lastStepRect.bottom)
+          : null
+    };
+  });
+
+  expect(metrics.maxScroll).toBeGreaterThan(0);
+  expect(metrics.scrollTop).toBeGreaterThanOrEqual(metrics.maxScroll - 1);
+  expect(metrics.bodyPaddingBottom).toBeLessThanOrEqual(16);
+  expect(metrics.spacerHeight).not.toBeNull();
+  expect(metrics.spacerHeight!).toBeGreaterThanOrEqual(60);
+  expect(metrics.composerTop).not.toBeNull();
+  expect(metrics.lastStepBottom).not.toBeNull();
+  expect(metrics.clearance).not.toBeNull();
+  expect(metrics.lastStepBottom!).toBeLessThan(metrics.composerTop!);
+  expect(metrics.clearance!).toBeGreaterThanOrEqual(12);
+});
