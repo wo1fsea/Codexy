@@ -79,7 +79,8 @@ codexy/
 │  │  │  ├─ threads/[threadId]/route.ts
 │  │  │  ├─ threads/[threadId]/interrupt/route.ts
 │  │  │  ├─ threads/[threadId]/turns/route.ts
-│  │  │  └─ uploads/route.ts
+│  │  │  ├─ uploads/route.ts
+│  │  │  └─ uploads/[uploadId]/route.ts
 │  │  ├─ globals.css
 │  │  ├─ layout.tsx
 │  │  └─ page.tsx
