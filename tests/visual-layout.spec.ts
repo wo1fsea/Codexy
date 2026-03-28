@@ -27,7 +27,10 @@ test("desktop layout follows the codexy visual contract", async ({ page }) => {
     const stageScroll = document.querySelector(".dock-stage-scroll");
     const threadList = document.querySelector(".dock-thread-sections");
     const composer = document.querySelector(".dock-composer-shell");
+    const composerInput = document.querySelector("textarea.dock-composer-input");
     const statusFooter = document.querySelector(".dock-status-footer");
+    const shell = document.querySelector(".dock-shell");
+    const header = document.querySelector(".dock-stage-header");
 
     const sidebarBox = sidebar?.getBoundingClientRect() ?? null;
     const stageBox = stage?.getBoundingClientRect() ?? null;
@@ -44,6 +47,14 @@ test("desktop layout follows the codexy visual contract", async ({ page }) => {
       stageTitleFontSize: stageTitle ? getComputedStyle(stageTitle).fontSize : null,
       stageScrollOverflow: stageScroll ? getComputedStyle(stageScroll).overflowY : null,
       threadListOverflow: threadList ? getComputedStyle(threadList).overflowY : null,
+      shellBackgroundImage: shell ? getComputedStyle(shell).backgroundImage : null,
+      stageBackgroundImage: stage ? getComputedStyle(stage).backgroundImage : null,
+      headerBackgroundImage: header ? getComputedStyle(header).backgroundImage : null,
+      composerBackgroundImage: composer ? getComputedStyle(composer).backgroundImage : null,
+      composerInputRows: composerInput?.getAttribute("rows"),
+      composerInputMinHeight: composerInput
+        ? Math.round(parseFloat(getComputedStyle(composerInput).minHeight))
+        : null,
       composerBottomGap:
         composerBox && stageBox
           ? Math.round(stageBox.bottom - composerBox.bottom)
@@ -63,18 +74,26 @@ test("desktop layout follows the codexy visual contract", async ({ page }) => {
   expect(metrics.htmlOverflow).toBe("hidden");
   expect(metrics.sidebarWidth).toBeGreaterThanOrEqual(248);
   expect(metrics.sidebarWidth).toBeLessThanOrEqual(480);
-  expect(metrics.searchHeight).toBeGreaterThanOrEqual(40);
-  expect(metrics.selectHeight).toBeGreaterThanOrEqual(38);
+  expect(metrics.searchHeight).toBeGreaterThanOrEqual(34);
+  expect(metrics.selectHeight).toBeGreaterThanOrEqual(32);
   expect(metrics.sidebarTitleFontSize).toBe("15px");
   expect(metrics.stageTitleFontSize).toBe("15px");
   expect(metrics.stageScrollOverflow).toBe("auto");
   expect(metrics.threadListOverflow).toBe("auto");
+  expect(metrics.shellBackgroundImage).toBe("none");
+  expect(metrics.stageBackgroundImage).toBe("none");
+  expect(metrics.headerBackgroundImage).toBe("none");
+  expect(metrics.composerBackgroundImage).toBe("none");
+  expect(metrics.composerInputRows).toBe("2");
+  expect(metrics.composerInputMinHeight).not.toBeNull();
+  expect(metrics.composerInputMinHeight!).toBeGreaterThanOrEqual(40);
+  expect(metrics.composerInputMinHeight!).toBeLessThanOrEqual(50);
   expect(metrics.composerBottomGap).not.toBeNull();
   expect(metrics.statusBottomGap).not.toBeNull();
   expect(metrics.composerStatusGap).not.toBeNull();
   expect(metrics.composerBottomGap!).toBeLessThanOrEqual(110);
   expect(metrics.statusBottomGap!).toBeLessThanOrEqual(32);
-  expect(metrics.composerStatusGap!).toBeGreaterThanOrEqual(8);
+  expect(metrics.composerStatusGap!).toBeGreaterThanOrEqual(6);
   expect(metrics.composerStatusGap!).toBeLessThanOrEqual(20);
 });
 

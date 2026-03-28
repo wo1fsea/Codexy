@@ -11,8 +11,9 @@ The UI contract in this document is normative for desktop and serves as the base
 1. Use a quiet, warm graphite palette instead of pure black or neon accents.
 2. Keep typography compact and stable. Most interface text should live in the 12px to 15px range.
 3. Favor crisp borders, subtle fills, and shallow shadows over glossy cards.
-4. Preserve clear fixed zones: navigation, scroll region, composer dock.
-5. Match Codex Desktop density. Do not inflate paddings, radii, or button sizes without a concrete mobile reason.
+4. Do not use gradients. Surfaces should separate with tone, border, and density instead of decorative fills.
+5. Preserve clear fixed zones: navigation, scroll region, composer dock.
+6. Match Codex Desktop density and tighten further on phone layouts. Do not inflate paddings, radii, helper copy, or button sizes without a concrete mobile reason.
 
 ## Typography
 
@@ -20,6 +21,7 @@ The UI contract in this document is normative for desktop and serves as the base
 
 - UI font: `"Segoe UI Variable Display", "Aptos", "Segoe UI", sans-serif`
 - Monospace font: `"JetBrains Mono", "Cascadia Code", "Consolas", monospace`
+- Brand / wordmark font: `"Iowan Old Style", "Palatino Linotype", "Book Antiqua", "Times New Roman", serif`
 
 ### Type Scale
 
@@ -36,6 +38,9 @@ The UI contract in this document is normative for desktop and serves as the base
 - `500`: body emphasis, labels
 - `600`: thread titles, section titles, stage title
 
+Brand cues may use serif typography and larger scale than surrounding chrome when they replace an icon logo.
+When the empty-state hero uses a wordmark, the order should read: brand wordmark, build prompt, then workspace name.
+
 ## Spacing Scale
 
 - `4px`: micro separation
@@ -47,6 +52,8 @@ The UI contract in this document is normative for desktop and serves as the base
 - `40px+`: empty-state spacing only
 
 All component sizing should derive from this scale.
+
+On phone breakpoints, prefer the `4px` to `12px` range and collapse optional spacing before shrinking core tap targets.
 
 ## Color Tokens
 
@@ -136,11 +143,12 @@ The product should not rely on only `primary / muted / soft`. It needs a stable 
 
 ### Sidebar Controls
 
-- Search field height: `40px`
-- Filter select height: `38px`
-- Search + filter group gap: `8px to 10px`
+- Search field height: `34px`
+- Filter select height: `32px`
+- Search + filter group gap: `3px to 6px`
 - Sidebar title size: `15px`
-- Eyebrow size: `11px`
+- Eyebrow labels are optional and should be removed when they repeat the title or cost mobile space.
+- Dense control chrome should use `6px to 8px` horizontal inset and keep text visually close to the border.
 
 ### Project Groups
 
@@ -150,35 +158,50 @@ The product should not rely on only `primary / muted / soft`. It needs a stable 
 
 ### Thread Rows
 
-- Row padding: `10px 12px`
+- Row padding: `7px 10px`
 - Title size: `13px`, weight `600`
 - Preview size: `12px to 13px`
 - Metadata size: `11px to 12px`
 - Selected state uses a subtle filled background and visible border.
+- Prefer one time representation per row. Do not show duplicated timestamp formats in the same compact row.
 
 ### Stage Header
 
-- Header height target: `56px`
+- Header height target: `52px`
 - Stage title size: `15px`, weight `600`
 - Subtitle size: `12px`
-- Toolbar actions use `32px to 34px` hit areas
+- Toolbar actions use `28px to 32px` hit areas
+- On phone widths, collapse stage subtitle before wrapping the header into multiple tall rows.
 
 ### Transcript
 
 - Turn metadata size: `11px to 12px`
 - User messages align to the right edge of the transcript column
 - Assistant/tool cards align to the left edge
-- Message card radius: `16px`
-- Artifact/request card radius: `16px`
-- Long text uses `1.6` to `1.7` line height
+- Message card radius: `12px`
+- Artifact/request card radius: `12px`
+- Long text uses `1.5` to `1.6` line height
+- Empty and loading states should stay compact. Avoid large hero cards or dashed placeholder boxes.
 
 ### Composer
 
 - Composer remains visible on every breakpoint
 - Composer shell radius: `18px`
-- Composer input min height: `120px`
+- Composer textarea defaults to `2` visible rows
+- Composer input min height should track two text lines: about `42px` desktop and `48px` phone at the default type scale
 - Action controls sit on the same baseline as the bottom row of selects
-- Status pills sit directly under the composer with a `12px` gap
+- Status pills sit directly under the composer with a `6px` to `10px` gap
+- Plan panels, attachment chips, and approval banners should feel like inline utilities rather than stacked cards.
+- Plan panel collapse control should be a small borderless icon on the right edge, not a labeled button.
+- Command execution cards must keep a visible expand affordance on the right edge; if the native disclosure marker is hidden, replace it with a compact custom chevron.
+- The task panel should inset only slightly relative to the input shell and stay visually close to the outer frame.
+- Task-body copy should sit slightly inward from the frame so scrolling text does not hug the border.
+- In each task row, the status marker sits to the left of the numeric index, and the text block starts after both markers.
+- The input shell should overlap the task panel with a minimal seam so the two read as interlocked surfaces, with no visible gap between them.
+- The task panel keeps its own frame. The input region and bottom controls share a separate frame beneath it; do not wrap both inside a third outer card.
+- The task panel frame and header stay outside the scroll region. Only the inner task-content area scrolls.
+- The overlapped lower edge of the task panel should remain visually flat; do not expose its lower rounded corners above the input shell.
+- The textarea itself should render frameless inside the input-region shell.
 
 ## Interaction States
 
@@ -204,6 +227,7 @@ Every UI-facing change must pass all three gates:
      - composer stays visible
      - sidebar resize still works
      - project collapse still works
+     - primary shell surfaces render with solid fills, not gradients
 
 3. Automated regression
    - `npm run typecheck`
@@ -220,6 +244,7 @@ The automated suite must assert at least the following desktop invariants:
 - stage title and sidebar title use the defined font sizes
 - composer is present near the bottom dock rather than floating in the middle of the stage
 - transcript is rendered inside the stage scroll container
+- shell, stage, header, and composer surfaces render without gradients
 
 ## Change Control
 

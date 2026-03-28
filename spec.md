@@ -38,7 +38,7 @@ The canonical UI contract lives in [visual-spec.md](C:\Users\wo1fsea\Documents\c
 - Runs inside the Next.js server runtime.
 - Talks to `codex app-server` over local WebSocket JSON-RPC.
 - Starts the bridge process automatically unless an external bridge URL is configured.
-- Uses Tailscale CLI only for host status reporting.
+- Uses Tailscale LocalAPI for host status and serve configuration. On platforms where LocalAPI is not directly reachable from Node, the host adapter may establish a local proxy first.
 
 ### Codex Integration
 
@@ -161,8 +161,10 @@ codexy/
 ## Deployment Model
 
 - Local app binds to `0.0.0.0:3000`.
-- Recommended remote access is `tailscale serve 3000`.
-- UI shows host tailnet DNS name and IPs to reduce setup ambiguity.
+- Development mode must allow the machine's active non-loopback hosts plus Tailnet DNS names to reach Next dev assets and websocket endpoints, so remote `http://<tailscale-ip>:3000` access hydrates and interactive controls keep working.
+- On startup/status load, the server should best-effort ensure the node's LocalAPI serve config points the root `https://<node>.ts.net/` route at Codexy's local `127.0.0.1:3000` backend when no existing serve config is present.
+- Recommended remote access is the served HTTPS URL on the node's `.ts.net` name when serve is available, otherwise the direct Tailscale IP with `:3000`.
+- UI should prefer showing the actual served tailnet URL, otherwise the direct Tailscale IP with `:3000`, instead of a bare DNS name.
 
 ## First Implementation Slice
 

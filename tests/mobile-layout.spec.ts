@@ -12,6 +12,7 @@ test("mobile top surface matches the stage tone", async ({ page }) => {
     const shell = document.querySelector(".dock-shell");
     const stage = document.querySelector(".dock-stage");
     const header = document.querySelector(".dock-stage-header");
+    const composer = document.querySelector(".dock-composer-shell");
     const themeColor = document
       .querySelector('meta[name="theme-color"]')
       ?.getAttribute("content");
@@ -19,13 +20,23 @@ test("mobile top surface matches the stage tone", async ({ page }) => {
     return {
       themeColor,
       shellBackground: shell ? getComputedStyle(shell).backgroundColor : null,
+      shellBackgroundImage: shell ? getComputedStyle(shell).backgroundImage : null,
       stageBackground: stage ? getComputedStyle(stage).backgroundColor : null,
-      headerBackground: header ? getComputedStyle(header).backgroundColor : null
+      stageBackgroundImage: stage ? getComputedStyle(stage).backgroundImage : null,
+      headerBackground: header ? getComputedStyle(header).backgroundColor : null,
+      headerBackgroundImage: header ? getComputedStyle(header).backgroundImage : null,
+      composerBackgroundImage: composer
+        ? getComputedStyle(composer).backgroundImage
+        : null
     };
   });
 
   expect(surfaces.themeColor).toBe("#141416");
   expect(surfaces.shellBackground).toBe("rgb(20, 20, 22)");
+  expect(surfaces.shellBackgroundImage).toBe("none");
   expect(surfaces.stageBackground).toBe("rgb(20, 20, 22)");
+  expect(surfaces.stageBackgroundImage).toBe("none");
   expect(surfaces.headerBackground).toBe("rgb(20, 20, 22)");
+  expect(surfaces.headerBackgroundImage).toBe("none");
+  expect(surfaces.composerBackgroundImage).toBe("none");
 });

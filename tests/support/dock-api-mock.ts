@@ -15,6 +15,8 @@ export const DEFAULT_STATUS = {
     dnsName: "test.tailnet.ts.net",
     hostName: "test-host",
     ips: ["100.64.0.1"],
+    serveConfigured: true,
+    tailnetUrl: "https://test.tailnet.ts.net",
     serveHint: "tailscale serve --bg 3000",
     error: null
   },

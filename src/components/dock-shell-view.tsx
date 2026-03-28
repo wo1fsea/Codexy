@@ -300,9 +300,7 @@ function getLatestPlanItem(
 
 export function DockShellView(props: DockShellViewProps) {
   const {
-    formatDateTime,
     formatRelativeTime,
-    formatSidebarTime,
     locale,
     localeOptions,
     setLocale,
@@ -652,9 +650,7 @@ export function DockShellView(props: DockShellViewProps) {
         <div className={clsx("dock-left-stack", props.sidebarOpen && "is-open")}>
           <aside className="dock-nav-rail">
             <div className="dock-nav-head">
-              <div className="dock-nav-logo">
-                <AppIcon className="dock-nav-logo-icon" name="codex" />
-              </div>
+              <div className="dock-nav-wordmark">Codexy</div>
             </div>
 
             <div className="dock-nav-items">
@@ -685,11 +681,10 @@ export function DockShellView(props: DockShellViewProps) {
           <aside className="dock-thread-sidebar">
             <div className="dock-sidebar-header">
               <div>
-                <div className="dock-sidebar-eyebrow">{t("sidebar.threads")}</div>
                 <strong>
                   {props.archiveFilter === "archived"
                     ? t("sidebar.archived")
-                    : t("sidebar.allProjects")}
+                    : t("sidebar.threads")}
                 </strong>
               </div>
               <div className="dock-sidebar-tools">
@@ -779,11 +774,10 @@ export function DockShellView(props: DockShellViewProps) {
                           >
                             <div className="dock-thread-row-head">
                               <strong>{getThreadLabel(thread, t)}</strong>
-                              <span>{formatSidebarTime(thread.updatedAt)}</span>
+                              <span>{formatRelativeTime(thread.updatedAt)}</span>
                             </div>
                             <div className="dock-thread-row-meta">
                               <span>{getThreadStatusText(thread, t)}</span>
-                              <span>{formatRelativeTime(thread.updatedAt)}</span>
                             </div>
                           </button>
                         ))}
@@ -836,10 +830,8 @@ export function DockShellView(props: DockShellViewProps) {
                 </div>
                 <p className="dock-stage-subtitle">
                   {props.selectedThread
-                    ? `${props.selectedThread.cwd} · ${formatDateTime(props.selectedThread.updatedAt)}`
-                    : t("stage.readyToBuild", {
-                        workspace: props.workspaceLabel
-                      })}
+                    ? props.selectedThread.cwd
+                    : props.workspaceLabel}
                 </p>
               </div>
             </div>
@@ -951,9 +943,7 @@ export function DockShellView(props: DockShellViewProps) {
 
               {!props.selectedThread && !props.loadingThread ? (
                 <div className="dock-hero">
-                  <div className="dock-hero-icon">
-                    <AppIcon className="dock-hero-icon-svg" name="codex" />
-                  </div>
+                  <div className="dock-hero-wordmark">Codexy</div>
                   <strong>{t("stage.startBuilding")}</strong>
                   <div className="dock-hero-project">{props.workspaceLabel}</div>
                 </div>
@@ -1029,7 +1019,6 @@ export function DockShellView(props: DockShellViewProps) {
                   type="button"
                 >
                   <AppIcon className="dock-scroll-bottom-icon" name="chevron" />
-                  <span>{t("actions.jumpToBottom")}</span>
                 </button>
               </div>
             ) : null}
@@ -1082,94 +1071,96 @@ export function DockShellView(props: DockShellViewProps) {
                   </div>
                 ) : null}
 
-                {props.attachments.length ? (
-                  <div className="dock-upload-strip">
-                    {props.attachments.map((attachment) => (
-                      <div className="dock-upload-chip" key={attachment.id}>
-                        {attachment.previewUrl ? (
-                          <img alt={attachment.name} src={attachment.previewUrl} />
-                        ) : null}
-                        <div>
-                          <strong>{attachment.name}</strong>
-                          <p>{Math.max(1, Math.round(attachment.size / 1024))} KB</p>
+                <div className="dock-composer-panel">
+                  {props.attachments.length ? (
+                    <div className="dock-upload-strip">
+                      {props.attachments.map((attachment) => (
+                        <div className="dock-upload-chip" key={attachment.id}>
+                          {attachment.previewUrl ? (
+                            <img alt={attachment.name} src={attachment.previewUrl} />
+                          ) : null}
+                          <div>
+                            <strong>{attachment.name}</strong>
+                            <p>{Math.max(1, Math.round(attachment.size / 1024))} KB</p>
+                          </div>
+                          <button
+                            className="dock-chip-remove"
+                            onClick={() => props.onRemoveAttachment(attachment.id)}
+                            type="button"
+                          >
+                            {t("actions.remove")}
+                          </button>
                         </div>
-                        <button
-                          className="dock-chip-remove"
-                          onClick={() => props.onRemoveAttachment(attachment.id)}
-                          type="button"
-                        >
-                          {t("actions.remove")}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
+                      ))}
+                    </div>
+                  ) : null}
 
-                <textarea
-                  className="dock-composer-input"
-                  onChange={(event) => props.onPromptChange(event.target.value)}
-                  onPaste={handleComposerPaste}
-                  placeholder={t("composer.placeholder")}
-                  rows={4}
-                  value={props.prompt}
-                />
+                  <textarea
+                    className="dock-composer-input"
+                    onChange={(event) => props.onPromptChange(event.target.value)}
+                    onPaste={handleComposerPaste}
+                    placeholder={t("composer.placeholder")}
+                    rows={2}
+                    value={props.prompt}
+                  />
 
-                <div className="dock-composer-footer">
-                  <div className="dock-composer-controls">
-                    <label className="dock-composer-add-button" title={t("actions.uploadImage")}>
-                      <AppIcon className="dock-inline-icon" name="plus" />
-                      <input
-                        accept="image/*"
-                        hidden
-                        multiple
-                        onChange={(event) => {
-                          props.onUploadFiles(event.target.files);
-                          event.currentTarget.value = "";
-                        }}
-                        type="file"
-                      />
-                    </label>
-                    <DockSelect
-                      ariaLabel={t("aria.modelSelection")}
-                      className="dock-composer-select"
-                      onChange={props.onComposerModelChange}
-                      options={modelOptions}
-                      placement="top"
-                      value={props.composerModel}
-                    />
-                    {reasoningEffortOptions.length ? (
+                  <div className="dock-composer-footer">
+                    <div className="dock-composer-controls">
+                      <label className="dock-composer-add-button" title={t("actions.uploadImage")}>
+                        <AppIcon className="dock-inline-icon" name="plus" />
+                        <input
+                          accept="image/*"
+                          hidden
+                          multiple
+                          onChange={(event) => {
+                            props.onUploadFiles(event.target.files);
+                            event.currentTarget.value = "";
+                          }}
+                          type="file"
+                        />
+                      </label>
                       <DockSelect
-                        ariaLabel={t("aria.reasoningEffort")}
-                        className="dock-composer-select dock-composer-effort-select"
-                        onChange={props.onComposerReasoningEffortChange}
-                        options={reasoningEffortOptions}
+                        ariaLabel={t("aria.modelSelection")}
+                        className="dock-composer-select"
+                        onChange={props.onComposerModelChange}
+                        options={modelOptions}
                         placement="top"
-                        value={props.composerReasoningEffort}
+                        value={props.composerModel}
                       />
-                    ) : null}
-                  </div>
+                      {reasoningEffortOptions.length ? (
+                        <DockSelect
+                          ariaLabel={t("aria.reasoningEffort")}
+                          className="dock-composer-select dock-composer-effort-select"
+                          onChange={props.onComposerReasoningEffortChange}
+                          options={reasoningEffortOptions}
+                          placement="top"
+                          value={props.composerReasoningEffort}
+                        />
+                      ) : null}
+                    </div>
 
-                  <div className="dock-composer-actions">
-                    <button
-                      aria-label={primaryActionLabel}
-                      className={clsx(
-                        "dock-send-button",
-                        primaryActionIsStop && "is-stop"
-                      )}
-                      disabled={primaryActionIsStop ? false : !canSubmit}
-                      onClick={
-                        primaryActionIsStop
-                          ? props.onInterruptCurrentTurn
-                          : props.onSubmitPrompt
-                      }
-                      title={primaryActionLabel}
-                      type="button"
-                    >
-                      <AppIcon
-                        className="dock-send-icon"
-                        name={primaryActionIsStop ? "stop" : "send"}
-                      />
-                    </button>
+                    <div className="dock-composer-actions">
+                      <button
+                        aria-label={primaryActionLabel}
+                        className={clsx(
+                          "dock-send-button",
+                          primaryActionIsStop && "is-stop"
+                        )}
+                        disabled={primaryActionIsStop ? false : !canSubmit}
+                        onClick={
+                          primaryActionIsStop
+                            ? props.onInterruptCurrentTurn
+                            : props.onSubmitPrompt
+                        }
+                        title={primaryActionLabel}
+                        type="button"
+                      >
+                        <AppIcon
+                          className="dock-send-icon"
+                          name={primaryActionIsStop ? "stop" : "send"}
+                        />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1190,8 +1181,9 @@ export function DockShellView(props: DockShellViewProps) {
                 </div>
                 <div className="dock-status-group">
                   <span className="dock-status-pill dock-tailnet-pill">
-                    {props.status?.tailscale.dnsName ||
+                    {props.status?.tailscale.tailnetUrl ||
                       props.status?.tailscale.ips[0] ||
+                      props.status?.tailscale.dnsName ||
                       t("status.tailnet")}
                   </span>
                 </div>

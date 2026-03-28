@@ -20,12 +20,15 @@
   --accent-strong: #ffffff;
   --danger: #f18e7f;
   --success: #98c8a2;
-  --shadow: 0 20px 48px rgba(0, 0, 0, 0.34);
-  --shell-width: 920px;
-  --radius-xl: 24px;
-  --radius-lg: 18px;
-  --radius-md: 16px;
-  --radius-sm: 12px;
+  --shadow: 0 16px 32px rgba(0, 0, 0, 0.26);
+  --shell-width: 900px;
+  --radius-xl: 18px;
+  --radius-lg: 14px;
+  --radius-md: 12px;
+  --radius-sm: 10px;
+  --control-radius: 10px;
+  --control-pad-x: 8px;
+  --control-gap: 4px;
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 10px;
@@ -39,6 +42,7 @@
   --text-15: 15px;
   --font-sans: "Segoe UI Variable Display", "Aptos", "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", "Cascadia Code", "Consolas", monospace;
+  --font-serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", "Times New Roman", serif;
 }
 
 * {
@@ -53,10 +57,7 @@ body {
   overflow: hidden;
   overflow-x: hidden;
   overflow-y: hidden;
-  background:
-    radial-gradient(circle at top left, rgba(255, 232, 208, 0.03), transparent 26%),
-    radial-gradient(circle at bottom right, rgba(104, 76, 54, 0.06), transparent 22%),
-    linear-gradient(180deg, #151417 0%, #111113 100%);
+  background: var(--app-bg);
   color: var(--text);
   font-family: var(--font-sans);
   font-size: var(--text-14);
@@ -132,7 +133,7 @@ pre {
   height: 36px;
   padding: 0 14px;
   border-bottom: 1px solid rgba(255, 247, 238, 0.04);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.01), transparent), var(--menu-bg);
+  background: var(--menu-bg);
   color: var(--text-muted);
 }
 
@@ -212,9 +213,7 @@ pre {
   min-height: 0;
   overflow: hidden;
   border-right: 1px solid var(--line);
-  background:
-    linear-gradient(180deg, rgba(255, 230, 199, 0.02), transparent 14%),
-    var(--sidebar-bg);
+  background: var(--sidebar-bg);
 }
 
 .dock-sidebar-resize-handle {
@@ -241,7 +240,7 @@ pre {
 
 .dock-sidebar-resize-handle:hover::before,
 .dock-shell.is-resizing .dock-sidebar-resize-handle::before {
-  background: rgba(255, 247, 238, 0.22);
+  background: rgba(255, 247, 238, 0.18);
 }
 
 .dock-nav-rail,
@@ -255,8 +254,8 @@ pre {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: var(--space-4);
-  padding: 8px 8px 6px;
+  gap: var(--space-3);
+  padding: 8px 8px 4px;
   background: transparent;
 }
 
@@ -264,6 +263,14 @@ pre {
 .dock-nav-foot {
   display: flex;
   justify-content: flex-start;
+}
+
+.dock-nav-wordmark {
+  color: var(--text-strong);
+  font-family: var(--font-serif);
+  font-size: 20px;
+  line-height: 1;
+  letter-spacing: 0.02em;
 }
 
 .dock-nav-items {
@@ -291,8 +298,8 @@ pre {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 42px;
-  padding: 10px 10px;
+  min-height: 38px;
+  padding: 8px 10px;
   color: var(--text-muted);
   font-size: var(--text-14);
   font-weight: 600;
@@ -340,11 +347,11 @@ pre {
 .dock-thread-sidebar {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: 10px;
+  gap: 8px;
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
-  padding: 10px 10px 12px;
+  padding: 8px 8px 10px;
   background: transparent;
 }
 
@@ -383,7 +390,7 @@ pre {
 }
 
 .dock-sidebar-eyebrow {
-  margin-bottom: 4px;
+  margin-bottom: 2px;
   color: var(--text-faint);
   font-size: var(--text-11);
   letter-spacing: 0.03em;
@@ -397,13 +404,13 @@ pre {
 
 .dock-sidebar-filters {
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .dock-sidebar-body {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: 10px;
+  gap: 8px;
   min-height: 0;
   overflow: hidden;
 }
@@ -411,21 +418,20 @@ pre {
 .dock-search-field {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 40px;
+  gap: var(--control-gap);
+  min-height: 34px;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--control-radius);
   background: rgba(255, 247, 238, 0.03);
-  padding: 0 11px;
+  padding: 0 var(--control-pad-x);
 }
 
 .dock-sidebar-input,
 .dock-search-input,
 .dock-composer-cwd,
-.dock-composer-input,
 .dock-question input {
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 12px;
   background: rgba(255, 247, 238, 0.03);
   color: var(--text);
   outline: none;
@@ -436,13 +442,13 @@ pre {
 .dock-composer-cwd,
 .dock-question input {
   width: 100%;
-  padding: 10px 12px;
+  padding: 7px 8px;
 }
 
 .dock-search-field .dock-search-input {
   border: 0;
   background: transparent;
-  padding: 9px 0;
+  padding: 6px 0;
   color: var(--text-muted);
   font-size: var(--text-13);
 }
@@ -450,12 +456,11 @@ pre {
 .dock-sidebar-select-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 6px;
+  gap: 3px;
 }
 
 .dock-sidebar-input:focus,
 .dock-composer-cwd:focus,
-.dock-composer-input:focus,
 .dock-question input:focus,
 .dock-search-field:focus-within {
   border-color: rgba(255, 247, 238, 0.18);
@@ -470,13 +475,13 @@ pre {
 .dock-select-trigger {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   width: 100%;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--control-radius);
   background: rgba(255, 247, 238, 0.03);
   color: var(--text);
-  padding: 0 12px;
+  padding: 0 var(--control-pad-x);
   text-align: left;
   transition:
     border-color 160ms ease,
@@ -544,12 +549,10 @@ pre {
   overflow-x: hidden;
   overflow-y: auto;
   border: 1px solid var(--line-strong);
-  border-radius: 16px;
-  background:
-    linear-gradient(180deg, rgba(255, 247, 238, 0.03), rgba(255, 247, 238, 0.015)),
-    #221f24;
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.42);
-  padding: 6px;
+  border-radius: 10px;
+  background: #221f24;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.34);
+  padding: 4px;
 }
 
 .dock-select-option {
@@ -557,10 +560,10 @@ pre {
   gap: 2px;
   width: 100%;
   border: 0;
-  border-radius: 10px;
+  border-radius: 7px;
   background: transparent;
   color: var(--text);
-  padding: 9px 10px;
+  padding: 7px 8px;
   text-align: left;
 }
 
@@ -590,20 +593,20 @@ pre {
 }
 
 .dock-sidebar-select .dock-select-trigger {
-  min-height: 38px;
-  padding: 0 10px;
+  min-height: 32px;
+  padding: 0 var(--control-pad-x);
   font-size: var(--text-13);
 }
 
 .dock-composer-select .dock-select-trigger {
   width: auto;
-  min-height: 30px;
+  min-height: 26px;
   min-width: 0;
   border-color: transparent;
-  border-radius: 10px;
+  border-radius: 8px;
   background: transparent;
   box-shadow: none;
-  padding: 0 9px;
+  padding: 0 6px;
   color: var(--text-muted);
   font-size: var(--text-13);
 }
@@ -630,7 +633,7 @@ pre {
 .dock-thread-sections {
   display: grid;
   align-content: start;
-  gap: 10px;
+  gap: 8px;
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
@@ -639,7 +642,7 @@ pre {
 
 .dock-thread-group {
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .dock-project-row {
@@ -687,12 +690,12 @@ pre {
 
 .dock-thread-row {
   display: grid;
-  gap: 4px;
+  gap: 3px;
   width: 100%;
   border: 1px solid transparent;
-  border-radius: 12px;
+  border-radius: 10px;
   background: transparent;
-  padding: 8px 10px;
+  padding: 7px 9px;
   color: inherit;
   text-align: left;
   justify-self: stretch;
@@ -739,23 +742,19 @@ pre {
 .dock-empty-state {
   display: grid;
   place-items: center;
-  border: 1px dashed var(--line);
-  border-radius: 18px;
-  padding: 24px;
+  padding: 16px 10px;
   color: var(--text-faint);
   text-align: center;
 }
 
 .dock-stage {
-  --stage-inline-pad: clamp(18px, 4vw, 48px);
+  --stage-inline-pad: clamp(14px, 3vw, 28px);
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background:
-    radial-gradient(circle at top center, rgba(255, 244, 228, 0.02), transparent 18%),
-    var(--stage-bg);
+  background: var(--stage-bg);
 }
 
 .dock-stage-header,
@@ -769,10 +768,10 @@ pre {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  min-height: 56px;
-  padding-top: 12px;
-  padding-bottom: 12px;
+  gap: 10px;
+  min-height: 52px;
+  padding-top: 8px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -792,7 +791,7 @@ pre {
 }
 
 .dock-stage-subtitle {
-  margin: 4px 0 0;
+  margin: 2px 0 0;
   color: var(--text-muted);
   font-size: var(--text-12);
   overflow: hidden;
@@ -805,15 +804,15 @@ pre {
   margin-left: auto;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 6px;
+  gap: 4px;
 }
 
 .dock-icon-button,
 .dock-round-action {
   display: inline-grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   padding: 0;
   color: var(--text-muted);
 }
@@ -837,17 +836,17 @@ pre {
 
 .dock-toolbar-confirm-popover {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 6px);
   right: 0;
   z-index: 20;
-  width: min(260px, calc(100vw - 32px));
+  width: min(240px, calc(100vw - 24px));
   display: grid;
-  gap: 10px;
+  gap: 8px;
   border: 1px solid rgba(255, 247, 238, 0.1);
-  border-radius: 14px;
+  border-radius: 12px;
   background: rgba(30, 26, 27, 0.96);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
-  padding: 11px 12px 12px;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.24);
+  padding: 10px;
 }
 
 .dock-toolbar-confirm-copy {
@@ -870,7 +869,7 @@ pre {
 .dock-toolbar-confirm-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
@@ -878,12 +877,12 @@ pre {
 .dock-status-pill {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  min-height: 30px;
+  gap: 4px;
+  min-height: 24px;
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: 7px;
   background: transparent;
-  padding: 0 9px;
+  padding: 0 6px;
   color: var(--text-muted);
   font-size: var(--text-12);
   white-space: nowrap;
@@ -912,12 +911,12 @@ pre {
 
 .dock-stage-language-select .dock-select-trigger {
   width: auto;
-  min-height: 30px;
+  min-height: 24px;
   border-color: transparent;
-  border-radius: 10px;
+  border-radius: 7px;
   background: transparent;
   box-shadow: none;
-  padding: 0 9px 0 11px;
+  padding: 0 6px 0 8px;
   color: var(--text-muted);
   font-size: var(--text-12);
 }
@@ -941,12 +940,12 @@ pre {
 }
 
 .dock-status-select-shell .dock-select-trigger {
-  min-height: 30px;
+  min-height: 24px;
   border-color: transparent;
-  border-radius: 10px;
+  border-radius: 7px;
   background: transparent;
   box-shadow: none;
-  padding: 0 9px;
+  padding: 0 6px;
   color: var(--text-muted);
   font-size: var(--text-12);
 }
@@ -968,9 +967,9 @@ pre {
 .dock-rename-strip {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding-top: 12px;
-  padding-bottom: 12px;
+  gap: 8px;
+  padding-top: 8px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -994,38 +993,35 @@ pre {
   min-height: 100%;
   display: flex;
   flex-direction: column;
-  padding-top: 14px;
-  padding-bottom: 24px;
+  padding-top: 10px;
+  padding-bottom: 16px;
 }
 
 .dock-stage-scroll-jump {
   position: sticky;
-  bottom: 18px;
+  bottom: 12px;
   z-index: 3;
   display: flex;
   justify-content: flex-end;
   width: min(100%, var(--shell-width));
-  margin: -72px auto 0;
-  padding: 0 0 16px;
+  margin: -56px auto 0;
+  padding: 0 0 10px;
   pointer-events: none;
 }
 
 .dock-scroll-bottom-button {
   pointer-events: auto;
-  display: inline-flex;
+  display: inline-grid;
+  place-items: center;
   align-items: center;
-  gap: 8px;
-  min-height: 38px;
+  min-height: 28px;
+  min-width: 28px;
   border: 1px solid rgba(255, 247, 238, 0.12);
   border-radius: 999px;
-  background:
-    linear-gradient(180deg, rgba(32, 32, 36, 0.94), rgba(23, 23, 26, 0.98)),
-    rgba(20, 20, 22, 0.92);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32);
-  padding: 0 14px;
+  background: rgba(20, 20, 22, 0.96);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
+  padding: 0;
   color: var(--text);
-  font-size: var(--text-12);
-  font-weight: 600;
   transition:
     transform 140ms ease,
     border-color 140ms ease,
@@ -1035,14 +1031,12 @@ pre {
 .dock-scroll-bottom-button:hover {
   transform: translateY(-1px);
   border-color: rgba(255, 247, 238, 0.18);
-  background:
-    linear-gradient(180deg, rgba(42, 42, 46, 0.96), rgba(28, 28, 31, 0.98)),
-    rgba(20, 20, 22, 0.92);
+  background: rgba(28, 28, 31, 0.98);
 }
 
 .dock-scroll-bottom-icon {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   transform: rotate(90deg);
   color: var(--text-muted);
 }
@@ -1053,45 +1047,40 @@ pre {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 4px;
   min-height: 100%;
-  padding: 48px 0 64px;
+  padding: 24px 0 32px;
   text-align: center;
 }
 
+.dock-hero-wordmark {
+  color: var(--text-strong);
+  font-family: var(--font-serif);
+  font-size: clamp(34px, 5vw, 48px);
+  line-height: 0.95;
+  letter-spacing: 0.03em;
+}
+
 .dock-hero strong {
-  font-size: clamp(32px, 5vw, 48px);
-  font-weight: 600;
-}
-
-.dock-hero-icon {
-  display: grid;
-  place-items: center;
-  width: 72px;
-  height: 72px;
-  border-radius: 999px;
-  color: var(--accent);
-}
-
-.dock-hero-icon-svg {
-  width: 44px;
-  height: 44px;
+  font-size: clamp(20px, 2.8vw, 26px);
+  font-weight: 500;
 }
 
 .dock-hero-project {
   color: var(--text-muted);
-  font-size: clamp(22px, 3vw, 32px);
+  font-size: var(--text-13);
+  letter-spacing: 0.02em;
 }
 
 .dock-transcript {
   display: grid;
-  gap: 18px;
-  padding: 0 0 24px;
+  gap: 14px;
+  padding: 0 0 12px;
 }
 
 .dock-turn {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .dock-turn-head {
@@ -1102,7 +1091,7 @@ pre {
 
 .dock-turn-items {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .dock-turn-item {
@@ -1123,18 +1112,18 @@ pre {
 .dock-artifact,
 .dock-request-card {
   border: 1px solid var(--line);
-  border-radius: 16px;
-  background: rgba(255, 247, 238, 0.022);
+  border-radius: 12px;
+  background: rgba(255, 247, 238, 0.02);
 }
 
 .dock-entry {
-  padding: 14px 16px;
+  padding: 10px 12px;
 }
 
 .dock-user-message-stack {
   display: grid;
   justify-items: end;
-  gap: 8px;
+  gap: 6px;
   max-width: min(100%, 560px);
 }
 
@@ -1142,20 +1131,17 @@ pre {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 6px;
 }
 
 .dock-user-attachment-tile {
   display: block;
-  width: 112px;
-  height: 74px;
+  width: 96px;
+  height: 64px;
   overflow: hidden;
   border: 1px solid rgba(255, 247, 238, 0.1);
-  border-radius: 14px;
-  background:
-    linear-gradient(180deg, rgba(255, 247, 238, 0.035), rgba(255, 247, 238, 0.015)),
-    rgba(255, 247, 238, 0.025);
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
+  border-radius: 12px;
+  background: rgba(255, 247, 238, 0.025);
   padding: 0;
 }
 
@@ -1174,16 +1160,14 @@ pre {
   width: fit-content;
   max-width: min(100%, 560px);
   border: 1px solid rgba(255, 247, 238, 0.09);
-  border-radius: 16px;
-  background:
-    linear-gradient(180deg, rgba(255, 247, 238, 0.04), rgba(255, 247, 238, 0.02)),
-    rgba(255, 247, 238, 0.024);
-  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(255, 247, 238, 0.028);
+  padding: 8px 10px;
 }
 
 .dock-agent-response {
   max-width: min(100%, 860px);
-  padding: 4px 0;
+  padding: 2px 0;
 }
 
 .dock-agent-response .dock-entry-text {
@@ -1193,7 +1177,7 @@ pre {
 .dock-markdown {
   color: var(--text);
   font-size: var(--text-14);
-  line-height: 1.68;
+  line-height: 1.58;
 }
 
 .dock-markdown > :first-child {
@@ -1211,12 +1195,12 @@ pre {
 .dock-markdown pre,
 .dock-markdown table,
 .dock-markdown hr {
-  margin: 0 0 14px;
+  margin: 0 0 10px;
 }
 
 .dock-markdown ul,
 .dock-markdown ol {
-  padding-left: 22px;
+  padding-left: 18px;
 }
 
 .dock-markdown li + li {
@@ -1250,9 +1234,9 @@ pre {
 .dock-markdown pre {
   overflow-x: auto;
   border: 1px solid rgba(255, 247, 238, 0.08);
-  border-radius: 14px;
+  border-radius: 12px;
   background: rgba(0, 0, 0, 0.24);
-  padding: 12px 14px;
+  padding: 10px 12px;
 }
 
 .dock-markdown pre code {
@@ -1265,7 +1249,7 @@ pre {
 .dock-markdown blockquote {
   border-left: 2px solid rgba(255, 247, 238, 0.18);
   margin-left: 0;
-  padding-left: 14px;
+  padding-left: 10px;
   color: var(--text-muted);
 }
 
@@ -1283,7 +1267,7 @@ pre {
 .dock-markdown th,
 .dock-markdown td {
   border: 1px solid rgba(255, 247, 238, 0.08);
-  padding: 8px 10px;
+  padding: 6px 8px;
   text-align: left;
   vertical-align: top;
 }
@@ -1297,68 +1281,65 @@ pre {
 .dock-user-bubble .dock-entry-text {
   margin: 0;
   font-size: var(--text-14);
-  line-height: 1.55;
+  line-height: 1.5;
 }
 
 .dock-plan-card {
   width: min(100%, 720px);
   border: 1px solid rgba(255, 247, 238, 0.09);
-  border-radius: 18px;
-  background: rgba(255, 247, 238, 0.022);
-  padding: 14px 16px 14px;
+  border-radius: 12px;
+  background: rgba(255, 247, 238, 0.02);
+  overflow: hidden;
+  padding: 0;
 }
 
 .dock-plan-card-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
+  gap: 8px;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid rgba(255, 247, 238, 0.05);
+  background: rgba(255, 247, 238, 0.024);
 }
 
 .dock-plan-card-summary {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
-  color: var(--text);
+  color: var(--text-muted);
   font-size: var(--text-13);
 }
 
 .dock-plan-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 32px;
-  padding: 0 10px;
-  border: 1px solid rgba(255, 247, 238, 0.08);
-  border-radius: 999px;
-  background: rgba(255, 247, 238, 0.03);
-  color: var(--text-muted);
-  font-size: var(--text-12);
-  line-height: 1;
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-soft);
   cursor: pointer;
+  flex: none;
   transition:
-    border-color 140ms ease,
-    background-color 140ms ease,
+    transform 140ms ease,
     color 140ms ease;
 }
 
 .dock-plan-toggle:hover {
-  border-color: rgba(255, 247, 238, 0.12);
-  background: rgba(255, 247, 238, 0.05);
   color: var(--text);
 }
 
 .dock-plan-toggle:focus-visible {
   outline: none;
-  border-color: rgba(255, 247, 238, 0.18);
-  box-shadow: 0 0 0 3px rgba(255, 247, 238, 0.05);
+  color: var(--text);
 }
 
 .dock-plan-toggle-icon {
-  width: 13px;
-  height: 13px;
+  width: 12px;
+  height: 12px;
   transform: rotate(90deg);
   transition: transform 140ms ease;
 }
@@ -1369,8 +1350,8 @@ pre {
 
 .dock-plan-card-glyph {
   display: inline-grid;
-  gap: 3px;
-  width: 13px;
+  gap: 2px;
+  width: 11px;
   flex: none;
 }
 
@@ -1383,41 +1364,54 @@ pre {
   opacity: 0.46;
 }
 
+.dock-plan-card-body {
+  max-height: min(26vh, 180px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 10px 16px 12px 14px;
+}
+
 .dock-plan-card-explanation {
-  margin: 8px 0 0;
+  margin: 0;
+  padding-left: 34px;
   color: var(--text-muted);
   font-size: var(--text-12);
-  line-height: 1.55;
+  line-height: 1.45;
 }
 
 .dock-plan-list {
   display: grid;
-  gap: 10px;
-  margin: 12px 0 0;
+  gap: 8px;
+  margin: 8px 0 0;
   padding: 0;
   list-style: none;
 }
 
 .dock-plan-row {
-  display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr);
-  align-items: start;
-  gap: 8px;
+  position: relative;
+  display: block;
   min-width: 0;
+  padding-left: 34px;
   color: var(--text);
 }
 
 .dock-plan-row-index {
+  position: absolute;
+  top: 0;
+  left: 14px;
   color: rgba(255, 247, 238, 0.58);
   font-size: var(--text-13);
   line-height: 1.55;
-  min-width: 1.2rem;
+  min-width: 0;
 }
 
 .dock-plan-row-status {
-  width: 9px;
-  height: 9px;
-  margin-top: 5px;
+  position: absolute;
+  top: 0.62em;
+  left: 0;
+  width: 7px;
+  height: 7px;
+  margin-top: 0;
   border: 1px solid rgba(255, 247, 238, 0.26);
   border-radius: 999px;
   background: transparent;
@@ -1445,7 +1439,7 @@ pre {
   min-width: 0;
   color: var(--text);
   font-size: var(--text-14);
-  line-height: 1.58;
+  line-height: 1.48;
 }
 
 .dock-plan-row-copy > :first-child {
@@ -1473,7 +1467,7 @@ pre {
 .dock-reasoning-status {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 5px;
   min-height: 22px;
   padding: 0;
   border: 0;
@@ -1521,14 +1515,13 @@ pre {
   height: 8px;
   border-radius: 999px;
   background: rgba(255, 247, 238, 0.45);
-  box-shadow: 0 0 0 4px rgba(255, 247, 238, 0.04);
   animation: dock-pulse 1.2s ease-in-out infinite;
 }
 
 .dock-entry-text {
   white-space: pre-wrap;
   word-break: break-word;
-  line-height: 1.65;
+  line-height: 1.55;
   color: var(--text);
 }
 
@@ -1536,21 +1529,21 @@ pre {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 6px;
+  gap: 4px;
 }
 
 .dock-user-meta-chip,
 .dock-inline-asset {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  min-height: 28px;
+  gap: 4px;
+  min-height: 24px;
   max-width: min(100%, 360px);
   overflow: hidden;
   border: 1px solid rgba(255, 247, 238, 0.08);
   border-radius: 999px;
   background: rgba(255, 247, 238, 0.03);
-  padding: 0 10px;
+  padding: 0 8px;
   color: var(--text-muted);
   font-size: var(--text-12);
   text-overflow: ellipsis;
@@ -1605,11 +1598,11 @@ pre {
 
 .dock-artifact {
   max-width: min(100%, 860px);
-  padding: 14px 16px;
+  padding: 10px 12px;
 }
 
 .dock-artifact-head {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   color: var(--text-muted);
   font-size: 12px;
 }
@@ -1617,22 +1610,28 @@ pre {
 .dock-command-card {
   width: min(100%, 860px);
   border: 1px solid rgba(255, 247, 238, 0.07);
-  border-radius: 14px;
+  border-radius: 12px;
   background: rgba(255, 247, 238, 0.02);
 }
 
 .dock-command-summary {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 10px;
-  padding: 12px 14px;
+  gap: 8px;
+  padding: 10px 12px;
   list-style: none;
   color: var(--text-muted);
   font-size: var(--text-13);
+  cursor: pointer;
 }
 
 .dock-command-summary::-webkit-details-marker {
   display: none;
+}
+
+.dock-command-summary::marker {
+  content: "";
 }
 
 .dock-command-label {
@@ -1652,9 +1651,31 @@ pre {
   flex: none;
 }
 
+.dock-command-toggle {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  color: var(--text-soft);
+  flex: none;
+}
+
+.dock-command-toggle-icon {
+  width: 11px;
+  height: 11px;
+  transform: rotate(0deg);
+  transition:
+    transform 140ms ease,
+    color 140ms ease;
+}
+
+.dock-command-card[open] .dock-command-toggle-icon {
+  transform: rotate(90deg);
+}
+
 .dock-command-detail {
   border-top: 1px solid rgba(255, 247, 238, 0.06);
-  padding: 12px 14px 14px;
+  padding: 10px 12px 12px;
 }
 
 .dock-terminal-path {
@@ -1666,12 +1687,12 @@ pre {
 }
 
 .dock-command-output {
-  margin: 10px 0 0;
+  margin: 8px 0 0;
   overflow: auto;
   border: 1px solid rgba(255, 247, 238, 0.06);
-  border-radius: 12px;
+  border-radius: 10px;
   background: rgba(0, 0, 0, 0.22);
-  padding: 10px 12px;
+  padding: 8px 10px;
   color: #dfdbd5;
   font-size: var(--text-12);
   line-height: 1.6;
@@ -1681,19 +1702,19 @@ pre {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 6px;
   max-width: min(100%, 860px);
 }
 
 .dock-filechange-chip {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  min-height: 32px;
+  gap: 6px;
+  min-height: 28px;
   border: 1px solid rgba(255, 247, 238, 0.09);
-  border-radius: 12px;
+  border-radius: 10px;
   background: rgba(255, 247, 238, 0.03);
-  padding: 0 12px;
+  padding: 0 10px;
   font-size: var(--text-12);
 }
 
@@ -1718,11 +1739,9 @@ pre {
   z-index: 2;
   padding-left: var(--stage-inline-pad);
   padding-right: var(--stage-inline-pad);
-  background:
-    linear-gradient(180deg, rgba(20, 20, 22, 0.98), rgba(20, 20, 22, 1) 28%),
-    var(--stage-bg);
-  padding-top: 10px;
-  padding-bottom: 12px;
+  background: var(--stage-bg);
+  padding-top: 6px;
+  padding-bottom: 8px;
 }
 
 .dock-bottom-center {
@@ -1734,44 +1753,47 @@ pre {
 .dock-bottom-panels {
   display: grid;
   width: 100%;
-  gap: 8px;
-  max-height: min(24vh, 220px);
-  margin-bottom: 8px;
+  gap: 6px;
+  max-height: min(22vh, 180px);
+  margin-bottom: 6px;
   overflow-x: hidden;
   overflow-y: auto;
-  padding-right: 4px;
+  padding-right: 2px;
 }
 
 .dock-alert-banner {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  border: 1px solid rgba(243, 240, 234, 0.18);
-  border-radius: 16px;
-  background: rgba(243, 240, 234, 0.05);
-  padding: 12px 14px;
+  gap: 8px;
+  border: 1px solid rgba(243, 240, 234, 0.12);
+  border-radius: 12px;
+  background: rgba(243, 240, 234, 0.03);
+  padding: 8px 10px;
 }
 
 .dock-alert-banner p {
-  margin: 4px 0 0;
+  margin: 2px 0 0;
   color: var(--text-soft);
 }
 
 .dock-alert-banner.is-subtle {
   justify-content: flex-start;
+  border-color: transparent;
+  background: transparent;
+  padding: 0;
   color: var(--text-muted);
 }
 
 .dock-request-stack {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .dock-request-card {
   display: grid;
-  gap: 10px;
-  padding: 12px 14px;
+  gap: 8px;
+  padding: 10px 12px;
 }
 
 .dock-request-card p,
@@ -1784,9 +1806,9 @@ pre {
   display: block;
   overflow: auto;
   border: 1px solid rgba(255, 247, 238, 0.05);
-  border-radius: 12px;
+  border-radius: 10px;
   background: rgba(0, 0, 0, 0.2);
-  padding: 10px 12px;
+  padding: 8px 10px;
   color: #d6d2cb;
   font-size: 12px;
 }
@@ -1798,7 +1820,7 @@ pre {
 
 .dock-request-heading {
   display: grid;
-  gap: 2px;
+  gap: 1px;
 }
 
 .dock-request-subtitle,
@@ -1810,9 +1832,9 @@ pre {
 
 .dock-request-command-shell {
   border: 1px solid rgba(255, 247, 238, 0.06);
-  border-radius: 14px;
+  border-radius: 10px;
   background: rgba(0, 0, 0, 0.22);
-  padding: 10px 12px;
+  padding: 8px 10px;
 }
 
 .dock-request-command {
@@ -1826,21 +1848,21 @@ pre {
 
 .dock-request-meta-row {
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .dock-request-actions {
-  margin-top: 2px;
-  gap: 10px;
+  margin-top: 0;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
 .dock-request-action {
-  min-height: 36px;
+  min-height: 32px;
   border: 1px solid rgba(255, 247, 238, 0.1);
-  border-radius: 12px;
+  border-radius: 10px;
   background: rgba(255, 247, 238, 0.03);
-  padding: 0 14px;
+  padding: 0 10px;
   color: var(--text);
 }
 
@@ -1866,8 +1888,8 @@ pre {
 }
 
 .dock-ghost-action {
-  min-height: 34px;
-  padding: 0 14px;
+  min-height: 30px;
+  padding: 0 10px;
   color: var(--text);
 }
 
@@ -1877,55 +1899,72 @@ pre {
 }
 
 .dock-composer-shell {
+  display: grid;
+  gap: 2px;
   width: 100%;
-  border: 1px solid var(--line);
+  padding: 0;
+}
+
+.dock-composer-panel {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  margin-top: -10px;
+  border: 1px solid rgba(255, 247, 238, 0.08);
   border-radius: 18px;
-  background:
-    linear-gradient(180deg, rgba(255, 247, 238, 0.03), rgba(255, 247, 238, 0.015)),
-    var(--panel-bg);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
-  padding: 10px;
+  background: #252527;
+  box-shadow: none;
+  padding: 12px 14px 10px;
+}
+
+.dock-composer-panel:focus-within {
+  border-color: rgba(255, 247, 238, 0.14);
 }
 
 .dock-composer-plan-panel {
-  margin-bottom: 10px;
-  max-height: min(30vh, 280px);
-  overflow-x: hidden;
-  overflow-y: auto;
-  padding-right: 4px;
+  position: relative;
+  z-index: 0;
+  margin-bottom: -18px;
+  overflow: visible;
+  padding: 0 0 18px;
 }
 
 .dock-composer-plan-panel .dock-plan-card {
-  width: 100%;
-  margin: 0;
-  border-color: rgba(255, 247, 238, 0.1);
-  background:
-    linear-gradient(180deg, rgba(255, 247, 238, 0.045), rgba(255, 247, 238, 0.02)),
-    rgba(255, 247, 238, 0.028);
+  width: calc(100% - 8px);
+  margin: 0 auto;
+  border-color: rgba(255, 247, 238, 0.07);
+  background: rgba(255, 247, 238, 0.024);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.dock-composer-plan-panel .dock-plan-card-summary strong {
+  color: var(--text);
+  font-weight: 500;
 }
 
 .dock-upload-strip {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
 .dock-upload-chip {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   min-width: 0;
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: 12px;
   background: var(--panel-bg-soft);
-  padding: 8px 10px;
+  padding: 6px 8px;
 }
 
 .dock-upload-chip img {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   object-fit: cover;
 }
 
@@ -1940,17 +1979,25 @@ pre {
 }
 
 .dock-chip-remove {
-  height: 30px;
-  padding: 0 10px;
+  height: 26px;
+  padding: 0 8px;
 }
 
 .dock-composer-input {
   width: 100%;
-  min-height: 108px;
+  min-height: calc(2 * 1.5em);
   resize: none;
-  padding: 12px 14px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
   font-size: var(--text-14);
-  line-height: 1.6;
+  line-height: 1.5;
+  box-shadow: none;
+}
+
+.dock-composer-input:focus {
+  outline: none;
 }
 
 .dock-composer-footer {
@@ -1958,7 +2005,7 @@ pre {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   margin-top: 10px;
 }
 
@@ -1967,17 +2014,17 @@ pre {
   flex-wrap: nowrap;
   flex: 0 1 auto;
   align-items: flex-end;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
 }
 
 .dock-composer-add-button {
   display: inline-grid;
   place-items: center;
-  width: 28px;
-  height: 30px;
+  width: 26px;
+  height: 28px;
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: 8px;
   background: transparent;
   color: var(--text-soft);
   transition:
@@ -2010,8 +2057,9 @@ pre {
 }
 
 .dock-composer-select .dock-select-trigger {
-  padding-left: 8px;
-  padding-right: 8px;
+  min-height: 28px;
+  padding-left: 7px;
+  padding-right: 7px;
 }
 
 .dock-composer-effort-select .dock-select-trigger {
@@ -2020,22 +2068,22 @@ pre {
 
 .dock-composer-actions {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   flex: none;
   align-items: flex-end;
 }
 
 .dock-round-action,
 .dock-send-button {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 999px;
 }
 
 .dock-round-action {
-  width: 28px;
-  height: 30px;
-  border-radius: 10px;
+  width: 26px;
+  height: 28px;
+  border-radius: 8px;
 }
 
 .dock-send-button {
@@ -2053,8 +2101,8 @@ pre {
 }
 
 .dock-send-button .dock-send-icon {
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
 }
 
 .dock-send-button:not(.is-stop) .dock-send-icon {
@@ -2063,8 +2111,8 @@ pre {
 }
 
 .dock-send-button.is-stop .dock-send-icon {
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
 }
 
 .dock-send-button:hover {
@@ -2082,7 +2130,7 @@ pre {
 
 .dock-status-footer {
   width: 100%;
-  margin-top: 8px;
+  margin-top: 6px;
   color: var(--text-soft);
 }
 
@@ -2092,20 +2140,20 @@ pre {
 
 .dock-error {
   border: 1px solid rgba(241, 142, 127, 0.28);
-  border-radius: 16px;
+  border-radius: 12px;
   background: rgba(241, 142, 127, 0.08);
-  padding: 12px 14px;
+  padding: 8px 10px;
   color: #ffc0b5;
 }
 
 .dock-question-stack {
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 
 .dock-question {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   color: var(--text-muted);
 }
 
@@ -2166,7 +2214,7 @@ pre {
   }
 
   .dock-stage {
-    --stage-inline-pad: 24px;
+    --stage-inline-pad: 18px;
   }
 
   .dock-stage-scroll-body,
@@ -2191,7 +2239,7 @@ pre {
     position: fixed;
     inset: 0 auto 0 0;
     z-index: 40;
-    width: min(88vw, 292px);
+    width: min(88vw, 280px);
     height: 100vh;
     transform: translateX(-104%);
     transition: transform 180ms ease;
@@ -2209,7 +2257,7 @@ pre {
 
   .dock-stage {
     min-height: 100vh;
-    --stage-inline-pad: 14px;
+    --stage-inline-pad: 10px;
   }
 
   .dock-stage-header {
@@ -2221,11 +2269,11 @@ pre {
   }
 
   .dock-stage-header {
-    align-items: flex-start;
+    align-items: center;
   }
 
   .dock-stage-heading {
-    align-items: flex-start;
+    align-items: center;
   }
 
   .dock-stage-toolbar {
@@ -2242,17 +2290,29 @@ pre {
 
 @media (max-width: 560px) {
   .dock-thread-sidebar {
-    padding: 14px 12px 12px;
+    padding: 10px 10px 10px;
   }
 
   .dock-sidebar-select-row {
     grid-template-columns: 1fr;
   }
 
+  .dock-stage-header,
+  .dock-rename-strip,
+  .dock-stage-scroll,
+  .dock-bottom-dock {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .dock-stage-subtitle {
+    display: none;
+  }
+
   .dock-composer-footer {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
   }
 
   .dock-composer-controls {
@@ -2277,7 +2337,7 @@ pre {
     min-height: 28px;
     padding-left: 6px;
     padding-right: 6px;
-    font-size: 16px;
+    font-size: var(--text-13);
   }
 
   .dock-composer-add-button,
@@ -2287,13 +2347,13 @@ pre {
   }
 
   .dock-send-button {
-    width: 24px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
   }
 
   .dock-send-button .dock-send-icon {
-    width: 22px;
-    height: 22px;
+    width: 18px;
+    height: 18px;
   }
 
   .dock-send-button:not(.is-stop) .dock-send-icon {
@@ -2301,25 +2361,25 @@ pre {
   }
 
   .dock-send-button.is-stop .dock-send-icon {
-    width: 22px;
-    height: 22px;
+    width: 18px;
+    height: 18px;
   }
 
   .dock-composer-plan-panel {
-    max-height: min(26vh, 220px);
+    max-height: min(24vh, 180px);
   }
 
   .dock-status-footer {
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
+    gap: 8px;
   }
 
   .dock-status-group {
     min-width: 0;
     flex-wrap: nowrap;
-    gap: 8px;
+    gap: 6px;
   }
 
   .dock-status-group:last-child {
@@ -2331,7 +2391,7 @@ pre {
     min-height: 28px;
     padding-left: 7px;
     padding-right: 7px;
-    font-size: 16px;
+    font-size: var(--text-13);
   }
 
   .dock-tailnet-pill {
@@ -2351,6 +2411,14 @@ pre {
   }
 
   .dock-hero strong {
+    font-size: 18px;
+  }
+
+  .dock-nav-wordmark {
+    font-size: 18px;
+  }
+
+  .dock-hero-wordmark {
     font-size: 30px;
   }
 
@@ -2358,7 +2426,7 @@ pre {
   .dock-artifact,
   .dock-request-card,
   .dock-upload-chip,
-  .dock-composer-shell {
-    border-radius: 18px;
+  .dock-composer-panel {
+    border-radius: 12px;
   }
 }

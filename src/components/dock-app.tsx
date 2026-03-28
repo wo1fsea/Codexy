@@ -1078,9 +1078,6 @@ function PlanItemView({
       ? item.explanation.trim()
       : null;
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const toggleLabel = isCollapsed
-    ? t("actions.showTasks")
-    : t("actions.hideTasks");
 
   useEffect(() => {
     setIsCollapsed(false);
@@ -1104,12 +1101,11 @@ function PlanItemView({
           onClick={() => setIsCollapsed((current) => !current)}
           type="button"
         >
-          <span>{toggleLabel}</span>
           <AppIcon className="dock-plan-toggle-icon" name="chevron" />
         </button>
       </div>
       {!isCollapsed ? (
-        <>
+        <div className="dock-plan-card-body">
           {explanation ? <p className="dock-plan-card-explanation">{explanation}</p> : null}
           <ol className="dock-plan-list">
             {steps.map((step, index) => (
@@ -1117,8 +1113,8 @@ function PlanItemView({
                 className={clsx("dock-plan-row", `is-${step.status}`)}
                 key={`${step.status}-${step.step}-${index}`}
               >
-                <span className="dock-plan-row-index">{index + 1}.</span>
                 <span aria-hidden="true" className="dock-plan-row-status" />
+                <span className="dock-plan-row-index">{index + 1}.</span>
                 <div className="dock-plan-row-copy">
                   <ReactMarkdown
                     components={{
@@ -1142,7 +1138,7 @@ function PlanItemView({
               </li>
             ))}
           </ol>
-        </>
+        </div>
       ) : null}
     </section>
   );
@@ -1196,6 +1192,9 @@ function ThreadItemView({ item }: { item: DockThreadItem }) {
           </span>
           <span className="dock-command-text">{commandItem.command}</span>
           {duration ? <span className="dock-command-duration">({duration})</span> : null}
+          <span aria-hidden="true" className="dock-command-toggle">
+            <AppIcon className="dock-command-toggle-icon" name="chevron" />
+          </span>
         </summary>
         <div className="dock-command-detail">
           <div className="dock-terminal-path">{commandItem.cwd}</div>
@@ -1343,6 +1342,11 @@ export function DockApp() {
   const [submitScrollToken, setSubmitScrollToken] = useState(0);
   const reconnectNoticeTimerRef = useRef<number | null>(null);
   const backgroundSyncInFlightRef = useRef(false);
+  const inFlightThreadSyncRef = useRef<{
+    threadId: string;
+    controller: AbortController;
+    promise: Promise<void>;
+  } | null>(null);
   const selectedThreadIdRef = useRef<string | null>(null);
   const resolvedRequestIdsRef = useRef<Set<string>>(new Set());
 
@@ -1377,6 +1381,10 @@ export function DockApp() {
     return data;
   }
 
+  function isAbortError(cause: unknown) {
+    return cause instanceof Error && cause.name === "AbortError";
+  }
+
   async function refreshThreads() {
     const params = new URLSearchParams();
     params.set(
@@ -1405,54 +1413,96 @@ export function DockApp() {
       const fallbackThread =
         threads.find((thread) => thread.id === threadId) ??
         (selectedThread?.id === threadId ? selectedThread : null);
+      const currentSync = inFlightThreadSyncRef.current;
+
+      if (currentSync?.threadId === threadId) {
+        if (!isBackground) {
+          setLoadingThread(true);
+        }
+        try {
+          await currentSync.promise;
+        } finally {
+          if (!isBackground && selectedThreadIdRef.current === threadId) {
+            setLoadingThread(false);
+          }
+        }
+        return;
+      }
+
+      if (currentSync) {
+        currentSync.controller.abort();
+        inFlightThreadSyncRef.current = null;
+      }
 
       if (!isBackground) {
         setLoadingThread(true);
       }
 
-      try {
-        const data = await fetchJson<{ thread: DockThread }>(
-          `/api/threads/${threadId}`
-        );
-        if (selectedThreadIdRef.current !== threadId) {
-          return;
-        }
-        setSelectedThread((current) =>
-          mergeThreadPreservingRichTurns(current, data.thread)
-        );
-        setComposerCwd(data.thread.cwd);
-        if (!suppressErrors) {
-          setError(null);
-        }
-      } catch (cause) {
-        const message =
-          cause instanceof Error
-            ? localizeRuntimeMessage(cause.message, t)
-            : t("error.failedLoadThread");
-
-        if (message.includes("not materialized yet") && fallbackThread) {
+      const controller = new AbortController();
+      const requestPromise = (async () => {
+        try {
+          const data = await fetchJson<{ thread: DockThread }>(
+            `/api/threads/${threadId}`,
+            { signal: controller.signal }
+          );
           if (selectedThreadIdRef.current !== threadId) {
             return;
           }
-          setSelectedThread({
-            ...fallbackThread,
-            turns: fallbackThread.turns ?? []
-          });
-          setComposerCwd(fallbackThread.cwd);
+          setSelectedThread((current) =>
+            mergeThreadPreservingRichTurns(current, data.thread)
+          );
+          setComposerCwd(data.thread.cwd);
           if (!suppressErrors) {
             setError(null);
           }
-          return;
-        }
-
-        if (!suppressErrors) {
-          if (selectedThreadIdRef.current !== threadId) {
+        } catch (cause) {
+          if (controller.signal.aborted || isAbortError(cause)) {
             return;
           }
-          setError(message);
+
+          const message =
+            cause instanceof Error
+              ? localizeRuntimeMessage(cause.message, t)
+              : t("error.failedLoadThread");
+
+          if (message.includes("not materialized yet") && fallbackThread) {
+            if (selectedThreadIdRef.current !== threadId) {
+              return;
+            }
+            setSelectedThread({
+              ...fallbackThread,
+              turns: fallbackThread.turns ?? []
+            });
+            setComposerCwd(fallbackThread.cwd);
+            if (!suppressErrors) {
+              setError(null);
+            }
+            return;
+          }
+
+          if (!suppressErrors) {
+            if (selectedThreadIdRef.current !== threadId) {
+              return;
+            }
+            setError(message);
+          }
+        } finally {
+          if (inFlightThreadSyncRef.current?.controller === controller) {
+            inFlightThreadSyncRef.current = null;
+          }
         }
+      })();
+
+      inFlightThreadSyncRef.current = {
+        threadId,
+        controller,
+        promise: requestPromise
+      };
+
+      try {
+        await requestPromise;
       } finally {
-        if (!isBackground) {
+        if (!isBackground && selectedThreadIdRef.current === threadId) {
           setLoadingThread(false);
         }
       }
@@ -1724,52 +1774,69 @@ export function DockApp() {
   });
 
   useEffect(() => {
-    void (async () => {
-      const [threadResult, modelResult, statusResult] = await Promise.allSettled([
-          fetchJson<{ data: DockThread[] }>("/api/threads"),
-          fetchJson<{ data: DockModel[] }>("/api/models"),
-          fetchJson<StatusPayload>("/api/status")
-      ]);
+    let cancelled = false;
 
-      startTransition(() => {
-        if (threadResult.status === "fulfilled") {
-          setThreads(threadResult.value.data);
+    startTransition(() => {
+      setPendingRequests([]);
+    });
+
+    void fetchJson<{ data: DockModel[] }>("/api/models")
+      .then((result) => {
+        if (cancelled) {
+          return;
         }
 
-        if (modelResult.status === "fulfilled") {
-          setModels(modelResult.value.data);
+        startTransition(() => {
+          setModels(result.data);
           const defaultModel =
-            modelResult.value.data.find((model) => model.isDefault) ??
-            modelResult.value.data[0] ??
+            result.data.find((model) => model.isDefault) ??
+            result.data[0] ??
             null;
           setComposerModel(defaultModel?.model ?? "");
           setComposerReasoningEffort(defaultModel?.defaultReasoningEffort ?? "");
+        });
+      })
+      .catch((cause) => {
+        if (cancelled) {
+          return;
         }
 
-        if (statusResult.status === "fulfilled") {
-          setStatus(statusResult.value);
-          setComposerCwd(statusResult.value.defaults.cwd);
-          setComposerApprovalPolicy(
-            statusResult.value.defaults.approvalPolicy as DockApprovalPolicy
-          );
-        }
-
-        setPendingRequests([]);
-      });
-
-      const failures = [threadResult, modelResult, statusResult].filter(
-        (result) => result.status === "rejected"
-      ) as PromiseRejectedResult[];
-
-      if (failures.length) {
-        const firstFailure = failures[0]?.reason;
         setError(
-          firstFailure instanceof Error
-            ? localizeRuntimeMessage(firstFailure.message, t)
+          cause instanceof Error
+            ? localizeRuntimeMessage(cause.message, t)
             : t("error.initializationFailed")
         );
-      }
-    })();
+      });
+
+    void fetchJson<StatusPayload>("/api/status")
+      .then((result) => {
+        if (cancelled) {
+          return;
+        }
+
+        startTransition(() => {
+          setStatus(result);
+          setComposerCwd(result.defaults.cwd);
+          setComposerApprovalPolicy(
+            result.defaults.approvalPolicy as DockApprovalPolicy
+          );
+        });
+      })
+      .catch((cause) => {
+        if (cancelled) {
+          return;
+        }
+
+        setError(
+          cause instanceof Error
+            ? localizeRuntimeMessage(cause.message, t)
+            : t("error.initializationFailed")
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [t]);
 
   useEffect(() => {
@@ -1784,12 +1851,27 @@ export function DockApp() {
 
   useEffect(() => {
     if (!selectedThreadId) {
+      inFlightThreadSyncRef.current?.controller.abort();
+      inFlightThreadSyncRef.current = null;
       setSelectedThread(null);
       setRenamingThread(false);
       setThreadNameDraft("");
       setTakeoverPromptOpen(false);
+      setLoadingThread(false);
       return;
     }
+    const fallbackThread =
+      threads.find((thread) => thread.id === selectedThreadId) ?? null;
+    setSelectedThread(
+      fallbackThread
+        ? {
+            ...fallbackThread,
+            turns: fallbackThread.turns ?? []
+          }
+        : null
+    );
+    setComposerCwd(fallbackThread?.cwd ?? "");
+    setError(null);
     void loadThread(selectedThreadId);
   }, [selectedThreadId]);
 
@@ -1813,8 +1895,8 @@ export function DockApp() {
     source.onopen = () => {
       clearReconnectNoticeTimer();
       setConnectionNotice(null);
-      if (selectedThreadId) {
-        void syncThread(selectedThreadId, {
+      if (selectedThreadIdRef.current) {
+        void syncThread(selectedThreadIdRef.current, {
           background: true,
           suppressErrors: true
         });
@@ -1846,7 +1928,14 @@ export function DockApp() {
       clearReconnectNoticeTimer();
       source.close();
     };
-  }, [handleBridgeEvent, selectedThreadId, syncThread, t]);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      inFlightThreadSyncRef.current?.controller.abort();
+      inFlightThreadSyncRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     const activeTurn = getActiveTurn(selectedThread);
@@ -2187,9 +2276,6 @@ export function DockApp() {
         <div className="dock-request-head">
           <div className="dock-request-heading">
             <strong>{getRequestTitle(request.method, t)}</strong>
-            <span className="dock-request-subtitle">
-              {t("request.confirmationRequired")}
-            </span>
           </div>
         </div>
 
@@ -2201,9 +2287,6 @@ export function DockApp() {
               </pre>
             </div>
             <div className="dock-request-meta-row">
-              <span className="dock-request-meta-label">
-                {t("request.workingDirectory")}
-              </span>
               <code>{getCommandApprovalCwd(request, selectedThread?.cwd || composerCwd)}</code>
             </div>
             <div className="dock-request-actions">
@@ -2239,12 +2322,11 @@ export function DockApp() {
 
         {request.method === "item/fileChange/requestApproval" ? (
           <>
-            <p className="dock-request-copy">
-              {
-                (request.params as { reason?: string | null }).reason ||
-                  t("request.fileNeedsApproval")
-              }
-            </p>
+            {(request.params as { reason?: string | null }).reason ? (
+              <p className="dock-request-copy">
+                {(request.params as { reason?: string | null }).reason}
+              </p>
+            ) : null}
             <div className="dock-request-actions">
                 <button
                   className="dock-request-action is-primary"
@@ -2284,9 +2366,6 @@ export function DockApp() {
               </pre>
             </div>
             <div className="dock-request-meta-row">
-              <span className="dock-request-meta-label">
-                {t("request.workingDirectory")}
-              </span>
               <code>{request.params.cwd || selectedThread?.cwd || composerCwd}</code>
             </div>
             <div className="dock-request-actions">
@@ -2322,9 +2401,9 @@ export function DockApp() {
 
         {request.method === "applyPatchApproval" ? (
           <>
-            <p className="dock-request-copy">
-              {request.params.reason || t("request.fileNeedsApproval")}
-            </p>
+            {request.params.reason ? (
+              <p className="dock-request-copy">{request.params.reason}</p>
+            ) : null}
             <pre>{Object.keys(request.params.fileChanges).join("\n")}</pre>
             <div className="dock-request-actions">
                 <button

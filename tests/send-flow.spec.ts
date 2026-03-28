@@ -104,6 +104,99 @@ test("sending a prompt enters transcript context immediately", async ({ page }) 
   expect(Math.abs(layout!.composerRight - layout!.transcriptRight)).toBeLessThanOrEqual(2);
 });
 
+test("rapid session switching stays responsive while older thread reads are still pending", async ({
+  page
+}) => {
+  await installDockApiMock(page, {
+    detailDelaysMs: {
+      "thread-switch-a": 700,
+      "thread-switch-b": 450,
+      "thread-switch-c": 25
+    },
+    threads: [
+      {
+        id: "thread-switch-a",
+        preview: "slow session alpha",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000000,
+        updatedAt: 1774003600,
+        status: { type: "idle" },
+        path: null,
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "session",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: "slow session alpha",
+        turns: []
+      },
+      {
+        id: "thread-switch-b",
+        preview: "slow session beta",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000001,
+        updatedAt: 1774003601,
+        status: { type: "idle" },
+        path: null,
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "session",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: "slow session beta",
+        turns: []
+      },
+      {
+        id: "thread-switch-c",
+        preview: "fast session gamma",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000002,
+        updatedAt: 1774003602,
+        status: { type: "idle" },
+        path: null,
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "session",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: "fast session gamma",
+        turns: []
+      }
+    ]
+  });
+
+  await gotoDock(page);
+
+  const alphaRow = page.locator(".dock-thread-row", {
+    hasText: "slow session alpha"
+  });
+  const betaRow = page.locator(".dock-thread-row", {
+    hasText: "slow session beta"
+  });
+  const gammaRow = page.locator(".dock-thread-row", {
+    hasText: "fast session gamma"
+  });
+
+  await alphaRow.click();
+  await page.waitForTimeout(40);
+  await betaRow.click();
+  await page.waitForTimeout(40);
+  await gammaRow.click();
+
+  await expect(page.locator(".dock-stage-title")).toContainText("fast session gamma");
+
+  await betaRow.click();
+  await expect(page.locator(".dock-stage-title")).toContainText("slow session beta");
+  await expect(page.locator("textarea.dock-composer-input")).toBeVisible();
+  await expect(page.locator("button.dock-send-button")).toBeVisible();
+});
+
 test("pasting an image into composer creates an attachment chip", async ({ page }) => {
   await installDockApiMock(page);
   await gotoDock(page);
@@ -372,6 +465,79 @@ test("approval buttons submit the matching server request payload", async ({ pag
   await expect(card).toHaveCount(0);
 });
 
+test("command execution items keep a visible expand control and reveal output", async ({
+  page
+}) => {
+  await installDockApiMock(page, {
+    threads: [
+      {
+        id: "thread-command-expand",
+        preview: "command execution",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000100,
+        updatedAt: 1774000400,
+        status: { type: "idle" },
+        path: null,
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "session",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: "command execution",
+        turns: [
+          {
+            id: "turn-command-expand",
+            status: "completed",
+            error: null,
+            items: [
+              {
+                type: "userMessage",
+                id: "user-command-expand",
+                content: [{ type: "text", text: "run Get-Date", text_elements: [] }]
+              },
+              {
+                type: "commandExecution",
+                id: "command-expand",
+                command: "Get-Date",
+                cwd: DEFAULT_CWD,
+                processId: "2456",
+                status: "completed",
+                commandActions: [],
+                aggregatedOutput: "Sunday, March 29, 2026 10:45:00 AM",
+                exitCode: 0,
+                durationMs: 1200
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  });
+
+  await gotoDock(page);
+  await page.locator(".dock-thread-row").first().click();
+
+  const card = page.locator(".dock-command-card");
+  const summary = card.locator(".dock-command-summary");
+  const toggle = card.locator(".dock-command-toggle");
+  const detail = card.locator(".dock-command-detail");
+
+  await expect(card).toBeVisible();
+  await expect(toggle).toBeVisible();
+  await expect(detail).toBeHidden();
+
+  await summary.click();
+
+  await expect.poll(() =>
+    card.evaluate((element) => (element as HTMLDetailsElement).open)
+  ).toBe(true);
+  await expect(detail).toBeVisible();
+  await expect(detail).toContainText(DEFAULT_CWD);
+  await expect(detail).toContainText("Sunday, March 29, 2026");
+});
+
 test("latest plan renders above the composer instead of inside the transcript", async ({
   page
 }) => {
@@ -506,7 +672,8 @@ test("latest plan renders above the composer instead of inside the transcript", 
   expect(layout.planTop).not.toBeNull();
   expect(layout.planBottom).not.toBeNull();
   expect(layout.inputTop).not.toBeNull();
-  expect(layout.planBottom!).toBeLessThanOrEqual(layout.inputTop!);
+  expect(layout.planTop!).toBeLessThan(layout.inputTop!);
+  expect(layout.planBottom!).toBeLessThanOrEqual(layout.inputTop! + 14);
 });
 
 test("scroll to bottom button appears and jumps transcript to the end", async ({ page }) => {
