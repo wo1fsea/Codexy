@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --hostname 0.0.0.0 --port 3000",
-    "build": "next build --webpack",
+    "build": "node scripts/next-build.mjs",
     "start": "next start --hostname 0.0.0.0 --port 3000",
     "restart:3001": "node scripts/restart-3001.mjs",
     "typecheck": "tsc --noEmit",
