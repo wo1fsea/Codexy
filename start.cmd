@@ -16,5 +16,5 @@ if not "%~1"=="" (
   )
 )
 
-call npx next start --hostname 0.0.0.0 --port %PORT%
+call node scripts\next-start.mjs --port %PORT%
 exit /b %errorlevel%

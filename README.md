@@ -40,6 +40,8 @@ Build the production bundle:
 npm run build
 ```
 
+This writes the production bundle to `.next-runtime` so development runs can keep using `.next` without clobbering the live runtime.
+
 Windows shortcut:
 
 ```bat
@@ -48,7 +50,7 @@ build.cmd
 
 ### 2. Development Runtime
 
-Start the development server on port `3000` by default:
+Start the development server on port `3001` by default:
 
 ```bash
 npm run dev
@@ -58,6 +60,12 @@ Windows shortcut:
 
 ```bat
 dev.cmd
+```
+
+Shell shortcut:
+
+```sh
+./dev.sh
 ```
 
 To use a custom port, pass the port directly or use `--port`:
@@ -82,12 +90,32 @@ Windows shortcut:
 start.cmd
 ```
 
+Shell shortcuts:
+
+```sh
+./build.sh
+./start.sh
+```
+
 Custom ports are also supported:
 
 ```bat
 start.cmd 3100
 start.cmd --port 3100
 ```
+
+```sh
+./start.sh 3100
+./start.sh --port 3100
+```
+
+## Default Port Split
+
+- Production runtime: `3000`
+- Development runtime: `3001`
+- Direct entrypoints:
+  - Windows: `build.cmd`, `dev.cmd`, `start.cmd`
+  - Shell: `build.sh`, `dev.sh`, `start.sh`
 
 ## Common Verification Commands
 

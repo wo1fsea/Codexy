@@ -1,7 +1,7 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-set "PORT=3000"
+set "PORT=3001"
 
 if not "%~1"=="" (
   if /i "%~1"=="--port" (

@@ -4,7 +4,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-function sanitizeBuildEnv() {
+function sanitizeRuntimeEnv() {
   const env = {
     ...process.env,
     NODE_ENV: "production",
@@ -25,17 +25,47 @@ function sanitizeBuildEnv() {
   return env;
 }
 
+function resolvePort(argv) {
+  const args = [...argv];
+
+  while (args.length > 0) {
+    const current = args.shift();
+    if (!current) {
+      continue;
+    }
+
+    if (current === "--port") {
+      const next = args.shift();
+      if (next) {
+        return next;
+      }
+      break;
+    }
+
+    if (!current.startsWith("-")) {
+      return current;
+    }
+  }
+
+  return process.env.PORT?.trim() || "3000";
+}
+
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
 const require = createRequire(import.meta.url);
 const nextBin = require.resolve("next/dist/bin/next");
+const port = resolvePort(process.argv.slice(2));
 
-const child = spawn(process.execPath, [nextBin, "build", "--webpack"], {
-  cwd: repoRoot,
-  env: sanitizeBuildEnv(),
-  stdio: "inherit",
-  shell: false
-});
+const child = spawn(
+  process.execPath,
+  [nextBin, "start", "--hostname", "0.0.0.0", "--port", port],
+  {
+    cwd: repoRoot,
+    env: sanitizeRuntimeEnv(),
+    stdio: "inherit",
+    shell: false
+  }
+);
 
 child.on("exit", (code, signal) => {
   if (signal) {
