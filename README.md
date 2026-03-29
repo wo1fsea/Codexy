@@ -47,7 +47,7 @@ Current first-run command surface:
 - `codexy cloud status`
 - `codexy cloud logs`
 - `codexy cloud open`
-- `codexy link <cloud-url>`
+- `codexy link <cloud-url> [--code 123456]`
 - `codexy unlink`
 
 To start a local self-hosted cloud entrypoint:
@@ -59,10 +59,15 @@ codexy cloud start
 To point a node at a self-hosted cloud entrypoint:
 
 ```bash
-codexy link https://cloud.example.com
+codexy link https://cloud.example.com --code 123456
 ```
 
 Start the linked node with `codexy start`, then open that node from the cloud dashboard. The node keeps a cloud connector open in the background, so the browser does not need a directly reachable node address.
+
+Cloud mode is protected by a single Google Authenticator-compatible TOTP binding. On the first cloud open, bind an authenticator in the browser. After that:
+
+- browser access to the dashboard and remote node workspaces requires a 6-digit authenticator login
+- `codexy link` also requires the current 6-digit authenticator code so node registration is not anonymous
 
 This writes local node configuration into the active Codexy home directory, which defaults to `~/.codexy` unless `CODEXY_HOME_DIR` is set.
 

@@ -16,6 +16,7 @@ Codexy is a Tailscale-first web control plane for Codex on a host machine. The o
 - surfacing `request_user_input` prompts
 - warning when the web client is about to take over a thread that may already be active elsewhere
 - opening a linked node workspace from cloud mode without requiring the node to expose a directly reachable browser address
+- authenticating self-hosted cloud dashboard access and node linking with a single Google Authenticator-compatible 6-digit code model
 
 The canonical UI contract lives in [visual-spec.md](./visual-spec.md). Product and engineering changes that affect presentation must follow that document.
 
@@ -42,6 +43,7 @@ The canonical UI contract lives in [visual-spec.md](./visual-spec.md). Product a
 - Starts the bridge process automatically unless an external bridge URL is configured.
 - Uses Tailscale LocalAPI for host status and serve configuration. On platforms where LocalAPI is not directly reachable from Node, the host adapter may establish a local proxy first.
 - In self-hosted cloud mode, the browser-facing cloud API can proxy node API requests through an outbound node connector instead of relying on direct browser-to-node reachability.
+- In self-hosted cloud mode, the browser dashboard requires a one-time TOTP binding flow on first open, then regular TOTP-backed login sessions for subsequent access.
 
 ### Codex Integration
 
@@ -76,6 +78,9 @@ codexy/
 ├─ src/
 │  ├─ app/
 │  │  ├─ api/
+│  │  │  ├─ cloud/auth/login/route.ts
+│  │  │  ├─ cloud/auth/logout/route.ts
+│  │  │  ├─ cloud/auth/setup/route.ts
 │  │  │  ├─ cloud/connectors/poll/route.ts
 │  │  │  ├─ cloud/connectors/responses/route.ts
 │  │  │  ├─ cloud/connectors/streams/route.ts
@@ -93,6 +98,8 @@ codexy/
 │  │  │  ├─ threads/[threadId]/turns/route.ts
 │  │  │  ├─ uploads/route.ts
 │  │  │  └─ uploads/[uploadId]/route.ts
+│  │  ├─ auth/login/page.tsx
+│  │  ├─ auth/setup/page.tsx
 │  │  ├─ globals.css
 │  │  ├─ layout.tsx
 │  │  ├─ nodes/[nodeId]/page.tsx
@@ -101,6 +108,8 @@ codexy/
 │  │  ├─ cloud-app.tsx
 │  │  └─ dock-app.tsx
 │  └─ lib/
+│     ├─ cloud-auth-http.ts
+│     ├─ cloud-auth.ts
 │     ├─ cloud-registry.ts
 │     ├─ cloud-tunnel.ts
 │     ├─ codex/
@@ -188,6 +197,7 @@ codexy/
 - Recommended remote access is the served HTTPS URL on the node's `.ts.net` name when serve is available, otherwise the direct Tailscale IP with `:3000`.
 - UI should prefer showing the actual served tailnet URL, otherwise the direct Tailscale IP with `:3000`, instead of a bare DNS name.
 - In cloud mode, Codexy should expose a self-hosted dashboard for linked nodes, keep node registration local to the deployment, and proxy node API access through an outbound connector when the node is not directly reachable from the browser.
+- Self-hosted cloud access should bind a Google Authenticator-compatible TOTP secret on first open, require TOTP login before showing linked nodes, and require the same current 6-digit code when a node runs `codexy link <cloud-url>`.
 
 ## First Implementation Slice
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { requireCloudApiSession } from "@/lib/cloud-auth-http";
 import { getCloudNode } from "@/lib/cloud-registry";
 import { getCloudTunnelBroker } from "@/lib/cloud-tunnel";
 
@@ -30,6 +31,11 @@ async function proxyNodeRequest(
     }>;
   }
 ) {
+  const authError = await requireCloudApiSession();
+  if (authError) {
+    return authError;
+  }
+
   const { nodeId, path } = await context.params;
   const node = getCloudNode(nodeId);
   if (!node) {

@@ -3,6 +3,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
+import { createInterface } from "node:readline/promises";
 import {
   existsSync,
   mkdirSync,
@@ -286,6 +287,33 @@ function parseJson(text) {
     return JSON.parse(text);
   } catch {
     return null;
+  }
+}
+
+function normalizeTotpCode(rawCode) {
+  const normalized = rawCode.replace(/\s+/g, "");
+  if (!/^\d{6}$/.test(normalized)) {
+    fail("Enter a valid 6-digit Google Authenticator code.");
+  }
+
+  return normalized;
+}
+
+async function promptForTotpCode() {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    fail("A 6-digit authenticator code is required. Rerun `codexy link <cloud-url> --code 123456`.");
+  }
+
+  const rl = createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+
+  try {
+    const code = await rl.question("Enter the current Codexy cloud 6-digit code: ");
+    return normalizeTotpCode(code);
+  } finally {
+    rl.close();
   }
 }
 
@@ -765,13 +793,14 @@ async function requestCloudJson(url, init) {
   return data;
 }
 
-async function registerNodeWithCloud(cloudUrl, node, linkedAt, connectorToken) {
+async function registerNodeWithCloud(cloudUrl, node, linkedAt, connectorToken, totpCode) {
   await requestCloudJson(`${cloudUrl}/api/cloud/nodes`, {
     method: "POST",
     body: JSON.stringify({
       cloudUrl,
       linkedAt,
       connectorToken,
+      totpCode,
       nodeId: node.nodeId,
       nodeName: node.nodeName
     })
@@ -779,22 +808,42 @@ async function registerNodeWithCloud(cloudUrl, node, linkedAt, connectorToken) {
 }
 
 async function unregisterNodeFromCloud(cloud) {
-  if (!cloud.url || !cloud.nodeId) {
+  if (!cloud.url || !cloud.nodeId || !cloud.connectorToken) {
     return;
   }
 
   await requestCloudJson(
     `${cloud.url}/api/cloud/nodes/${encodeURIComponent(cloud.nodeId)}`,
     {
-      method: "DELETE"
+      method: "DELETE",
+      headers: {
+        "x-codexy-connector-token": cloud.connectorToken
+      }
     }
   );
 }
 
 async function runLink(argv) {
   const [rawUrl, ...rest] = argv;
-  if (rest.length) {
-    fail(`Unknown argument: ${rest[0]}`);
+  if (!rawUrl) {
+    fail("Usage: codexy link <cloud-url> [--code 123456]");
+  }
+
+  let totpCode = process.env.CODEXY_TOTP_CODE?.trim() || null;
+  for (let index = 0; index < rest.length; index += 1) {
+    const current = rest[index];
+    if (current === "--code") {
+      const next = rest[index + 1];
+      if (!next) {
+        fail("Missing value for --code.");
+      }
+
+      totpCode = next;
+      index += 1;
+      continue;
+    }
+
+    fail(`Unknown argument: ${current}`);
   }
 
   try {
@@ -802,8 +851,15 @@ async function runLink(argv) {
     const node = ensureLocalNodeIdentity();
     const linkedAt = new Date().toISOString();
     const connectorToken = randomUUID();
+    const verifiedTotpCode = totpCode ? normalizeTotpCode(totpCode) : await promptForTotpCode();
 
-    await registerNodeWithCloud(cloudUrl, node, linkedAt, connectorToken);
+    await registerNodeWithCloud(
+      cloudUrl,
+      node,
+      linkedAt,
+      connectorToken,
+      verifiedTotpCode
+    );
 
     const cloud = writeCloudLink(cloudUrl, {
       linkedAt,
@@ -861,6 +917,9 @@ function printHelp() {
   );
   process.stdout.write(
     "Usage: node scripts/service.mjs cloud <start|stop|status|logs|open> [--port 3400]\n"
+  );
+  process.stdout.write(
+    "Usage: node scripts/service.mjs link <cloud-url> [--code 123456]\n"
   );
 }
 

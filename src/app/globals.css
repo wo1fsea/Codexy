@@ -40,6 +40,11 @@
   --text-13: 13px;
   --text-14: 14px;
   --text-15: 15px;
+  --icon-disclosure: 14px;
+  --icon-support: 18px;
+  --icon-compact-action: 22px;
+  --icon-toolbar-action: 24px;
+  --icon-hero-action: 28px;
   --font-sans: "Segoe UI Variable Display", "Aptos", "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", "Cascadia Code", "Consolas", monospace;
   --font-serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", "Times New Roman", serif;
@@ -135,6 +140,177 @@ pre {
   padding: clamp(20px, 4vw, 40px);
 }
 
+.cloud-auth-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: clamp(20px, 4vw, 40px);
+  background:
+    radial-gradient(circle at top left, rgba(152, 200, 162, 0.12), transparent 34%),
+    linear-gradient(180deg, #101214 0%, #15181c 100%);
+}
+
+.cloud-auth-card {
+  width: min(980px, 100%);
+  border: 1px solid rgba(255, 247, 238, 0.08);
+  border-radius: 24px;
+  background: rgba(22, 23, 26, 0.88);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.24);
+  padding: clamp(22px, 4vw, 30px);
+}
+
+.cloud-auth-card-narrow {
+  width: min(560px, 100%);
+}
+
+.cloud-auth-copy {
+  display: grid;
+  gap: 12px;
+}
+
+.cloud-auth-copy h1 {
+  margin: 0;
+  color: var(--text-strong);
+  font-family: var(--font-serif);
+  font-size: clamp(30px, 5vw, 48px);
+  line-height: 0.96;
+}
+
+.cloud-auth-copy p,
+.cloud-auth-note,
+.cloud-auth-meta {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.cloud-auth-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(0, 1.2fr);
+  gap: 18px;
+  margin-top: 22px;
+}
+
+.cloud-auth-qr-panel,
+.cloud-auth-form-panel {
+  border: 1px solid rgba(255, 247, 238, 0.08);
+  border-radius: 20px;
+  background: rgba(12, 13, 16, 0.34);
+  padding: 20px;
+}
+
+.cloud-auth-qr-panel {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 14px;
+}
+
+.cloud-auth-qr {
+  width: min(224px, 100%);
+  height: auto;
+  border-radius: 16px;
+  background: #fff;
+  padding: 10px;
+}
+
+.cloud-auth-form-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.cloud-auth-secret {
+  display: grid;
+  gap: 8px;
+}
+
+.cloud-auth-secret-label {
+  color: var(--text-faint);
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.cloud-auth-secret code,
+.cloud-auth-footer code {
+  display: block;
+  overflow-wrap: anywhere;
+  color: var(--text-strong);
+  font-family: var(--font-mono);
+}
+
+.cloud-auth-form {
+  display: grid;
+  gap: 14px;
+}
+
+.cloud-auth-field {
+  display: grid;
+  gap: 8px;
+  color: var(--text-soft);
+  font-size: 13px;
+}
+
+.cloud-auth-input {
+  min-height: 46px;
+  border: 1px solid rgba(255, 247, 238, 0.12);
+  border-radius: 14px;
+  background: rgba(255, 247, 238, 0.04);
+  padding: 0 14px;
+  color: var(--text-strong);
+  font-size: 18px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.14em;
+}
+
+.cloud-auth-input:focus {
+  outline: none;
+  border-color: rgba(152, 200, 162, 0.38);
+  box-shadow: 0 0 0 3px rgba(152, 200, 162, 0.14);
+}
+
+.cloud-auth-submit,
+.cloud-session-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  border: 1px solid rgba(152, 200, 162, 0.28);
+  border-radius: 999px;
+  background: rgba(152, 200, 162, 0.12);
+  padding: 0 16px;
+  color: var(--text-strong);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.cloud-auth-submit:hover,
+.cloud-session-action:hover {
+  background: rgba(152, 200, 162, 0.18);
+  border-color: rgba(152, 200, 162, 0.42);
+}
+
+.cloud-auth-error {
+  margin: 0;
+  color: #ffcfb7;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.cloud-auth-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.cloud-auth-footer a {
+  color: var(--text-soft);
+}
+
 .cloud-hero,
 .cloud-panel {
   width: min(1120px, 100%);
@@ -203,6 +379,40 @@ pre {
   line-height: 1.6;
 }
 
+.cloud-code-fence {
+  margin-top: 14px;
+  border: 1px solid rgba(255, 247, 238, 0.08);
+  border-radius: 16px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(12, 13, 16, 0.98) 0%, rgba(17, 18, 22, 0.98) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 247, 238, 0.04);
+}
+
+.cloud-code-fence-label {
+  display: block;
+  border-bottom: 1px solid rgba(255, 247, 238, 0.06);
+  padding: 8px 12px;
+  color: var(--text-soft);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: rgba(255, 247, 238, 0.03);
+}
+
+.cloud-code-fence-body {
+  margin: 0;
+  padding: 14px 16px;
+  overflow-x: auto;
+  color: var(--text-strong);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .cloud-hero-copy code,
 .cloud-panel-head code,
 .cloud-empty-state code,
@@ -231,6 +441,11 @@ pre {
 
 .cloud-overview-card span:last-child {
   color: var(--text-muted);
+}
+
+.cloud-overview-card form,
+.cloud-remote-status form {
+  margin: 0;
 }
 
 .cloud-panel {
@@ -309,8 +524,7 @@ pre {
   justify-content: flex-end;
 }
 
-.cloud-node-open,
-.cloud-remote-back {
+.cloud-node-open {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -325,9 +539,34 @@ pre {
 }
 
 .cloud-node-open:hover,
-.cloud-remote-back:hover {
+.cloud-node-open:hover {
   border-color: rgba(152, 200, 162, 0.3);
   background: rgba(152, 200, 162, 0.12);
+}
+
+.cloud-remote-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  border-color: rgba(255, 247, 238, 0.1);
+  background: rgba(255, 247, 238, 0.04);
+  color: var(--text-strong);
+  text-decoration: none;
+}
+
+.cloud-remote-icon-button:hover {
+  border-color: rgba(152, 200, 162, 0.3);
+  background: rgba(152, 200, 162, 0.12);
+}
+
+.cloud-remote-inline-icon {
+  width: var(--icon-hero-action);
+  height: var(--icon-hero-action);
 }
 
 .cloud-node-meta {
@@ -355,65 +594,85 @@ pre {
 }
 
 .cloud-remote-shell {
-  min-height: 100vh;
+  height: 100dvh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
   background:
     radial-gradient(circle at top right, rgba(152, 200, 162, 0.1), transparent 24%),
     linear-gradient(180deg, #101113 0%, #141619 100%);
-  padding: clamp(16px, 3vw, 28px);
+  overflow: hidden;
 }
 
 .cloud-remote-header,
 .cloud-remote-stage {
-  width: min(1320px, 100%);
-  margin: 0 auto;
+  width: 100%;
 }
 
 .cloud-remote-header {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
-  gap: 18px;
-  margin-bottom: 18px;
+  gap: 14px;
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255, 247, 238, 0.08);
+  background: rgba(18, 20, 24, 0.94);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
 }
 
 .cloud-remote-copy {
-  display: grid;
-  gap: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  flex-wrap: wrap;
 }
 
-.cloud-remote-copy h1 {
-  margin: 0;
+.cloud-remote-node-name {
   color: var(--text-strong);
-  font-family: var(--font-serif);
-  font-size: clamp(28px, 4vw, 44px);
-  line-height: 0.96;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .cloud-remote-copy p {
   margin: 0;
-  max-width: 720px;
+  max-width: none;
   color: var(--text-muted);
-  line-height: 1.6;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .cloud-remote-status {
-  display: grid;
-  justify-items: end;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   gap: 10px;
-}
-
-.cloud-remote-status code {
-  color: var(--text-soft);
-  font-family: var(--font-mono);
-  font-size: 12px;
+  flex-wrap: wrap;
 }
 
 .cloud-remote-stage {
-  border: 1px solid rgba(255, 247, 238, 0.08);
-  border-radius: 24px;
-  background: rgba(12, 13, 16, 0.48);
-  padding: 10px;
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.24);
+  flex: 1 1 auto;
+  min-height: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
+}
+
+.cloud-remote-stage > * {
+  height: 100%;
+  min-height: 0;
+}
+
+.cloud-remote-stage .dock-app,
+.cloud-remote-stage .dock-shell {
+  height: 100%;
+  min-height: 0;
 }
 
 .dock-menubar {
@@ -450,8 +709,8 @@ pre {
 
 .dock-menubar-logo-icon,
 .dock-nav-logo-icon {
-  width: 16px;
-  height: 16px;
+  width: var(--icon-support);
+  height: var(--icon-support);
 }
 
 .dock-menubar-link {
@@ -630,8 +889,8 @@ pre {
 .dock-nav-item-icon,
 .dock-inline-icon,
 .dock-send-icon {
-  width: 16px;
-  height: 16px;
+  width: var(--icon-support);
+  height: var(--icon-support);
   flex: none;
 }
 
@@ -1126,10 +1385,16 @@ pre {
 .dock-round-action {
   display: inline-grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   color: var(--text-muted);
+}
+
+.dock-icon-button > .dock-inline-icon,
+.dock-round-action > .dock-inline-icon {
+  width: var(--icon-toolbar-action);
+  height: var(--icon-toolbar-action);
 }
 
 .dock-toolbar-confirm-shell {
@@ -1362,8 +1627,8 @@ pre {
 }
 
 .dock-scroll-bottom-icon {
-  width: 12px;
-  height: 12px;
+  width: var(--icon-compact-action);
+  height: var(--icon-compact-action);
   transform: rotate(90deg);
   color: var(--text-muted);
 }
@@ -1742,8 +2007,8 @@ pre {
 }
 
 .dock-plan-toggle-icon {
-  width: 12px;
-  height: 12px;
+  width: var(--icon-disclosure);
+  height: var(--icon-disclosure);
   transform: rotate(90deg);
   transition: transform 140ms ease;
 }
@@ -2062,15 +2327,15 @@ pre {
 .dock-command-toggle {
   display: inline-grid;
   place-items: center;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   color: var(--text-soft);
   flex: none;
 }
 
 .dock-command-toggle-icon {
-  width: 11px;
-  height: 11px;
+  width: var(--icon-disclosure);
+  height: var(--icon-disclosure);
   transform: rotate(0deg);
   transition:
     transform 140ms ease,
@@ -2445,7 +2710,7 @@ pre {
 .dock-composer-add-button {
   display: inline-grid;
   place-items: center;
-  width: 26px;
+  width: 28px;
   height: 28px;
   border: 1px solid transparent;
   border-radius: 8px;
@@ -2465,8 +2730,8 @@ pre {
 }
 
 .dock-composer-add-button .dock-inline-icon {
-  width: 15px;
-  height: 15px;
+  width: var(--icon-compact-action);
+  height: var(--icon-compact-action);
 }
 
 .dock-composer-cwd {
@@ -2505,7 +2770,6 @@ pre {
 }
 
 .dock-round-action {
-  width: 26px;
   height: 28px;
   border-radius: 8px;
 }
@@ -2525,8 +2789,8 @@ pre {
 }
 
 .dock-send-button .dock-send-icon {
-  width: 18px;
-  height: 18px;
+  width: var(--icon-compact-action);
+  height: var(--icon-compact-action);
 }
 
 .dock-send-button:not(.is-stop) .dock-send-icon {
@@ -2535,8 +2799,8 @@ pre {
 }
 
 .dock-send-button.is-stop .dock-send-icon {
-  width: 18px;
-  height: 18px;
+  width: var(--icon-compact-action);
+  height: var(--icon-compact-action);
 }
 
 .dock-send-button:hover {
@@ -2715,18 +2979,27 @@ pre {
     grid-template-columns: 1fr;
   }
 
+  .cloud-auth-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cloud-auth-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
   .cloud-panel-head {
     align-items: stretch;
     flex-direction: column;
   }
 
   .cloud-remote-header {
-    align-items: flex-start;
     flex-direction: column;
+    align-items: stretch;
   }
 
   .cloud-remote-status {
-    justify-items: start;
+    justify-content: flex-start;
   }
 }
 
@@ -2784,7 +3057,7 @@ pre {
 
   .dock-composer-add-button,
   .dock-round-action {
-    width: 26px;
+    width: 28px;
     height: 28px;
   }
 
@@ -2794,8 +3067,8 @@ pre {
   }
 
   .dock-send-button .dock-send-icon {
-    width: 18px;
-    height: 18px;
+    width: var(--icon-compact-action);
+    height: var(--icon-compact-action);
   }
 
   .dock-send-button:not(.is-stop) .dock-send-icon {
@@ -2803,8 +3076,8 @@ pre {
   }
 
   .dock-send-button.is-stop .dock-send-icon {
-    width: 18px;
-    height: 18px;
+    width: var(--icon-compact-action);
+    height: var(--icon-compact-action);
   }
 
   .dock-composer-plan-panel {

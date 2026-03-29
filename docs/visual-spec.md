@@ -150,6 +150,17 @@ The product should not rely on only `primary / muted / soft`. It needs a stable 
 - Eyebrow labels are optional and should be removed when they repeat the title or cost mobile space.
 - Dense control chrome should use `6px to 8px` horizontal inset and keep text visually close to the border.
 
+### Icon Scale
+
+- Document both hit area and glyph size. Do not treat a large button with a tiny icon as compliant.
+- Icon-only buttons should keep glyphs at roughly `75% to 80%` of the container size.
+- `36px` icon-only container uses a `28px` glyph.
+- `30px to 32px` icon-only container uses a `24px` glyph.
+- `28px` compact action container uses a `22px` glyph.
+- `22px` micro chrome container uses an `18px` glyph.
+- `18px to 20px` disclosure or collapse container uses a `14px` glyph.
+- Inline supportive icons that sit next to text should default to the `18px` tier unless the local layout explicitly needs the disclosure tier.
+
 ### Project Groups
 
 - Project rows are collapsible.

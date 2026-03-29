@@ -26,7 +26,7 @@ Usage:
   codexy cloud status
   codexy cloud logs
   codexy cloud open
-  codexy link <cloud-url>
+  codexy link <cloud-url> [--code 123456]
   codexy unlink
 
 This CLI is installed from the current checkout. If you move the checkout,

@@ -1,5 +1,6 @@
 type IconName =
   | "codex"
+  | "back"
   | "chevron"
   | "compact"
   | "new-thread"
@@ -20,7 +21,8 @@ type IconName =
   | "security"
   | "repo"
   | "desktop"
-  | "plus";
+  | "plus"
+  | "logout";
 
 export const APP_MENU_ITEMS = ["File", "Edit", "View", "Window", "Help"];
 
@@ -74,6 +76,18 @@ export function AppIcon({
   } as const;
 
   switch (name) {
+    case "back":
+      return (
+        <svg {...props}>
+          <path
+            d="M14.5 6.5 9 12l5.5 5.5M10 12h8.5"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.7"
+          />
+        </svg>
+      );
     case "new-thread":
       return (
         <svg {...props}>
@@ -199,6 +213,25 @@ export function AppIcon({
       return (
         <svg {...props}>
           <path d="M12 5v14M5 12h14" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
+        </svg>
+      );
+    case "logout":
+      return (
+        <svg {...props}>
+          <path
+            d="M10.5 6.5H7.8a1.8 1.8 0 0 0-1.8 1.8v7.4a1.8 1.8 0 0 0 1.8 1.8h2.7"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.6"
+          />
+          <path
+            d="M13 8.5 16.5 12 13 15.5M10.5 12h6"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.7"
+          />
         </svg>
       );
     default:

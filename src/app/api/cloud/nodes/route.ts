@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { verifyCloudAuthenticatorCode } from "@/lib/cloud-auth";
+import { requireCloudApiSession } from "@/lib/cloud-auth-http";
 import {
   getCloudRegistrySnapshot,
   registerCloudNode
@@ -13,10 +15,16 @@ const registerNodeSchema = z.object({
   linkedAt: z.string().trim().optional().nullable(),
   connectorToken: z.string().trim().min(1),
   nodeId: z.string().trim().min(1),
-  nodeName: z.string().trim().min(1)
+  nodeName: z.string().trim().min(1),
+  totpCode: z.string().trim().min(1)
 });
 
 export async function GET() {
+  const authError = await requireCloudApiSession();
+  if (authError) {
+    return authError;
+  }
+
   const snapshot = getCloudRegistrySnapshot();
 
   return NextResponse.json({
@@ -27,6 +35,14 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const payload = registerNodeSchema.parse(await request.json());
+    if (!verifyCloudAuthenticatorCode(payload.totpCode)) {
+      return NextResponse.json(
+        {
+          error: "The authenticator code was not valid."
+        },
+        { status: 403 }
+      );
+    }
     const node = registerCloudNode(payload);
 
     return NextResponse.json({
