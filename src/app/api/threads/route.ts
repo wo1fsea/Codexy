@@ -11,6 +11,7 @@ export const runtime = "nodejs";
 
 const THREAD_LIST_TIMEOUT_MS = 1_500;
 const THREAD_LIST_DEGRADED_TTL_MS = 30_000;
+const DEFAULT_ATTACHMENT_THREAD_NAME = "Image attachment";
 
 let degradedThreadListUntil = 0;
 
@@ -36,6 +37,33 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string) {
       promise.finally(() => clearTimeout(timer)).catch(() => {});
     })
   ]);
+}
+
+function normalizeThreadName(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return null;
+  }
+
+  return normalized.length > 160
+    ? `${normalized.slice(0, 157)}...`
+    : normalized;
+}
+
+function deriveInitialThreadName(input: {
+  prompt?: string;
+  preview?: string | null;
+  attachmentCount?: number;
+}) {
+  return (
+    normalizeThreadName(input.preview) ??
+    normalizeThreadName(input.prompt) ??
+    (input.attachmentCount ? DEFAULT_ATTACHMENT_THREAD_NAME : null)
+  );
 }
 
 function mergeThreadLists(
@@ -183,6 +211,25 @@ export async function POST(request: Request) {
       sandbox: body.sandbox ?? "workspace-write",
       attachmentPaths: body.attachmentPaths ?? []
     });
+
+    const initialThreadName =
+      result.thread.name ??
+      deriveInitialThreadName({
+        prompt: body.prompt,
+        preview: result.thread.preview,
+        attachmentCount: body.attachmentPaths?.length ?? 0
+      });
+
+    if (initialThreadName && initialThreadName !== result.thread.name) {
+      try {
+        await bridge.renameThread(result.thread.id, initialThreadName);
+        result.thread = {
+          ...result.thread,
+          name: initialThreadName,
+          preview: result.thread.preview || initialThreadName
+        };
+      } catch {}
+    }
 
     return NextResponse.json(result);
   } catch (error) {

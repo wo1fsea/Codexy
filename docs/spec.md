@@ -140,7 +140,8 @@ codexy/
 2. UI uploads image files first, producing local host paths.
 3. Server calls `thread/start`.
 4. Server calls `turn/start` with text + `localImage` inputs.
-5. UI listens on SSE and renders incremental events until `turn/completed`.
+5. If the thread has no explicit title yet, the server seeds an initial thread name from the first prompt preview so Codex Desktop can index the new session consistently.
+6. UI listens on SSE and renders incremental events until `turn/completed`.
 
 ### Existing Thread
 
