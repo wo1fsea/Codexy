@@ -131,6 +131,7 @@ codexy/
 - method
 - available decisions or answer schema
 - human-readable context for command, file change, or user-input prompt
+- turn detail payloads may include optional `startedAt`, `completedAt`, and `durationMs` metadata for transcript-only UI treatments such as processed-step disclosures
 
 ## Interaction Rules
 

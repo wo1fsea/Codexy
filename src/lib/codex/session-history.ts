@@ -18,6 +18,7 @@ let sessionSummaryCache:
   | null = null;
 
 type SessionJsonlRecord = {
+  timestamp?: unknown;
   type?: unknown;
   payload?: unknown;
 };
@@ -61,6 +62,18 @@ function getTimestampMs(value: unknown, fallback: number) {
 
   const parsed = Date.parse(stringValue);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function getOptionalTimestampMs(value: unknown) {
+  const parsed = getTimestampMs(value, Number.NaN);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getRecordTimestampMs(
+  record: SessionJsonlRecord,
+  payload: Record<string, unknown>
+) {
+  return getOptionalTimestampMs(record.timestamp) ?? getOptionalTimestampMs(payload.timestamp);
 }
 
 function getSessionIdFromFilePath(filePath: string) {
@@ -517,6 +530,10 @@ function buildTurnsFromSessionContent(content: string) {
       order: number;
       status: DockTurn["status"];
       error: DockTurn["error"];
+      startedAt: number | null;
+      completedAt: number | null;
+      firstEventAt: number | null;
+      lastEventAt: number | null;
     }
   >();
   let currentTurnIdHint: string | null = null;
@@ -531,7 +548,11 @@ function buildTurnsFromSessionContent(content: string) {
     const created = {
       order: nextOrder++,
       status: "completed" as const,
-      error: null
+      error: null,
+      startedAt: null,
+      completedAt: null,
+      firstEventAt: null,
+      lastEventAt: null
     };
     turns.set(turnId, created);
     return created;
@@ -556,13 +577,18 @@ function buildTurnsFromSessionContent(content: string) {
     const payload = record.payload;
     const payloadTurnId =
       typeof payload.turn_id === "string" ? payload.turn_id : null;
+    const recordTimestampMs = getRecordTimestampMs(record, payload);
 
     if (payloadTurnId) {
       currentTurnIdHint = payloadTurnId;
     }
 
     if (record.type === "turn_context" && payloadTurnId) {
-      ensureTurn(payloadTurnId);
+      const turn = ensureTurn(payloadTurnId);
+      if (recordTimestampMs !== null) {
+        turn.firstEventAt = turn.firstEventAt ?? recordTimestampMs;
+        turn.lastEventAt = recordTimestampMs;
+      }
       continue;
     }
 
@@ -577,25 +603,33 @@ function buildTurnsFromSessionContent(content: string) {
     }
 
     const turn = ensureTurn(turnId);
+    if (recordTimestampMs !== null) {
+      turn.firstEventAt = turn.firstEventAt ?? recordTimestampMs;
+      turn.lastEventAt = recordTimestampMs;
+    }
 
     if (eventType === "task_started") {
       turn.status = "inProgress";
+      turn.startedAt = turn.startedAt ?? recordTimestampMs ?? turn.firstEventAt;
       continue;
     }
 
     if (eventType === "task_complete" || eventType === "task_completed") {
       turn.status = "completed";
       turn.error = null;
+      turn.completedAt = recordTimestampMs ?? turn.lastEventAt;
       continue;
     }
 
     if (eventType === "task_interrupted") {
       turn.status = "interrupted";
+      turn.completedAt = recordTimestampMs ?? turn.lastEventAt;
       continue;
     }
 
     if (eventType === "task_failed") {
       turn.status = "failed";
+      turn.completedAt = recordTimestampMs ?? turn.lastEventAt;
       turn.error =
         typeof payload.message === "string" && payload.message.trim()
           ? { message: payload.message }
@@ -613,7 +647,28 @@ function buildTurnsFromSessionContent(content: string) {
       id: turnId,
       items: turnItems.get(turnId) ?? [],
       status: turn.status,
-      error: turn.error
+      error: turn.error,
+      startedAt: turn.startedAt ?? turn.firstEventAt,
+      completedAt:
+        turn.status === "inProgress"
+          ? null
+          : turn.completedAt ?? turn.lastEventAt,
+      durationMs:
+        turn.status === "inProgress"
+          ? null
+          : (() => {
+              const startedAt = turn.startedAt ?? turn.firstEventAt;
+              const completedAt = turn.completedAt ?? turn.lastEventAt;
+              if (
+                startedAt === null ||
+                completedAt === null ||
+                completedAt < startedAt
+              ) {
+                return null;
+              }
+
+              return completedAt - startedAt;
+            })()
     }));
 }
 
@@ -781,6 +836,17 @@ function mergeTurnWithSessionItems(turn: DockTurn, sessionItems: DockThreadItem[
   return {
     ...turn,
     items: mergedItems
+  };
+}
+
+function mergeTurnWithSessionHistory(turn: DockTurn, sessionTurn: DockTurn) {
+  const mergedTurn = mergeTurnWithSessionItems(turn, sessionTurn.items);
+
+  return {
+    ...mergedTurn,
+    startedAt: sessionTurn.startedAt ?? mergedTurn.startedAt ?? null,
+    completedAt: sessionTurn.completedAt ?? mergedTurn.completedAt ?? null,
+    durationMs: sessionTurn.durationMs ?? mergedTurn.durationMs ?? null
   };
 }
 
@@ -962,16 +1028,18 @@ export async function enrichThreadWithSessionHistory(thread: DockThread) {
     return thread;
   }
 
-  const sessionTurnItems = parseSessionTurnItems(content);
-  if (!sessionTurnItems.size) {
+  const sessionTurns = buildTurnsFromSessionContent(content);
+  if (!sessionTurns.length) {
     return thread;
   }
+
+  const sessionTurnsById = new Map(sessionTurns.map((turn) => [turn.id, turn]));
 
   return {
     ...thread,
     turns: thread.turns.map((turn) => {
-      const items = sessionTurnItems.get(turn.id);
-      return items ? mergeTurnWithSessionItems(turn, items) : turn;
+      const sessionTurn = sessionTurnsById.get(turn.id);
+      return sessionTurn ? mergeTurnWithSessionHistory(turn, sessionTurn) : turn;
     })
   };
 }

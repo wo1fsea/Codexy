@@ -203,18 +203,40 @@ function getActiveTurn(thread: DockThread | null) {
   return [...turns].reverse().find((turn: DockTurn) => turn.status === "inProgress") ?? null;
 }
 
+function withTurnTimingMetadata(turn: DockTurn, previousTurn?: DockTurn | null) {
+  const startedAt =
+    turn.startedAt ??
+    previousTurn?.startedAt ??
+    (turn.status === "inProgress" ? Date.now() : null);
+  const completedAt = turn.completedAt ?? previousTurn?.completedAt ?? null;
+  const durationMs =
+    turn.durationMs ??
+    previousTurn?.durationMs ??
+    (startedAt !== null && completedAt !== null && completedAt >= startedAt
+      ? completedAt - startedAt
+      : null);
+
+  return {
+    ...turn,
+    startedAt,
+    completedAt,
+    durationMs
+  };
+}
+
 function upsertTurn(thread: DockThread, turn: DockTurn) {
   const turns = [...thread.turns];
   const index = turns.findIndex((entry) => entry.id === turn.id);
 
   if (index >= 0) {
+    const nextTurn = withTurnTimingMetadata(turn, turns[index]);
     turns[index] = {
       ...turns[index],
-      ...turn,
-      items: turn.items.length ? turn.items : turns[index].items
+      ...nextTurn,
+      items: nextTurn.items.length ? nextTurn.items : turns[index].items
     };
   } else {
-    turns.push(turn);
+    turns.push(withTurnTimingMetadata(turn));
   }
 
   return {
@@ -369,12 +391,12 @@ function upsertTurnPlan(
     ...thread,
     turns: [
       ...turns,
-      {
+      withTurnTimingMetadata({
         id: turnId,
         items: [nextPlanItem],
         status: "inProgress",
         error: null
-      } satisfies DockTurn
+      } satisfies DockTurn)
     ]
   };
 }
@@ -509,12 +531,15 @@ function mergeTurnPreservingAuxiliaryItems(
     }
   }
 
-  return mergedItems.length === incomingTurn.items.length
-    ? incomingTurn
-    : {
-        ...incomingTurn,
-        items: mergedItems
-      };
+  const nextTurn =
+    mergedItems.length === incomingTurn.items.length
+      ? incomingTurn
+      : {
+          ...incomingTurn,
+          items: mergedItems
+        };
+
+  return withTurnTimingMetadata(nextTurn, currentTurn);
 }
 
 function mergeThreadPreservingRichTurns(

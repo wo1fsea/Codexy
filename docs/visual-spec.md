@@ -178,6 +178,7 @@ The product should not rely on only `primary / muted / soft`. It needs a stable 
 - Turn metadata size: `11px to 12px`
 - User messages align to the right edge of the transcript column
 - Assistant/tool cards align to the left edge
+- Completed-turn processing details may collapse into a centered disclosure row; expanding it should reveal commentary and tool rows without moving the final answer out of transcript order
 - Message card radius: `12px`
 - Artifact/request card radius: `12px`
 - Long text uses `1.5` to `1.6` line height

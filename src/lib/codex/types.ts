@@ -122,6 +122,9 @@ export type DockTurn = {
   items: DockThreadItem[];
   status: "completed" | "interrupted" | "failed" | "inProgress";
   error: { message?: string } | null;
+  startedAt?: number | null;
+  completedAt?: number | null;
+  durationMs?: number | null;
 };
 
 export type DockThread = {

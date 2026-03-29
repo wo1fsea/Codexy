@@ -614,6 +614,13 @@ test("file change items render compact edit summaries from raw diffs", async ({ 
   await gotoDock(page);
   await page.locator(".dock-thread-row").first().click();
 
+  const processedSummary = page.locator(".dock-processed-summary");
+  await expect(processedSummary).toBeVisible();
+  await expect(processedSummary).toContainText("Processed");
+  await expect(page.locator(".dock-filechange-chip")).toHaveCount(0);
+
+  await processedSummary.click();
+
   const chip = page.locator(".dock-filechange-chip").first();
   await expect(chip).toBeVisible();
   await expect(chip).toContainText("Edited");
@@ -839,6 +846,13 @@ test("command execution items keep a visible expand control and reveal output", 
   await gotoDock(page);
   await page.locator(".dock-thread-row").first().click();
 
+  const processedSummary = page.locator(".dock-processed-summary");
+  await expect(processedSummary).toBeVisible();
+  await expect(processedSummary).toContainText("Processed");
+  await expect(page.locator(".dock-command-card")).toHaveCount(0);
+
+  await processedSummary.click();
+
   const card = page.locator(".dock-command-card");
   const summary = card.locator(".dock-command-summary");
   const toggle = card.locator(".dock-command-toggle");
@@ -856,6 +870,127 @@ test("command execution items keep a visible expand control and reveal output", 
   await expect(detail).toBeVisible();
   await expect(detail).toContainText(DEFAULT_CWD);
   await expect(detail).toContainText("Sunday, March 29, 2026");
+});
+
+test("completed turns collapse processed steps and show turn duration in the disclosure header", async ({
+  page
+}) => {
+  await installDockApiMock(page, {
+    threads: [
+      {
+        id: "thread-processed-steps",
+        preview: "processed steps",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000100,
+        updatedAt: 1774000400,
+        status: { type: "idle" },
+        path: null,
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "session",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: "processed steps",
+        turns: [
+          {
+            id: "turn-processed-steps",
+            status: "completed",
+            error: null,
+            startedAt: 1774000000000,
+            completedAt: 1774000620000,
+            durationMs: 620000,
+            items: [
+              {
+                type: "userMessage",
+                id: "item-user-processed",
+                content: [
+                  {
+                    type: "text",
+                    text: "push the branch and report back",
+                    text_elements: []
+                  }
+                ]
+              },
+              {
+                type: "agentMessage",
+                id: "item-commentary-processed",
+                text:
+                  "I am pushing the local commits to origin/main, then I will verify the processed-step rendering path.",
+                phase: "commentary"
+              },
+              {
+                type: "commandExecution",
+                id: "item-command-processed",
+                command: "git push origin main",
+                cwd: DEFAULT_CWD,
+                processId: "2456",
+                status: "completed",
+                commandActions: [],
+                aggregatedOutput: "To origin/main\n   abc123..def456  main -> main",
+                exitCode: 0,
+                durationMs: 1800
+              },
+              {
+                type: "fileChange",
+                id: "item-file-change-processed",
+                status: "completed",
+                changes: [
+                  {
+                    path: `${DEFAULT_CWD}\\src\\components\\dock-shell-view.tsx`,
+                    type: "update",
+                    additions: 12,
+                    deletions: 3
+                  }
+                ]
+              },
+              {
+                type: "agentMessage",
+                id: "item-final-processed",
+                text: "main is synced to origin/main now.",
+                phase: "final_answer"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  });
+
+  await gotoDock(page);
+  await page.locator(".dock-thread-row").first().click();
+
+  const processedSummary = page.locator(".dock-processed-summary");
+  await expect(processedSummary).toBeVisible();
+  await expect(processedSummary).toContainText("Processed 10m 20s");
+  await expect(page.locator(".dock-processed-items")).toHaveCount(0);
+  await expect(page.locator(".dock-markdown")).toContainText("main is synced to origin/main now.");
+  const labelBox = await page.locator(".dock-processed-label").boundingBox();
+  const toggleBox = await page.locator(".dock-processed-toggle").boundingBox();
+  const lineBoxes = await page.locator(".dock-processed-line").evaluateAll((elements) =>
+    elements.map((element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        left: rect.left,
+        right: rect.right
+      };
+    })
+  );
+  expect(labelBox).not.toBeNull();
+  expect(toggleBox).not.toBeNull();
+  expect(lineBoxes).toHaveLength(2);
+  expect(toggleBox!.x).toBeGreaterThan(labelBox!.x + labelBox!.width);
+  expect(lineBoxes[1].left).toBeGreaterThan(toggleBox!.x + toggleBox!.width);
+
+  await processedSummary.click();
+
+  const processedItems = page.locator(".dock-processed-items");
+  await expect(processedItems).toBeVisible();
+  await expect(processedItems).toContainText("git push origin main");
+  await expect(processedItems).toContainText("I am pushing the local commits");
+  await expect(processedItems).toContainText("Edited");
+  await expect(processedItems).toContainText("dock-shell-view.tsx");
 });
 
 test("latest plan renders above the composer instead of inside the transcript", async ({

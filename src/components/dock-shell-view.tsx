@@ -57,6 +57,17 @@ type ThreadGroup = {
   updatedAt: number;
 };
 
+type TranscriptEntry =
+  | {
+      type: "item";
+      item: DockThreadItem;
+    }
+  | {
+      type: "processed";
+      id: string;
+      items: DockThreadItem[];
+    };
+
 const DEFAULT_SIDEBAR_WIDTH = 296;
 const MIN_SIDEBAR_WIDTH = 248;
 const MAX_SIDEBAR_WIDTH = 480;
@@ -277,6 +288,92 @@ function getRenderableTranscriptItems(turn: DockTurn) {
   return getRenderableTurnItems(turn).filter((item) => item.type !== "plan");
 }
 
+function isProcessedTranscriptItem(item: DockThreadItem) {
+  if (item.type === "commandExecution" || item.type === "fileChange") {
+    return true;
+  }
+
+  if (item.type === "agentMessage") {
+    const agentItem = item as Extract<DockThreadItem, { type: "agentMessage" }>;
+    return agentItem.phase === "commentary";
+  }
+
+  return false;
+}
+
+function getTranscriptEntries(turn: DockTurn): TranscriptEntry[] {
+  const entries: TranscriptEntry[] = [];
+  const processedItems: DockThreadItem[] = [];
+  let processedStartIndex = -1;
+  const transcriptItems = getRenderableTranscriptItems(turn);
+
+  const flushProcessedItems = () => {
+    if (!processedItems.length) {
+      return;
+    }
+
+    entries.push({
+      type: "processed",
+      id: `${turn.id}:processed:${processedStartIndex}`,
+      items: [...processedItems]
+    });
+    processedItems.length = 0;
+    processedStartIndex = -1;
+  };
+
+  transcriptItems.forEach((item, index) => {
+    if (isProcessedTranscriptItem(item)) {
+      if (processedStartIndex < 0) {
+        processedStartIndex = index;
+      }
+      processedItems.push(item);
+      return;
+    }
+
+    flushProcessedItems();
+    entries.push({
+      type: "item",
+      item
+    });
+  });
+
+  flushProcessedItems();
+  return entries;
+}
+
+function formatTurnDuration(durationMs: number | null | undefined) {
+  if (!durationMs || durationMs <= 0) {
+    return null;
+  }
+
+  const totalSeconds = Math.max(1, Math.round(durationMs / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+  }
+
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+
+  return `${seconds}s`;
+}
+
+function getProcessedEntryLabel(turn: DockTurn, t: TranslateFn) {
+  const duration = formatTurnDuration(turn.durationMs);
+
+  if (turn.status === "completed") {
+    return duration
+      ? t("turn.processedWithDuration", { duration })
+      : t("turn.processed");
+  }
+
+  return duration ? `${getTurnStatusLabel(turn.status, t)} ${duration}` : getTurnStatusLabel(turn.status, t);
+}
+
 function getLatestPlanItem(
   thread: DockThread | null
 ): Extract<DockThreadItem, { type: "plan" }> | null {
@@ -320,6 +417,9 @@ export function DockShellView(props: DockShellViewProps) {
     ? t("archive.confirmUnarchiveBody")
     : t("archive.confirmArchiveBody");
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  const [expandedProcessedEntries, setExpandedProcessedEntries] = useState<
+    Record<string, boolean>
+  >({});
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
@@ -988,10 +1088,10 @@ export function DockShellView(props: DockShellViewProps) {
               {props.selectedThread ? (
                 <div className="dock-transcript">
                   {props.selectedThread.turns.map((turn) => {
-                    const transcriptItems = getRenderableTranscriptItems(turn);
+                    const transcriptEntries = getTranscriptEntries(turn);
                     const showThinkingState = shouldShowThinkingState(turn);
 
-                    if (!transcriptItems.length && !showThinkingState) {
+                    if (!transcriptEntries.length && !showThinkingState) {
                       return null;
                     }
 
@@ -1002,19 +1102,86 @@ export function DockShellView(props: DockShellViewProps) {
                           <code>{turn.id.slice(0, 8)}</code>
                         </div>
                         <div className="dock-turn-items">
-                          {transcriptItems.map((item) => (
-                            <div
-                              className={clsx(
-                                "dock-turn-item",
-                                item.type === "userMessage" && "is-user",
-                                item.type === "agentMessage" && "is-agent",
-                                item.type === "reasoning" && "is-reasoning"
-                              )}
-                              key={item.id}
-                            >
-                              {props.renderThreadItem(item)}
-                            </div>
-                          ))}
+                          {transcriptEntries.map((entry) => {
+                            if (entry.type === "processed") {
+                              const isExpanded =
+                                expandedProcessedEntries[entry.id] ??
+                                (turn.status === "inProgress");
+
+                              return (
+                                <div
+                                  className="dock-turn-item is-processed"
+                                  key={entry.id}
+                                >
+                                  <div className="dock-processed-block">
+                                    <button
+                                      aria-expanded={isExpanded}
+                                      aria-label={t("aria.toggleProcessedSteps")}
+                                      className={clsx(
+                                        "dock-processed-summary",
+                                        isExpanded && "is-expanded"
+                                      )}
+                                      onClick={() =>
+                                        setExpandedProcessedEntries((current) => ({
+                                          ...current,
+                                          [entry.id]: !isExpanded
+                                        }))
+                                      }
+                                      type="button"
+                                    >
+                                      <span className="dock-processed-line" />
+                                      <span className="dock-processed-label-group">
+                                        <span className="dock-processed-label">
+                                          {getProcessedEntryLabel(turn, t)}
+                                        </span>
+                                        <span
+                                          aria-hidden="true"
+                                          className="dock-processed-toggle"
+                                        >
+                                          <AppIcon
+                                            className="dock-processed-toggle-icon"
+                                            name="chevron"
+                                          />
+                                        </span>
+                                      </span>
+                                      <span className="dock-processed-line" />
+                                    </button>
+                                    {isExpanded ? (
+                                      <div className="dock-processed-items">
+                                        {entry.items.map((item) => (
+                                          <div
+                                            className={clsx(
+                                              "dock-processed-item",
+                                              item.type === "agentMessage" && "is-agent"
+                                            )}
+                                            key={item.id}
+                                          >
+                                            {props.renderThreadItem(item)}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            const item = entry.item;
+
+                            return (
+                              <div
+                                className={clsx(
+                                  "dock-turn-item",
+                                  item.type === "userMessage" && "is-user",
+                                  item.type === "agentMessage" && "is-agent",
+                                  item.type === "reasoning" && "is-reasoning"
+                                )}
+                                key={item.id}
+                              >
+                                {props.renderThreadItem(item)}
+                              </div>
+                            );
+                          })}
                         </div>
                         {showThinkingState ? (
                           <div
