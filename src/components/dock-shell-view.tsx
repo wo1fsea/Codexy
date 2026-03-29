@@ -7,6 +7,7 @@ import {
   useState,
   type ClipboardEvent,
   type CSSProperties,
+  type KeyboardEvent,
   type ReactNode
 } from "react";
 
@@ -392,6 +393,40 @@ export function DockShellView(props: DockShellViewProps) {
 
     event.preventDefault();
     props.onUploadFiles(pastedImages);
+  }
+
+  function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    const nativeEvent = event.nativeEvent;
+    if (nativeEvent.isComposing || nativeEvent.keyCode === 229) {
+      return;
+    }
+
+    if (event.altKey) {
+      event.preventDefault();
+
+      const textarea = event.currentTarget;
+      const { selectionEnd, selectionStart, value } = textarea;
+      const nextValue =
+        value.slice(0, selectionStart) + "\n" + value.slice(selectionEnd);
+      const nextCaretPosition = selectionStart + 1;
+
+      props.onPromptChange(nextValue);
+      window.requestAnimationFrame(() => {
+        textarea.setSelectionRange(nextCaretPosition, nextCaretPosition);
+      });
+      return;
+    }
+
+    if (!canSubmit) {
+      return;
+    }
+
+    event.preventDefault();
+    props.onSubmitPrompt();
   }
 
   useEffect(() => {
@@ -1099,6 +1134,7 @@ export function DockShellView(props: DockShellViewProps) {
                   <textarea
                     className="dock-composer-input"
                     onChange={(event) => props.onPromptChange(event.target.value)}
+                    onKeyDown={handleComposerKeyDown}
                     onPaste={handleComposerPaste}
                     placeholder={t("composer.placeholder")}
                     rows={2}

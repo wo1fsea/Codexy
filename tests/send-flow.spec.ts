@@ -122,6 +122,39 @@ test("sending a prompt enters transcript context immediately", async ({ page }) 
   expect(Math.abs(layout!.composerRight - layout!.transcriptRight)).toBeLessThanOrEqual(2);
 });
 
+test("pressing Enter in the composer sends the prompt", async ({ page }) => {
+  await installDockApiMock(page);
+
+  const prompt = `keyboard submit ${Date.now()}`;
+  const composer = page.locator("textarea.dock-composer-input");
+
+  await gotoDock(page);
+  await composer.fill(prompt);
+  await composer.press("Enter");
+
+  await expect(page.locator(".dock-hero")).toHaveCount(0);
+  await expect(page.locator(".dock-transcript")).toBeVisible();
+  await expect(page.locator(".dock-stage-title")).toContainText(prompt);
+  await expect(page.locator(".dock-transcript")).toContainText(prompt);
+});
+
+test("pressing Alt+Enter in the composer inserts a newline without sending", async ({
+  page
+}) => {
+  await installDockApiMock(page);
+
+  const composer = page.locator("textarea.dock-composer-input");
+
+  await gotoDock(page);
+  await composer.fill("line 1");
+  await composer.press("Alt+Enter");
+  await composer.type("line 2");
+
+  await expect(composer).toHaveValue("line 1\nline 2");
+  await expect(page.locator(".dock-hero")).toBeVisible();
+  await expect(page.locator(".dock-transcript")).toHaveCount(0);
+});
+
 test("rapid session switching stays responsive while older thread reads are still pending", async ({
   page
 }) => {
