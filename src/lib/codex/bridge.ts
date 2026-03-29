@@ -448,6 +448,8 @@ class CodexBridge extends EventEmitter {
 
   private loadedThreads = new Set<string>();
 
+  private loadingThreads = new Map<string, Promise<void>>();
+
   private activeAppServerUrl = normalizeWsUrl(dockEnv.codexAppServerUrl);
 
   private ownedAppServerUrl: string | null = null;
@@ -638,6 +640,10 @@ class CodexBridge extends EventEmitter {
     });
   }
 
+  async primeThread(threadId: string) {
+    await this.ensureThreadLoaded(threadId);
+  }
+
   async renameThread(threadId: string, name: string) {
     await this.request("thread/name/set", {
       threadId,
@@ -722,30 +728,45 @@ class CodexBridge extends EventEmitter {
       return;
     }
 
-    try {
-      await this.request("thread/resume", {
-        threadId,
-        cwd: overrides?.cwd ?? null,
-        model: overrides?.model ?? null,
-        reasoningEffort: overrides?.reasoningEffort ?? null,
-        approvalPolicy: overrides?.approvalPolicy ?? null,
-        sandbox: overrides?.sandbox ?? null,
-        experimentalRawEvents: true,
-        persistExtendedHistory: true
-      });
-    } catch (error) {
-      await this.request("thread/resume", {
-        threadId,
-        cwd: overrides?.cwd ?? null,
-        model: overrides?.model ?? null,
-        reasoningEffort: overrides?.reasoningEffort ?? null,
-        approvalPolicy: overrides?.approvalPolicy ?? null,
-        sandbox: overrides?.sandbox ?? null,
-        persistExtendedHistory: true
-      });
+    const existingLoad = this.loadingThreads.get(threadId);
+    if (existingLoad) {
+      await existingLoad;
+      return;
     }
 
-    this.loadedThreads.add(threadId);
+    const loadPromise = (async () => {
+      try {
+        try {
+          await this.request("thread/resume", {
+            threadId,
+            cwd: overrides?.cwd ?? null,
+            model: overrides?.model ?? null,
+            reasoningEffort: overrides?.reasoningEffort ?? null,
+            approvalPolicy: overrides?.approvalPolicy ?? null,
+            sandbox: overrides?.sandbox ?? null,
+            experimentalRawEvents: true,
+            persistExtendedHistory: true
+          });
+        } catch (error) {
+          await this.request("thread/resume", {
+            threadId,
+            cwd: overrides?.cwd ?? null,
+            model: overrides?.model ?? null,
+            reasoningEffort: overrides?.reasoningEffort ?? null,
+            approvalPolicy: overrides?.approvalPolicy ?? null,
+            sandbox: overrides?.sandbox ?? null,
+            persistExtendedHistory: true
+          });
+        }
+
+        this.loadedThreads.add(threadId);
+      } finally {
+        this.loadingThreads.delete(threadId);
+      }
+    })();
+
+    this.loadingThreads.set(threadId, loadPromise);
+    await loadPromise;
   }
 
   private async connectInternal(): Promise<void> {

@@ -4,6 +4,7 @@ import { getCodexBridge } from "@/lib/codex/bridge";
 import {
   listThreadSummariesFromSessionHistory
 } from "@/lib/codex/session-history";
+import { syncSessionThreadsToBridge } from "@/lib/codex/thread-sync";
 import type { DockThread, ThreadListResponse } from "@/lib/codex/types";
 
 export const runtime = "nodejs";
@@ -55,10 +56,10 @@ function mergeThreadLists(
 }
 
 async function listBridgeThreads(
+  bridge: ReturnType<typeof getCodexBridge>,
   archived: string | null,
   searchParams: URLSearchParams
 ): Promise<ThreadListResponse> {
-  const bridge = getCodexBridge();
   const input = getListInput(searchParams);
 
   if (archived === "all") {
@@ -89,6 +90,7 @@ async function listBridgeThreads(
 
 export async function GET(request: Request) {
   try {
+    const bridge = getCodexBridge();
     const { searchParams } = new URL(request.url);
     const archived = searchParams.get("archived");
     const sessionFallback =
@@ -108,12 +110,20 @@ export async function GET(request: Request) {
 
     try {
       const response = await withTimeout(
-        listBridgeThreads(archived, searchParams),
+        listBridgeThreads(bridge, archived, searchParams),
         THREAD_LIST_TIMEOUT_MS,
         "thread/list"
       );
 
       degradedThreadListUntil = 0;
+
+      if (archived !== "true" && sessionFallback.length) {
+        void syncSessionThreadsToBridge({
+          bridge,
+          bridgeThreads: response.data,
+          sessionThreads: sessionFallback
+        });
+      }
 
       return NextResponse.json({
         data:
