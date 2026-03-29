@@ -74,9 +74,9 @@ const MAX_SIDEBAR_WIDTH = 480;
 const SIDEBAR_WIDTH_STORAGE_KEY = "codexy-sidebar-width";
 
 type DockShellViewProps = {
-  archiveConfirmOpen: boolean;
+  archiveConfirmThreadId: string | null;
   archiveFilter: ArchiveFilter;
-  archivingThread: boolean;
+  archivingThreadId: string | null;
   attachments: UploadItem[];
   composerCwd: string;
   composerModel: string;
@@ -104,8 +104,7 @@ type DockShellViewProps = {
   threadNameDraft: string;
   workspaceLabel: string;
   onArchiveFilterChange: (value: ArchiveFilter) => void;
-  onArchiveCancel: () => void;
-  onArchiveConfirm: () => void;
+  onArchiveConfirm: (threadId: string) => void;
   onComposerCwdChange: (value: string) => void;
   onComposerModelChange: (value: string) => void;
   onComposerPermissionPresetChange: (value: DockPermissionPreset) => void;
@@ -121,13 +120,13 @@ type DockShellViewProps = {
   onRenameSave: () => void;
   onResolveRequest: (request: DockServerRequest) => ReactNode;
   onSearchChange: (value: string) => void;
-  onSelectThread: (threadId: string) => void;
+  onSelectThread: (thread: DockThread) => void;
   onSidebarClose: () => void;
   onSubmitPrompt: () => void;
   onTakeoverCancel: () => void;
   onTakeoverConfirm: () => void;
   onThreadNameDraftChange: (value: string) => void;
-  onToggleArchive: () => void;
+  onToggleArchive: (threadId: string) => void;
   onToggleRename: () => void;
   onUploadFiles: (files: FileList | File[] | null) => void;
   renderThreadItem: (item: DockThreadItem) => ReactNode;
@@ -212,6 +211,46 @@ function getThreadStatusText(thread: DockThread, t: TranslateFn) {
         .map((flag) => getActiveFlagLabel(flag, t))
         .join(", ")}`
     : t("status.active");
+}
+
+function getArchiveButtonLabel(
+  archived: boolean,
+  busy: boolean,
+  confirming: boolean,
+  t: TranslateFn
+) {
+  if (busy) {
+    return t("actions.archiving");
+  }
+
+  if (confirming) {
+    return t("actions.confirm");
+  }
+
+  return archived ? t("actions.unarchive") : t("actions.archive");
+}
+
+function getArchiveButtonTitle(
+  archived: boolean,
+  confirming: boolean,
+  t: TranslateFn
+) {
+  if (confirming) {
+    return archived
+      ? t("archive.confirmUnarchiveTitle")
+      : t("archive.confirmArchiveTitle");
+  }
+
+  return archived
+    ? t("archive.confirmUnarchiveBody")
+    : t("archive.confirmArchiveBody");
+}
+
+function isSidebarArchivedThread(
+  thread: DockThread,
+  archiveFilter: ArchiveFilter
+) {
+  return archiveFilter === "archived" || thread.source === "archive";
 }
 
 function getTurnStatusLabel(status: DockTurn["status"], t: TranslateFn) {
@@ -404,18 +443,6 @@ export function DockShellView(props: DockShellViewProps) {
     setLocale,
     t
   } = useI18n();
-  const selectedThreadArchived = props.selectedThread?.source === "archive";
-  const archiveButtonLabel = props.archivingThread
-    ? t("actions.archiving")
-    : selectedThreadArchived
-      ? t("actions.unarchive")
-      : t("actions.archive");
-  const archiveConfirmTitle = selectedThreadArchived
-    ? t("archive.confirmUnarchiveTitle")
-    : t("archive.confirmArchiveTitle");
-  const archiveConfirmBody = selectedThreadArchived
-    ? t("archive.confirmUnarchiveBody")
-    : t("archive.confirmArchiveBody");
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [expandedProcessedEntries, setExpandedProcessedEntries] = useState<
     Record<string, boolean>
@@ -898,25 +925,80 @@ export function DockShellView(props: DockShellViewProps) {
                     </button>
                     {!collapsedGroups[group.cwd] ? (
                       <div className="dock-thread-group-items">
-                        {group.items.map((thread) => (
-                          <button
-                            className={clsx(
-                              "dock-thread-row",
-                              props.selectedThreadId === thread.id && "is-selected"
-                            )}
-                            key={thread.id}
-                            onClick={() => props.onSelectThread(thread.id)}
-                            type="button"
-                          >
-                            <div className="dock-thread-row-head">
-                              <strong>{getThreadLabel(thread, t)}</strong>
-                              <span>{formatRelativeTime(thread.updatedAt)}</span>
+                        {group.items.map((thread) => {
+                          const threadArchived = isSidebarArchivedThread(
+                            thread,
+                            props.archiveFilter
+                          );
+                          const archiveConfirmOpen =
+                            props.archiveConfirmThreadId === thread.id;
+                          const archivingThread =
+                            props.archivingThreadId === thread.id;
+                          const archiveButtonLabel = getArchiveButtonLabel(
+                            threadArchived,
+                            archivingThread,
+                            archiveConfirmOpen,
+                            t
+                          );
+                          const archiveButtonTitle = getArchiveButtonTitle(
+                            threadArchived,
+                            archiveConfirmOpen,
+                            t
+                          );
+
+                          return (
+                            <div
+                              className={clsx(
+                                "dock-thread-row-shell",
+                                threadArchived && "is-archived",
+                                archiveConfirmOpen && "is-confirm-open"
+                              )}
+                              key={thread.id}
+                            >
+                              <button
+                                className={clsx(
+                                  "dock-thread-row",
+                                  !threadArchived &&
+                                    props.selectedThreadId === thread.id &&
+                                    "is-selected",
+                                  threadArchived && "is-archived"
+                                )}
+                                disabled={threadArchived}
+                                onClick={() => props.onSelectThread(thread)}
+                                type="button"
+                              >
+                                <div className="dock-thread-row-head">
+                                  <strong>{getThreadLabel(thread, t)}</strong>
+                                  <span>{formatRelativeTime(thread.updatedAt)}</span>
+                                </div>
+                                <div className="dock-thread-row-meta">
+                                  <span>{getThreadStatusText(thread, t)}</span>
+                                </div>
+                              </button>
+                              <div className="dock-thread-row-action-shell">
+                                <button
+                                  className={clsx(
+                                    "dock-thread-row-action",
+                                    "dock-thread-row-action-text",
+                                    archiveConfirmOpen && "is-confirming",
+                                    archivingThread && "is-busy",
+                                    threadArchived && "is-persistent"
+                                  )}
+                                  disabled={archivingThread}
+                                  onClick={() =>
+                                    archiveConfirmOpen
+                                      ? props.onArchiveConfirm(thread.id)
+                                      : props.onToggleArchive(thread.id)
+                                  }
+                                  title={archiveButtonTitle}
+                                  type="button"
+                                >
+                                  {archiveButtonLabel}
+                                </button>
+                              </div>
                             </div>
-                            <div className="dock-thread-row-meta">
-                              <span>{getThreadStatusText(thread, t)}</span>
-                            </div>
-                          </button>
-                        ))}
+                          );
+                        })}
                       </div>
                     ) : null}
                   </section>
@@ -974,61 +1056,13 @@ export function DockShellView(props: DockShellViewProps) {
 
             <div className="dock-stage-toolbar">
               {props.selectedThread ? (
-                <>
-                  <button
-                    className="dock-icon-button"
-                    onClick={props.onToggleRename}
-                    type="button"
-                  >
-                    <AppIcon className="dock-inline-icon" name="rename" />
-                  </button>
-                  <div
-                    className={clsx(
-                      "dock-toolbar-confirm-shell",
-                      props.archiveConfirmOpen && "is-open"
-                    )}
-                  >
-                    <button
-                      className={clsx(
-                        "dock-icon-button",
-                        props.archiveConfirmOpen && "is-armed",
-                        props.archivingThread && "is-busy"
-                      )}
-                      disabled={props.archivingThread}
-                      onClick={props.onToggleArchive}
-                      title={archiveButtonLabel}
-                      type="button"
-                    >
-                      <AppIcon className="dock-inline-icon" name="archive" />
-                    </button>
-                    {props.archiveConfirmOpen ? (
-                      <div className="dock-toolbar-confirm-popover">
-                        <div className="dock-toolbar-confirm-copy">
-                          <strong>{archiveConfirmTitle}</strong>
-                          <span>{archiveConfirmBody}</span>
-                        </div>
-                        <div className="dock-toolbar-confirm-actions">
-                          <button
-                            className="dock-request-action is-primary"
-                            disabled={props.archivingThread}
-                            onClick={props.onArchiveConfirm}
-                            type="button"
-                          >
-                            {archiveButtonLabel}
-                          </button>
-                          <button
-                            className="dock-ghost-action is-muted"
-                            disabled={props.archivingThread}
-                            onClick={props.onArchiveCancel}
-                            type="button"
-                          >
-                            {t("actions.cancel")}
-                          </button>
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                </>
+                <button
+                  className="dock-icon-button"
+                  onClick={props.onToggleRename}
+                  type="button"
+                >
+                  <AppIcon className="dock-inline-icon" name="rename" />
+                </button>
               ) : null}
               <button
                 className="dock-icon-button"

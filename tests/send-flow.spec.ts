@@ -594,7 +594,8 @@ test("file change items render compact edit summaries from raw diffs", async ({ 
                       type: "update",
                       move_path: null
                     },
-                    diff: "@@ -1,1 +1,3 @@\n-old line\n+new line\n+another new line\n"
+                    diff:
+                      "@@ -1,1 +1,4 @@\n-old line\n+new line\n+another new line\n+This README stays intentionally high-level and points detailed ownership decisions to the docs in this repo and the owning layers.\n"
                   }
                 ]
               },
@@ -617,16 +618,54 @@ test("file change items render compact edit summaries from raw diffs", async ({ 
   const processedSummary = page.locator(".dock-processed-summary");
   await expect(processedSummary).toBeVisible();
   await expect(processedSummary).toContainText("Processed");
-  await expect(page.locator(".dock-filechange-chip")).toHaveCount(0);
+  await expect(page.locator(".dock-filechange-card")).toHaveCount(0);
 
   await processedSummary.click();
 
-  const chip = page.locator(".dock-filechange-chip").first();
-  await expect(chip).toBeVisible();
-  await expect(chip).toContainText("Edited");
-  await expect(chip).toContainText("dock-app.tsx");
-  await expect(chip).toContainText("+2");
-  await expect(chip).toContainText("-1");
+  const card = page.locator(".dock-filechange-card").first();
+  const diffOutput = card.locator(".dock-filechange-output");
+
+  await expect(card).toBeVisible();
+  await expect(card).toContainText("Edited");
+  await expect(card).toContainText("dock-app.tsx");
+  await expect(card).toContainText("+3");
+  await expect(card).toContainText("-1");
+  await expect(diffOutput).toBeHidden();
+
+  await card.locator(".dock-filechange-summary").click();
+
+  await expect(diffOutput).toBeVisible();
+  await expect(diffOutput).toContainText("@@ -1,1 +1,4 @@");
+  await expect(diffOutput).toContainText("-old line");
+  await expect(diffOutput).toContainText("+new line");
+  await expect(diffOutput).toContainText("+another new line");
+  await expect(diffOutput).toContainText(
+    "This README stays intentionally high-level"
+  );
+
+  const overflowMetrics = await page.evaluate(() => {
+    const processed = document.querySelector(".dock-processed-items");
+    const card = document.querySelector(".dock-filechange-card");
+    const output = document.querySelector(".dock-filechange-output");
+
+    const processedBox = processed?.getBoundingClientRect();
+    const cardBox = card?.getBoundingClientRect();
+    const outputElement = output as HTMLElement | null;
+
+    return {
+      processedRight: processedBox?.right ?? 0,
+      cardRight: cardBox?.right ?? 0,
+      outputScrollWidth: outputElement?.scrollWidth ?? 0,
+      outputClientWidth: outputElement?.clientWidth ?? 0
+    };
+  });
+
+  expect(overflowMetrics.cardRight).toBeLessThanOrEqual(
+    overflowMetrics.processedRight + 1
+  );
+  expect(overflowMetrics.outputScrollWidth).toBeGreaterThan(
+    overflowMetrics.outputClientWidth
+  );
 });
 
 test("archiving the current thread jumps back to new thread and removes it from the live list", async ({
@@ -687,16 +726,66 @@ test("archiving the current thread jumps back to new thread and removes it from 
   await page.locator(".dock-thread-row").first().click();
   await expect(page.locator(".dock-stage-title")).toHaveText(archivedThreadName);
 
-  await page.locator(".dock-toolbar-confirm-shell > button.dock-icon-button").click();
-  await expect(page.locator(".dock-toolbar-confirm-popover")).toBeVisible();
-  await page
-    .locator(".dock-toolbar-confirm-popover .dock-request-action.is-primary")
-    .click();
+  const threadRowShell = page.locator(".dock-thread-row-shell").first();
+  await threadRowShell.hover();
+  const archiveButton = threadRowShell.locator("button.dock-thread-row-action-text");
+  await expect(archiveButton).toHaveText("Archive");
+  await archiveButton.click();
+  await expect(archiveButton).toHaveText("Confirm");
+  await archiveButton.click();
 
   await expect(page.locator(".dock-stage-title")).toHaveText("New thread");
   await expect(page.locator(".dock-hero")).toBeVisible();
   await expect(page.locator(".dock-thread-row")).toHaveCount(0);
   await expect(page.locator(".dock-empty-sidebar")).toContainText("No matching threads");
+});
+
+test("archived rows stay unselectable and keep a persistent unarchive action", async ({
+  page
+}) => {
+  const archivedThreadName = `archived row ${Date.now()}`;
+
+  await installDockApiMock(page, {
+    threads: [
+      {
+        id: "thread-archived-row-1",
+        preview: archivedThreadName,
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000000,
+        updatedAt: 1774003600,
+        status: { type: "notLoaded" },
+        path: null,
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "archive",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: archivedThreadName,
+        turns: []
+      }
+    ]
+  });
+
+  await gotoDock(page);
+  await chooseSelectOption(page, "Thread archive filter", "Archived");
+
+  const threadRow = page.locator(".dock-thread-row").first();
+  const unarchiveButton = page
+    .locator("button.dock-thread-row-action-text.is-persistent")
+    .first();
+
+  await expect(threadRow).toBeDisabled();
+  await expect(unarchiveButton).toBeVisible();
+  await expect(unarchiveButton).toHaveText("Unarchive");
+  await expect(page.locator(".dock-thread-row-badge")).toHaveCount(0);
+
+  await unarchiveButton.click();
+  await expect(unarchiveButton).toHaveText("Confirm");
+
+  await expect(page.locator(".dock-stage-title")).toHaveText("New thread");
+  await expect(page.locator(".dock-error")).toHaveCount(0);
 });
 
 test("approval buttons submit the matching server request payload", async ({ page }) => {

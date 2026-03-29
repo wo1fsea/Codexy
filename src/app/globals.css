@@ -712,10 +712,20 @@ pre {
   padding-left: 0;
 }
 
+.dock-thread-row-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 8px;
+}
+
 .dock-thread-row {
   display: grid;
   gap: 3px;
   width: 100%;
+  grid-column: 1;
+  grid-row: 1 / 3;
   border: 1px solid transparent;
   border-radius: 10px;
   background: transparent;
@@ -728,6 +738,16 @@ pre {
 .dock-thread-row.is-selected {
   background: rgba(255, 247, 238, 0.06);
   border-color: var(--line);
+}
+
+.dock-thread-row.is-archived {
+  background: rgba(255, 247, 238, 0.025);
+  border-color: rgba(255, 247, 238, 0.06);
+}
+
+.dock-thread-row:disabled {
+  cursor: default;
+  opacity: 1;
 }
 
 .dock-thread-row-head,
@@ -760,6 +780,64 @@ pre {
 .dock-thread-row-meta {
   color: var(--text-soft);
   font-size: var(--text-11);
+}
+
+.dock-thread-row-action-shell {
+  grid-column: 2;
+  grid-row: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-self: end;
+  align-self: center;
+  margin-right: 8px;
+}
+
+.dock-thread-row-action {
+  opacity: 0;
+  pointer-events: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--text-faint);
+  transform: translateY(1px);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease,
+    color 160ms ease;
+}
+
+.dock-thread-row-action-text {
+  min-height: 18px;
+  font-size: var(--text-11);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.dock-thread-row-shell:hover .dock-thread-row-action,
+.dock-thread-row-shell:focus-within .dock-thread-row-action,
+.dock-thread-row-shell.is-confirm-open .dock-thread-row-action,
+.dock-thread-row-action.is-persistent {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.dock-thread-row-shell:hover .dock-thread-row-action,
+.dock-thread-row-shell:focus-within .dock-thread-row-action {
+  color: var(--text-soft);
+}
+
+.dock-thread-row-action.is-persistent {
+  color: var(--text-soft);
+}
+
+.dock-thread-row-action.is-confirming {
+  color: var(--danger);
+}
+
+.dock-thread-row-action.is-busy {
+  color: var(--text-soft);
 }
 
 .dock-empty-sidebar,
@@ -841,12 +919,6 @@ pre {
   color: var(--text-muted);
 }
 
-.dock-toolbar-confirm-shell {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-
 .dock-icon-button.is-armed,
 .dock-icon-button.is-busy {
   border-color: var(--line);
@@ -856,45 +928,6 @@ pre {
 
 .dock-icon-button.is-busy {
   cursor: progress;
-}
-
-.dock-toolbar-confirm-popover {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 20;
-  width: min(240px, calc(100vw - 24px));
-  display: grid;
-  gap: 8px;
-  border: 1px solid rgba(255, 247, 238, 0.1);
-  border-radius: 12px;
-  background: rgba(30, 26, 27, 0.96);
-  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.24);
-  padding: 10px;
-}
-
-.dock-toolbar-confirm-copy {
-  display: grid;
-  gap: 4px;
-}
-
-.dock-toolbar-confirm-copy strong {
-  color: var(--text);
-  font-size: var(--text-13);
-  font-weight: 600;
-}
-
-.dock-toolbar-confirm-copy span {
-  color: var(--text-soft);
-  font-size: var(--text-12);
-  line-height: 1.45;
-}
-
-.dock-toolbar-confirm-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-  flex-wrap: wrap;
 }
 
 .dock-toolbar-pill,
@@ -1247,7 +1280,9 @@ pre {
 }
 
 .dock-agent-response {
+  width: 100%;
   max-width: min(100%, 860px);
+  min-width: 0;
   padding: 2px 0;
 }
 
@@ -1896,27 +1931,132 @@ pre {
 }
 
 .dock-filechange-stack {
+  display: grid;
+  gap: 8px;
+  width: min(100%, 860px);
+  min-width: 0;
+}
+
+.dock-filechange-card {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(255, 247, 238, 0.07);
+  border-radius: 12px;
+  background: rgba(255, 247, 238, 0.02);
+  box-sizing: border-box;
+}
+
+.dock-filechange-card.is-static {
+  border-color: rgba(255, 247, 238, 0.08);
+}
+
+.dock-filechange-summary {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 6px;
-  max-width: min(100%, 860px);
-}
-
-.dock-filechange-chip {
-  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  min-height: 28px;
-  border: 1px solid rgba(255, 247, 238, 0.09);
-  border-radius: 10px;
-  background: rgba(255, 247, 238, 0.03);
-  padding: 0 10px;
-  font-size: var(--text-12);
+  gap: 8px;
+  padding: 10px 12px;
+  list-style: none;
+  color: var(--text-muted);
+  font-size: var(--text-13);
+  cursor: pointer;
 }
 
-.dock-filechange-text {
+.dock-filechange-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.dock-filechange-summary.is-static {
+  cursor: default;
+}
+
+.dock-filechange-summary::-webkit-details-marker {
+  display: none;
+}
+
+.dock-filechange-summary::marker {
+  content: "";
+}
+
+.dock-filechange-action {
   color: var(--text);
+  flex: none;
+}
+
+.dock-filechange-label {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dock-filechange-toggle {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-left: auto;
+  color: var(--text-soft);
+  flex: none;
+}
+
+.dock-filechange-toggle-icon {
+  width: 11px;
+  height: 11px;
+  transform: rotate(0deg);
+  transition:
+    transform 140ms ease,
+    color 140ms ease;
+}
+
+.dock-filechange-card[open] .dock-filechange-toggle-icon {
+  transform: rotate(90deg);
+}
+
+.dock-filechange-detail {
+  min-width: 0;
+  border-top: 1px solid rgba(255, 247, 238, 0.06);
+  padding: 10px 12px 12px;
+}
+
+.dock-filechange-output {
+  margin: 0;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid rgba(255, 247, 238, 0.06);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.22);
+  padding: 8px 10px;
+  color: #dfdbd5;
+  font-family: var(--font-mono);
+  font-size: var(--text-12);
+  line-height: 1.6;
+  box-sizing: border-box;
+}
+
+.dock-filechange-line {
+  display: block;
+  white-space: pre;
+}
+
+.dock-filechange-line.is-meta {
+  color: var(--text-soft);
+}
+
+.dock-filechange-line.is-added {
+  color: #57d18c;
+}
+
+.dock-filechange-line.is-removed {
+  color: #ff8f88;
 }
 
 .dock-diff-count {

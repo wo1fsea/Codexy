@@ -46,6 +46,36 @@ export type DockUserInput =
       path: string;
     };
 
+export type DockFileChangeKind =
+  | string
+  | {
+      type?: string;
+      move_path?: string | null;
+      [key: string]: unknown;
+    }
+  | null;
+
+export type DockFileChangeEntry = {
+  path?: string;
+  filePath?: string;
+  targetPath?: string;
+  relativePath?: string;
+  newPath?: string | null;
+  type?: string;
+  status?: string;
+  additions?: number | null;
+  deletions?: number | null;
+  addedLines?: number | null;
+  deletedLines?: number | null;
+  removals?: number | null;
+  insertions?: number | null;
+  diff?: string | null;
+  unifiedDiff?: string | null;
+  unified_diff?: string | null;
+  kind?: DockFileChangeKind;
+  [key: string]: unknown;
+};
+
 export type DockThreadItem =
   | {
       type: "userMessage";
@@ -91,7 +121,7 @@ export type DockThreadItem =
   | {
       type: "fileChange";
       id: string;
-      changes: Array<Record<string, unknown>>;
+      changes: DockFileChangeEntry[];
       status: string;
       [key: string]: unknown;
     }

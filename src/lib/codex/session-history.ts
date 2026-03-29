@@ -394,13 +394,22 @@ function createSessionFileChangeItem(
   const changes = rawChanges
     ? Object.entries(rawChanges).map(([filePath, rawChange]) => {
         const change = isRecord(rawChange) ? rawChange : {};
-        const counts = countUnifiedDiffLines(change.unified_diff);
+        const rawDiff =
+          typeof change.unified_diff === "string"
+            ? change.unified_diff
+            : typeof change.unifiedDiff === "string"
+              ? change.unifiedDiff
+              : typeof change.diff === "string"
+                ? change.diff
+                : null;
+        const counts = countUnifiedDiffLines(rawDiff);
 
         return {
           path: filePath,
           type: typeof change.type === "string" ? change.type : "update",
           additions: counts.additions,
           deletions: counts.deletions,
+          ...(rawDiff ? { diff: rawDiff } : {}),
           ...(typeof change.move_path === "string" && change.move_path
             ? { newPath: change.move_path }
             : {})
