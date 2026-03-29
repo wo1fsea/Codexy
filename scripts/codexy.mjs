@@ -21,6 +21,11 @@ Usage:
   codexy status
   codexy logs
   codexy open
+  codexy cloud start [--port 3400]
+  codexy cloud stop
+  codexy cloud status
+  codexy cloud logs
+  codexy cloud open
   codexy link <cloud-url>
   codexy unlink
 
@@ -72,6 +77,9 @@ switch (command) {
   case "open":
   case "link":
   case "unlink":
+    delegate(command, args);
+    break;
+  case "cloud":
     delegate(command, args);
     break;
   default:

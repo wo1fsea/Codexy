@@ -18,7 +18,7 @@ export default defineConfig({
     trace: "retain-on-failure"
   },
   webServer: {
-    command: `npx next dev --hostname 127.0.0.1 --port ${playwrightWebPort}`,
+    command: `node scripts/next-dev.mjs --hostname 127.0.0.1 --port ${playwrightWebPort}`,
     url: playwrightBaseUrl,
     reuseExistingServer: shouldReuseExistingServer,
     timeout: 120_000

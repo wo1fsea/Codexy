@@ -80,6 +80,24 @@ function ensureNodeIdentity(config) {
   };
 }
 
+export function ensureLocalNodeIdentity() {
+  const current = readRawConfig();
+
+  if (current.error) {
+    throw new Error(current.error);
+  }
+
+  const nextConfig = ensureNodeIdentity(current.config);
+  const configPath = writeRawConfig(nextConfig);
+  const { nodeId, nodeName } = readNodeIdentity(nextConfig);
+
+  return {
+    nodeId,
+    nodeName,
+    configPath
+  };
+}
+
 function readNodeIdentity(config) {
   if (!isRecord(config.node)) {
     return {
@@ -152,11 +170,16 @@ export function getCloudLinkState() {
     cloud && typeof cloud.linkedAt === "string" && cloud.linkedAt.trim()
       ? cloud.linkedAt.trim()
       : null;
+  const connectorToken =
+    cloud && typeof cloud.connectorToken === "string" && cloud.connectorToken.trim()
+      ? cloud.connectorToken.trim()
+      : null;
 
   return {
     linked: Boolean(url),
     url,
     linkedAt,
+    connectorToken,
     nodeId,
     nodeName,
     configPath,
@@ -164,7 +187,7 @@ export function getCloudLinkState() {
   };
 }
 
-export function writeCloudLink(rawUrl) {
+export function writeCloudLink(rawUrl, options = {}) {
   const normalizedUrl = normalizeCloudUrl(rawUrl);
   const current = readRawConfig();
 
@@ -177,7 +200,15 @@ export function writeCloudLink(rawUrl) {
     ...configWithNode,
     cloud: {
       url: normalizedUrl,
-      linkedAt: new Date().toISOString()
+      linkedAt:
+        typeof options.linkedAt === "string" && options.linkedAt.trim()
+          ? options.linkedAt.trim()
+          : new Date().toISOString(),
+      ...(typeof options.connectorToken === "string" && options.connectorToken.trim()
+        ? {
+            connectorToken: options.connectorToken.trim()
+          }
+        : {})
     }
   };
 

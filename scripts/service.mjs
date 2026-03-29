@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import {
@@ -20,7 +20,9 @@ import { fileURLToPath } from "node:url";
 
 import {
   clearCloudLink,
+  ensureLocalNodeIdentity,
   getCloudLinkState,
+  normalizeCloudUrl,
   writeCloudLink
 } from "./cloud-link.mjs";
 
@@ -28,20 +30,47 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
 const runtimeKey = createHash("sha1").update(repoRoot).digest("hex").slice(0, 12);
 const codexyHome = process.env.CODEXY_HOME_DIR?.trim() || path.join(os.homedir(), ".codexy");
-const stateDir = path.join(codexyHome, "state", runtimeKey);
-const logDir = path.join(codexyHome, "logs");
-const metadataPath = path.join(stateDir, "service.json");
-const defaultPort =
-  Number.parseInt(process.env.PORT ?? process.env.CODEXY_WEB_PORT ?? "3000", 10) || 3000;
+
+const SERVICE_MODES = {
+  node: {
+    key: "node",
+    runtimeMode: "node",
+    label: "Codexy",
+    lowerLabel: "codexy",
+    defaultPort:
+      Number.parseInt(process.env.PORT ?? process.env.CODEXY_WEB_PORT ?? "3000", 10) || 3000,
+    distDir: ".next-runtime-node",
+    needsCodexBinary: true
+  },
+  cloud: {
+    key: "cloud",
+    runtimeMode: "cloud",
+    label: "Codexy cloud",
+    lowerLabel: "codexy cloud",
+    defaultPort:
+      Number.parseInt(process.env.PORT ?? process.env.CODEXY_CLOUD_PORT ?? "3400", 10) || 3400,
+    distDir: ".next-runtime-cloud",
+    needsCodexBinary: false
+  }
+};
 
 function fail(message, code = 1) {
   console.error(message);
   process.exit(code);
 }
 
-function parseArgs(argv) {
+function getModeConfig(modeName) {
+  const mode = SERVICE_MODES[modeName];
+  if (!mode) {
+    fail(`Unknown runtime mode: ${modeName}`);
+  }
+
+  return mode;
+}
+
+function parseArgs(argv, mode) {
   const result = {
-    port: defaultPort
+    port: mode.defaultPort
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -68,12 +97,37 @@ function parseArgs(argv) {
   return result;
 }
 
-function ensureStateDir() {
-  mkdirSync(stateDir, { recursive: true });
-  mkdirSync(logDir, { recursive: true });
+function getStateDir(mode) {
+  return path.join(codexyHome, "state", runtimeKey, mode.key);
 }
 
-function readMetadata() {
+function getLogDir(mode) {
+  return path.join(codexyHome, "logs", mode.key);
+}
+
+function getMetadataPath(mode) {
+  return path.join(getStateDir(mode), "service.json");
+}
+
+function getConnectorStateDir() {
+  return path.join(codexyHome, "state", runtimeKey, "node");
+}
+
+function getConnectorMetadataPath() {
+  return path.join(getConnectorStateDir(), "cloud-connector.json");
+}
+
+function getConnectorLogDir() {
+  return path.join(codexyHome, "logs", "cloud-connector");
+}
+
+function ensureModeDirs(mode) {
+  mkdirSync(getStateDir(mode), { recursive: true });
+  mkdirSync(getLogDir(mode), { recursive: true });
+}
+
+function readMetadata(mode) {
+  const metadataPath = getMetadataPath(mode);
   if (!existsSync(metadataPath)) {
     return null;
   }
@@ -85,13 +139,44 @@ function readMetadata() {
   }
 }
 
-function writeMetadata(metadata) {
-  ensureStateDir();
-  writeFileSync(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`, "utf8");
+function writeMetadata(mode, metadata) {
+  ensureModeDirs(mode);
+  writeFileSync(
+    getMetadataPath(mode),
+    `${JSON.stringify(metadata, null, 2)}\n`,
+    "utf8"
+  );
 }
 
-function clearMetadata() {
-  rmSync(metadataPath, { force: true });
+function clearMetadata(mode) {
+  rmSync(getMetadataPath(mode), { force: true });
+}
+
+function readConnectorMetadata() {
+  const metadataPath = getConnectorMetadataPath();
+  if (!existsSync(metadataPath)) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(readFileSync(metadataPath, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function writeConnectorMetadata(metadata) {
+  mkdirSync(getConnectorStateDir(), { recursive: true });
+  mkdirSync(getConnectorLogDir(), { recursive: true });
+  writeFileSync(
+    getConnectorMetadataPath(),
+    `${JSON.stringify(metadata, null, 2)}\n`,
+    "utf8"
+  );
+}
+
+function clearConnectorMetadata() {
+  rmSync(getConnectorMetadataPath(), { force: true });
 }
 
 function isProcessRunning(pid) {
@@ -107,11 +192,12 @@ function isProcessRunning(pid) {
   }
 }
 
-function sanitizeRuntimeEnv(port) {
+function sanitizeRuntimeEnv(port, mode) {
   const env = {
     ...process.env,
+    CODEXY_RUNTIME_MODE: mode.runtimeMode,
     NODE_ENV: "production",
-    NEXT_DIST_DIR: process.env.NEXT_DIST_DIR?.trim() || ".next-runtime",
+    NEXT_DIST_DIR: process.env.NEXT_DIST_DIR?.trim() || mode.distDir,
     PORT: String(port)
   };
 
@@ -133,11 +219,11 @@ function dependencyInstalled() {
   return existsSync(path.join(repoRoot, "node_modules", "next", "package.json"));
 }
 
-function buildRuntime(port) {
+function buildRuntime(mode, port) {
   const buildScript = path.join(repoRoot, "scripts", "next-build.mjs");
   const result = spawnSync(process.execPath, [buildScript], {
     cwd: repoRoot,
-    env: sanitizeRuntimeEnv(port),
+    env: sanitizeRuntimeEnv(port, mode),
     stdio: "inherit"
   });
 
@@ -189,6 +275,18 @@ function httpGetStatus(port) {
       resolve(null);
     });
   });
+}
+
+function parseJson(text) {
+  if (!text?.trim()) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
 }
 
 function isPortAvailable(port) {
@@ -276,6 +374,7 @@ function printCloudState(prefix = "Cloud") {
 }
 
 async function runDoctor() {
+  const mode = getModeConfig("node");
   let failures = 0;
 
   printCheck("ok", "repo", repoRoot);
@@ -326,14 +425,18 @@ async function runDoctor() {
     printCheck("warn", "cloud", "not linked to a self-hosted cloud");
   }
 
-  const buildIdPath = path.join(repoRoot, ".next-runtime", "BUILD_ID");
+  const buildIdPath = path.join(repoRoot, mode.distDir, "BUILD_ID");
   if (existsSync(buildIdPath)) {
-    printCheck("ok", "runtime build", ".next-runtime is present");
+    printCheck("ok", "runtime build", `${mode.distDir} is present`);
   } else {
-    printCheck("warn", "runtime build", "missing; `codexy start` will build before launching");
+    printCheck(
+      "warn",
+      "runtime build",
+      `missing; \`codexy start\` will build ${mode.distDir} before launching`
+    );
   }
 
-  const metadata = readMetadata();
+  const metadata = readMetadata(mode);
   if (metadata?.pid && isProcessRunning(metadata.pid)) {
     const health = await httpGetStatus(metadata.port);
     printCheck(
@@ -384,23 +487,109 @@ async function stopPid(pid) {
   }
 }
 
-async function runStart(argv) {
-  const options = parseArgs(argv);
-  const current = readMetadata();
+async function stopNodeConnector() {
+  const metadata = readConnectorMetadata();
+  if (!metadata?.pid) {
+    clearConnectorMetadata();
+    return false;
+  }
+
+  await stopPid(metadata.pid);
+  clearConnectorMetadata();
+  return true;
+}
+
+async function startNodeConnectorIfLinked() {
+  const nodeMetadata = readMetadata(getModeConfig("node"));
+  if (!nodeMetadata?.pid || !isProcessRunning(nodeMetadata.pid)) {
+    await stopNodeConnector();
+    return null;
+  }
+
+  const cloud = getCloudLinkState();
+  if (
+    cloud.error ||
+    !cloud.linked ||
+    !cloud.url ||
+    !cloud.nodeId ||
+    !cloud.connectorToken
+  ) {
+    await stopNodeConnector();
+    return null;
+  }
+
+  const current = readConnectorMetadata();
+  if (current?.pid && isProcessRunning(current.pid)) {
+    return current;
+  }
+
+  clearConnectorMetadata();
+
+  mkdirSync(getConnectorLogDir(), { recursive: true });
+  const logPath = path.join(
+    getConnectorLogDir(),
+    `cloud-connector-${runtimeKey}-${Date.now()}.log`
+  );
+  const logFd = openSync(logPath, "w");
+  const connectorScript = path.join(repoRoot, "scripts", "cloud-connector.mjs");
+  const child = spawn(process.execPath, [connectorScript], {
+    cwd: repoRoot,
+    detached: true,
+    env: {
+      ...process.env,
+      CODEXY_HOME_DIR: codexyHome
+    },
+    stdio: ["ignore", logFd, logFd],
+    windowsHide: true
+  });
+
+  child.unref();
+
+  const metadata = {
+    pid: child.pid,
+    logPath,
+    startedAt: new Date().toISOString()
+  };
+  writeConnectorMetadata(metadata);
+  return metadata;
+}
+
+function printNodeConnectorState() {
+  const metadata = readConnectorMetadata();
+  if (!metadata?.pid || !isProcessRunning(metadata.pid)) {
+    clearConnectorMetadata();
+    process.stdout.write("Connector: stopped\n");
+    return;
+  }
+
+  process.stdout.write(`Connector: running (PID ${metadata.pid})\n`);
+  if (metadata.logPath) {
+    process.stdout.write(`Connector log: ${metadata.logPath}\n`);
+  }
+}
+
+async function runStart(argv, modeName) {
+  const mode = getModeConfig(modeName);
+  const options = parseArgs(argv, mode);
+  const current = readMetadata(mode);
 
   if (current?.pid && isProcessRunning(current.pid)) {
+    if (mode.key === "node") {
+      await startNodeConnectorIfLinked();
+    }
+
     if (current.port !== options.port) {
       fail(
-        `Codexy is already running on port ${current.port}. Stop it before starting on port ${options.port}.`
+        `${mode.label} is already running on port ${current.port}. Stop it before starting on port ${options.port}.`
       );
     }
 
-    process.stdout.write(`Codexy is already running at ${serviceUrl(current.port)}.\n`);
+    process.stdout.write(`${mode.label} is already running at ${serviceUrl(current.port)}.\n`);
     process.stdout.write(`Log file: ${current.logPath}\n`);
     process.exit(0);
   }
 
-  clearMetadata();
+  clearMetadata(mode);
 
   if (!dependencyInstalled()) {
     fail(
@@ -412,14 +601,17 @@ async function runStart(argv) {
     fail(`Port ${options.port} is already in use. Choose another port or stop the existing listener.`);
   }
 
-  if (!checkBinary(process.env.CODEXY_CODEX_BIN || "codex")) {
+  if (mode.needsCodexBinary && !checkBinary(process.env.CODEXY_CODEX_BIN || "codex")) {
     process.stdout.write("WARN codex not found on PATH. The web UI may start, but bridge features will fail.\n");
   }
 
-  buildRuntime(options.port);
-  ensureStateDir();
+  buildRuntime(mode, options.port);
+  ensureModeDirs(mode);
 
-  const logPath = path.join(logDir, `codexy-${runtimeKey}-${options.port}-${Date.now()}.log`);
+  const logPath = path.join(
+    getLogDir(mode),
+    `${mode.key}-${runtimeKey}-${options.port}-${Date.now()}.log`
+  );
   const logFd = openSync(logPath, "w");
   const child = spawn(
     process.execPath,
@@ -427,7 +619,7 @@ async function runStart(argv) {
     {
       cwd: repoRoot,
       detached: true,
-      env: sanitizeRuntimeEnv(options.port),
+      env: sanitizeRuntimeEnv(options.port, mode),
       stdio: ["ignore", logFd, logFd],
       windowsHide: true
     }
@@ -435,60 +627,87 @@ async function runStart(argv) {
 
   child.unref();
 
-  writeMetadata({
+  writeMetadata(mode, {
     pid: child.pid,
     port: options.port,
     logPath,
     repoRoot,
+    runtimeMode: mode.runtimeMode,
     startedAt: new Date().toISOString()
   });
 
   const ready = await waitForReady(options.port);
   if (!ready) {
     await stopPid(child.pid);
-    clearMetadata();
-    fail(`Codexy did not become ready. Check ${logPath} for details.`);
+    clearMetadata(mode);
+    fail(`${mode.label} did not become ready. Check ${logPath} for details.`);
   }
 
-  process.stdout.write(`Codexy is running at ${serviceUrl(options.port)}.\n`);
+  process.stdout.write(`${mode.label} is running at ${serviceUrl(options.port)}.\n`);
   process.stdout.write(`Log file: ${logPath}\n`);
+
+  if (mode.key === "node") {
+    const connector = await startNodeConnectorIfLinked();
+    if (connector?.pid) {
+      process.stdout.write(`Connector PID: ${connector.pid}\n`);
+      process.stdout.write(`Connector log: ${connector.logPath}\n`);
+    }
+  }
 }
 
-async function runStop() {
-  const metadata = readMetadata();
+async function runStop(modeName) {
+  const mode = getModeConfig(modeName);
+  const metadata = readMetadata(mode);
   if (!metadata?.pid) {
-    process.stdout.write("Codexy is not running.\n");
-    clearMetadata();
+    process.stdout.write(`${mode.label} is not running.\n`);
+    clearMetadata(mode);
     return;
   }
 
   await stopPid(metadata.pid);
-  clearMetadata();
-  process.stdout.write("Codexy stopped.\n");
+  clearMetadata(mode);
+  if (mode.key === "node") {
+    await stopNodeConnector();
+  }
+  process.stdout.write(`${mode.label} stopped.\n`);
 }
 
-async function runStatus() {
-  const metadata = readMetadata();
+async function runStatus(modeName) {
+  const mode = getModeConfig(modeName);
+  const metadata = readMetadata(mode);
   if (!metadata?.pid || !isProcessRunning(metadata.pid)) {
-    clearMetadata();
-    process.stdout.write("Codexy is stopped.\n");
-    printCloudState();
+    clearMetadata(mode);
+    process.stdout.write(`${mode.label} is stopped.\n`);
+    if (mode.key === "node") {
+      printCloudState();
+      printNodeConnectorState();
+    }
     process.exit(1);
   }
 
   const health = await httpGetStatus(metadata.port);
-  process.stdout.write("Codexy is running.\n");
+  const statusPayload = parseJson(health?.body ?? "");
+  process.stdout.write(`${mode.label} is running.\n`);
   process.stdout.write(`PID: ${metadata.pid}\n`);
   process.stdout.write(`URL: ${serviceUrl(metadata.port)}\n`);
   process.stdout.write(`Health: ${health?.ok ? "ready" : "starting"}\n`);
   process.stdout.write(`Log file: ${metadata.logPath}\n`);
-  printCloudState();
+
+  if (mode.key === "cloud" && statusPayload && typeof statusPayload.nodeCount === "number") {
+    process.stdout.write(`Linked nodes: ${statusPayload.nodeCount}\n`);
+  }
+
+  if (mode.key === "node") {
+    printCloudState();
+    printNodeConnectorState();
+  }
 }
 
-function runLogs() {
-  const metadata = readMetadata();
+function runLogs(modeName) {
+  const mode = getModeConfig(modeName);
+  const metadata = readMetadata(mode);
   if (!metadata?.logPath || !existsSync(metadata.logPath)) {
-    fail("No Codexy log file is available yet.");
+    fail(`No ${mode.lowerLabel} log file is available yet.`);
   }
 
   process.stdout.write(readFileSync(metadata.logPath, "utf8"));
@@ -513,24 +732,84 @@ function openUrl(url) {
   child.unref();
 }
 
-async function runOpen() {
-  const metadata = readMetadata();
+async function runOpen(modeName) {
+  const mode = getModeConfig(modeName);
+  const metadata = readMetadata(mode);
   if (!metadata?.pid || !isProcessRunning(metadata.pid)) {
-    fail("Codexy is not running. Start it first with `codexy start`.");
+    fail(`${mode.label} is not running. Start it first.`);
   }
 
   openUrl(serviceUrl(metadata.port));
   process.stdout.write(`Opened ${serviceUrl(metadata.port)}.\n`);
 }
 
-function runLink(argv) {
+async function requestCloudJson(url, init) {
+  const response = await fetch(url, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(init?.headers ?? {})
+    }
+  });
+  const text = await response.text();
+  const data = parseJson(text);
+
+  if (!response.ok) {
+    const message =
+      (data && typeof data.error === "string" && data.error) ||
+      text ||
+      `Cloud request failed with status ${response.status}.`;
+    throw new Error(message);
+  }
+
+  return data;
+}
+
+async function registerNodeWithCloud(cloudUrl, node, linkedAt, connectorToken) {
+  await requestCloudJson(`${cloudUrl}/api/cloud/nodes`, {
+    method: "POST",
+    body: JSON.stringify({
+      cloudUrl,
+      linkedAt,
+      connectorToken,
+      nodeId: node.nodeId,
+      nodeName: node.nodeName
+    })
+  });
+}
+
+async function unregisterNodeFromCloud(cloud) {
+  if (!cloud.url || !cloud.nodeId) {
+    return;
+  }
+
+  await requestCloudJson(
+    `${cloud.url}/api/cloud/nodes/${encodeURIComponent(cloud.nodeId)}`,
+    {
+      method: "DELETE"
+    }
+  );
+}
+
+async function runLink(argv) {
   const [rawUrl, ...rest] = argv;
   if (rest.length) {
     fail(`Unknown argument: ${rest[0]}`);
   }
 
   try {
-    const cloud = writeCloudLink(rawUrl);
+    const cloudUrl = normalizeCloudUrl(rawUrl);
+    const node = ensureLocalNodeIdentity();
+    const linkedAt = new Date().toISOString();
+    const connectorToken = randomUUID();
+
+    await registerNodeWithCloud(cloudUrl, node, linkedAt, connectorToken);
+
+    const cloud = writeCloudLink(cloudUrl, {
+      linkedAt,
+      connectorToken
+    });
+    await startNodeConnectorIfLinked();
     process.stdout.write(`Codexy linked to ${cloud.url}.\n`);
     if (cloud.nodeName || cloud.nodeId) {
       process.stdout.write(
@@ -543,15 +822,30 @@ function runLink(argv) {
   }
 }
 
-function runUnlink(argv) {
+async function runUnlink(argv) {
   if (argv.length) {
     fail(`Unknown argument: ${argv[0]}`);
   }
 
+  const current = getCloudLinkState();
+  let unlinkWarning = null;
+
+  if (current.linked && current.url && current.nodeId) {
+    try {
+      await unregisterNodeFromCloud(current);
+    } catch (error) {
+      unlinkWarning = error instanceof Error ? error.message : "Unable to notify the self-hosted cloud.";
+    }
+  }
+
   try {
     const cloud = clearCloudLink();
+    await stopNodeConnector();
     process.stdout.write("Codexy cloud link cleared.\n");
     process.stdout.write(`Config: ${cloud.configPath}\n`);
+    if (unlinkWarning) {
+      process.stdout.write(`WARN ${unlinkWarning}\n`);
+    }
   } catch (error) {
     fail(
       error instanceof Error
@@ -561,39 +855,80 @@ function runUnlink(argv) {
   }
 }
 
+function printHelp() {
+  process.stdout.write(
+    "Usage: node scripts/service.mjs <doctor|start|stop|status|logs|open|link|unlink|cloud> [--port 3000]\n"
+  );
+  process.stdout.write(
+    "Usage: node scripts/service.mjs cloud <start|stop|status|logs|open> [--port 3400]\n"
+  );
+}
+
+async function runCloudCommand(argv) {
+  const [subcommand = "help", ...rest] = argv;
+
+  switch (subcommand) {
+    case "help":
+    case "--help":
+    case "-h":
+      process.stdout.write(
+        "Usage: node scripts/service.mjs cloud <start|stop|status|logs|open> [--port 3400]\n"
+      );
+      break;
+    case "start":
+      await runStart(rest, "cloud");
+      break;
+    case "stop":
+      await runStop("cloud");
+      break;
+    case "status":
+      await runStatus("cloud");
+      break;
+    case "logs":
+      runLogs("cloud");
+      break;
+    case "open":
+      await runOpen("cloud");
+      break;
+    default:
+      fail(`Unknown cloud command: ${subcommand}`);
+  }
+}
+
 const [command = "help", ...argv] = process.argv.slice(2);
 
 switch (command) {
   case "help":
   case "--help":
   case "-h":
-    process.stdout.write(
-      "Usage: node scripts/service.mjs <doctor|start|stop|status|logs|open|link|unlink> [--port 3000]\n"
-    );
+    printHelp();
     break;
   case "doctor":
     await runDoctor();
     break;
   case "start":
-    await runStart(argv);
+    await runStart(argv, "node");
     break;
   case "stop":
-    await runStop();
+    await runStop("node");
     break;
   case "status":
-    await runStatus();
+    await runStatus("node");
     break;
   case "logs":
-    runLogs();
+    runLogs("node");
     break;
   case "open":
-    await runOpen();
+    await runOpen("node");
     break;
   case "link":
-    runLink(argv);
+    await runLink(argv);
     break;
   case "unlink":
-    runUnlink(argv);
+    await runUnlink(argv);
+    break;
+  case "cloud":
+    await runCloudCommand(argv);
     break;
   default:
     fail(`Unknown service command: ${command}`);

@@ -70,6 +70,37 @@ async function getFreePort() {
   });
 }
 
+async function waitForJson(url, predicate, timeoutMs = 30_000) {
+  const deadline = Date.now() + timeoutMs;
+  let lastError = null;
+
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(url, {
+        cache: "no-store"
+      });
+
+      if (response.ok) {
+        const payload = await response.json();
+        if (!predicate || predicate(payload)) {
+          return payload;
+        }
+      }
+    } catch (error) {
+      lastError = error;
+    }
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, 1000);
+    });
+  }
+
+  throw (
+    lastError ??
+    new Error(`Timed out waiting for JSON response from ${url}.`)
+  );
+}
+
 function bashNodeAvailable() {
   if (process.platform === "win32") {
     return false;
@@ -89,6 +120,8 @@ test("codexy help prints the first-run command surface", () => {
   assert.match(result.stdout, /codexy doctor/);
   assert.match(result.stdout, /codexy start/);
   assert.match(result.stdout, /codexy stop/);
+  assert.match(result.stdout, /codexy cloud start/);
+  assert.match(result.stdout, /codexy cloud status/);
   assert.match(result.stdout, /codexy link <cloud-url>/);
   assert.match(result.stdout, /codexy unlink/);
 });
@@ -240,82 +273,12 @@ test("codexy lifecycle commands can start, report, and stop the local service", 
   }
 });
 
-test("codexy link and unlink manage the self-hosted cloud config", () => {
-  const codexyHome = makeTempDir("codexy-cloud-home-");
-
-  try {
-    const linkResult = runNodeCli(["link", "https://cloud.example.test/base/"], {
-      env: {
-        CODEXY_HOME_DIR: codexyHome
-      },
-      timeout: 10_000
-    });
-
-    assert.equal(linkResult.status, 0, linkResult.stdout + linkResult.stderr);
-    assert.match(linkResult.stdout, /Codexy linked to https:\/\/cloud\.example\.test\/base\./);
-    assert.match(linkResult.stdout, /Config:/);
-
-    const configPath = path.join(codexyHome, "config.json");
-    const config = JSON.parse(readFileSync(configPath, "utf8"));
-
-    assert.equal(config.cloud.url, "https://cloud.example.test/base");
-    assert.match(config.cloud.linkedAt, /^\d{4}-\d{2}-\d{2}T/);
-    assert.match(config.node.id, /^[0-9a-f-]{36}$/i);
-    assert.ok(config.node.name);
-
-    const statusResult = runNodeCli(["status"], {
-      env: {
-        CODEXY_HOME_DIR: codexyHome
-      },
-      timeout: 10_000
-    });
-
-    assert.notEqual(statusResult.status, 0);
-    assert.match(statusResult.stdout + statusResult.stderr, /Codexy is stopped/);
-    assert.match(statusResult.stdout + statusResult.stderr, /Cloud: linked to https:\/\/cloud\.example\.test\/base/);
-
-    const doctorResult = runNodeCli(["doctor"], {
-      env: {
-        CODEXY_HOME_DIR: codexyHome
-      },
-      timeout: 20_000
-    });
-
-    assert.match(doctorResult.stdout + doctorResult.stderr, /cloud: https:\/\/cloud\.example\.test\/base/i);
-
-    const unlinkResult = runNodeCli(["unlink"], {
-      env: {
-        CODEXY_HOME_DIR: codexyHome
-      },
-      timeout: 10_000
-    });
-
-    assert.equal(unlinkResult.status, 0, unlinkResult.stdout + unlinkResult.stderr);
-    assert.match(unlinkResult.stdout, /Codexy cloud link cleared/);
-
-    const configAfterUnlink = JSON.parse(readFileSync(configPath, "utf8"));
-    assert.equal(configAfterUnlink.cloud, undefined);
-    assert.equal(configAfterUnlink.node.id, config.node.id);
-  } finally {
-    rmSync(codexyHome, { recursive: true, force: true });
-  }
-});
-
-test("status API includes the current cloud link state", async () => {
-  const codexyHome = makeTempDir("codexy-cloud-status-home-");
+test("codexy cloud lifecycle commands can start, report, and stop the local cloud service", async () => {
+  const codexyHome = makeTempDir("codexy-cloud-runtime-home-");
   const port = await getFreePort();
 
   try {
-    const linkResult = runNodeCli(["link", "https://cloud.example.test"], {
-      env: {
-        CODEXY_HOME_DIR: codexyHome
-      },
-      timeout: 10_000
-    });
-
-    assert.equal(linkResult.status, 0, linkResult.stdout + linkResult.stderr);
-
-    const startResult = runNodeCli(["start", "--port", String(port)], {
+    const startResult = runNodeCli(["cloud", "start", "--port", String(port)], {
       env: {
         CODEXY_HOME_DIR: codexyHome
       },
@@ -323,25 +286,235 @@ test("status API includes the current cloud link state", async () => {
     });
 
     assert.equal(startResult.status, 0, startResult.stdout + startResult.stderr);
+    assert.match(startResult.stdout, new RegExp(`http://127\\.0\\.0\\.1:${port}`));
 
-    const response = await fetch(`http://127.0.0.1:${port}/api/status`, {
+    const statusResult = runNodeCli(["cloud", "status"], {
+      env: {
+        CODEXY_HOME_DIR: codexyHome
+      },
+      timeout: 20_000
+    });
+
+    assert.equal(statusResult.status, 0, statusResult.stdout + statusResult.stderr);
+    assert.match(statusResult.stdout, /Codexy cloud is running/);
+    assert.match(statusResult.stdout, new RegExp(`URL: http://127\\.0\\.0\\.1:${port}`));
+
+    const htmlResponse = await fetch(`http://127.0.0.1:${port}`, {
       cache: "no-store"
     });
-    assert.equal(response.status, 200);
+    const html = await htmlResponse.text();
+    assert.equal(htmlResponse.status, 200);
+    assert.match(html, /Codexy Cloud/);
 
-    const payload = await response.json();
-    assert.equal(payload.cloud.linked, true);
-    assert.equal(payload.cloud.url, "https://cloud.example.test");
-    assert.ok(payload.cloud.nodeId);
-    assert.ok(payload.cloud.nodeName);
-    assert.match(payload.cloud.configPath, /config\.json$/);
+    const stopResult = runNodeCli(["cloud", "stop"], {
+      env: {
+        CODEXY_HOME_DIR: codexyHome
+      },
+      timeout: 20_000
+    });
+
+    assert.equal(stopResult.status, 0, stopResult.stdout + stopResult.stderr);
+    assert.match(stopResult.stdout, /Codexy cloud stopped/);
   } finally {
-    runNodeCli(["stop"], {
+    runNodeCli(["cloud", "stop"], {
       env: {
         CODEXY_HOME_DIR: codexyHome
       },
       timeout: 20_000
     });
     rmSync(codexyHome, { recursive: true, force: true });
+  }
+});
+
+test("codexy link registers a node with a running local cloud and unlink removes it", async () => {
+  const nodeHome = makeTempDir("codexy-node-home-");
+  const cloudHome = makeTempDir("codexy-cloud-home-");
+  const cloudPort = await getFreePort();
+  const cloudUrl = `http://127.0.0.1:${cloudPort}`;
+
+  try {
+    const cloudStart = runNodeCli(["cloud", "start", "--port", String(cloudPort)], {
+      env: {
+        CODEXY_HOME_DIR: cloudHome
+      },
+      timeout: 180_000
+    });
+    assert.equal(cloudStart.status, 0, cloudStart.stdout + cloudStart.stderr);
+
+    const linkResult = runNodeCli(["link", cloudUrl], {
+      env: {
+        CODEXY_HOME_DIR: nodeHome
+      },
+      timeout: 20_000
+    });
+    assert.equal(linkResult.status, 0, linkResult.stdout + linkResult.stderr);
+    assert.match(linkResult.stdout, new RegExp(`Codexy linked to ${cloudUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+
+    const nodeConfig = JSON.parse(readFileSync(path.join(nodeHome, "config.json"), "utf8"));
+    assert.equal(nodeConfig.cloud.url, cloudUrl);
+    assert.ok(nodeConfig.node.id);
+
+    const nodesResponse = await fetch(`${cloudUrl}/api/cloud/nodes`, {
+      cache: "no-store"
+    });
+    const nodesPayload = await nodesResponse.json();
+    assert.equal(nodesResponse.status, 200);
+    assert.equal(nodesPayload.nodes.length, 1);
+    assert.equal(nodesPayload.nodes[0].nodeId, nodeConfig.node.id);
+    assert.equal(nodesPayload.nodes[0].displayName, nodeConfig.node.name);
+
+    const unlinkResult = runNodeCli(["unlink"], {
+      env: {
+        CODEXY_HOME_DIR: nodeHome
+      },
+      timeout: 20_000
+    });
+    assert.equal(unlinkResult.status, 0, unlinkResult.stdout + unlinkResult.stderr);
+
+    const nodesAfterUnlinkResponse = await fetch(`${cloudUrl}/api/cloud/nodes`, {
+      cache: "no-store"
+    });
+    const nodesAfterUnlinkPayload = await nodesAfterUnlinkResponse.json();
+    assert.equal(nodesAfterUnlinkResponse.status, 200);
+    assert.equal(nodesAfterUnlinkPayload.nodes.length, 0);
+  } finally {
+    runNodeCli(["cloud", "stop"], {
+      env: {
+        CODEXY_HOME_DIR: cloudHome
+      },
+      timeout: 20_000
+    });
+    rmSync(nodeHome, { recursive: true, force: true });
+    rmSync(cloudHome, { recursive: true, force: true });
+  }
+});
+
+test("status API includes the current cloud link state after local node+cloud registration", async () => {
+  const nodeHome = makeTempDir("codexy-cloud-status-node-home-");
+  const cloudHome = makeTempDir("codexy-cloud-status-cloud-home-");
+  const nodePort = await getFreePort();
+  const cloudPort = await getFreePort();
+  const cloudUrl = `http://127.0.0.1:${cloudPort}`;
+
+  try {
+    const cloudStart = runNodeCli(["cloud", "start", "--port", String(cloudPort)], {
+      env: {
+        CODEXY_HOME_DIR: cloudHome
+      },
+      timeout: 180_000
+    });
+    assert.equal(cloudStart.status, 0, cloudStart.stdout + cloudStart.stderr);
+
+    const linkResult = runNodeCli(["link", cloudUrl], {
+      env: {
+        CODEXY_HOME_DIR: nodeHome
+      },
+      timeout: 20_000
+    });
+    assert.equal(linkResult.status, 0, linkResult.stdout + linkResult.stderr);
+
+    const startResult = runNodeCli(["start", "--port", String(nodePort)], {
+      env: {
+        CODEXY_HOME_DIR: nodeHome
+      },
+      timeout: 180_000
+    });
+
+    assert.equal(startResult.status, 0, startResult.stdout + startResult.stderr);
+
+    const response = await fetch(`http://127.0.0.1:${nodePort}/api/status`, {
+      cache: "no-store"
+    });
+    assert.equal(response.status, 200);
+
+    const payload = await response.json();
+    assert.equal(payload.cloud.linked, true);
+    assert.equal(payload.cloud.url, cloudUrl);
+    assert.ok(payload.cloud.nodeId);
+    assert.ok(payload.cloud.nodeName);
+    assert.match(payload.cloud.configPath, /config\.json$/);
+  } finally {
+    runNodeCli(["stop"], {
+      env: {
+        CODEXY_HOME_DIR: nodeHome
+      },
+      timeout: 20_000
+    });
+    runNodeCli(["cloud", "stop"], {
+      env: {
+        CODEXY_HOME_DIR: cloudHome
+      },
+      timeout: 20_000
+    });
+    rmSync(nodeHome, { recursive: true, force: true });
+    rmSync(cloudHome, { recursive: true, force: true });
+  }
+});
+
+test("cloud proxy can read node status after the linked node connector comes online", async () => {
+  const nodeHome = makeTempDir("codexy-cloud-proxy-node-home-");
+  const cloudHome = makeTempDir("codexy-cloud-proxy-cloud-home-");
+  const nodePort = await getFreePort();
+  const cloudPort = await getFreePort();
+  const cloudUrl = `http://127.0.0.1:${cloudPort}`;
+
+  try {
+    const cloudStart = runNodeCli(["cloud", "start", "--port", String(cloudPort)], {
+      env: {
+        CODEXY_HOME_DIR: cloudHome
+      },
+      timeout: 180_000
+    });
+    assert.equal(cloudStart.status, 0, cloudStart.stdout + cloudStart.stderr);
+
+    const linkResult = runNodeCli(["link", cloudUrl], {
+      env: {
+        CODEXY_HOME_DIR: nodeHome
+      },
+      timeout: 20_000
+    });
+    assert.equal(linkResult.status, 0, linkResult.stdout + linkResult.stderr);
+
+    const nodeConfig = JSON.parse(readFileSync(path.join(nodeHome, "config.json"), "utf8"));
+    const startResult = runNodeCli(["start", "--port", String(nodePort)], {
+      env: {
+        CODEXY_HOME_DIR: nodeHome
+      },
+      timeout: 180_000
+    });
+    assert.equal(startResult.status, 0, startResult.stdout + startResult.stderr);
+
+    const proxiedStatus = await waitForJson(
+      `${cloudUrl}/api/cloud/nodes/${encodeURIComponent(nodeConfig.node.id)}/proxy/status`,
+      (payload) => payload?.cloud?.url === cloudUrl
+    );
+    assert.equal(proxiedStatus.cloud.linked, true);
+    assert.equal(proxiedStatus.cloud.url, cloudUrl);
+
+    const workspaceResponse = await fetch(
+      `${cloudUrl}/nodes/${encodeURIComponent(nodeConfig.node.id)}`,
+      {
+        cache: "no-store"
+      }
+    );
+    const workspaceHtml = await workspaceResponse.text();
+    assert.equal(workspaceResponse.status, 200);
+    assert.match(workspaceHtml, /Remote node workspace/);
+    assert.match(workspaceHtml, new RegExp(nodeConfig.node.name));
+  } finally {
+    runNodeCli(["stop"], {
+      env: {
+        CODEXY_HOME_DIR: nodeHome
+      },
+      timeout: 20_000
+    });
+    runNodeCli(["cloud", "stop"], {
+      env: {
+        CODEXY_HOME_DIR: cloudHome
+      },
+      timeout: 20_000
+    });
+    rmSync(nodeHome, { recursive: true, force: true });
+    rmSync(cloudHome, { recursive: true, force: true });
   }
 });

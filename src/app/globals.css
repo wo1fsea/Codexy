@@ -125,6 +125,297 @@ pre {
   background: transparent;
 }
 
+.cloud-app-shell {
+  min-height: 100vh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background:
+    radial-gradient(circle at top left, rgba(152, 200, 162, 0.12), transparent 32%),
+    linear-gradient(180deg, #111214 0%, #15171a 100%);
+  padding: clamp(20px, 4vw, 40px);
+}
+
+.cloud-hero,
+.cloud-panel {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+}
+
+.cloud-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(280px, 0.9fr);
+  gap: 18px;
+  align-items: stretch;
+  margin-bottom: 20px;
+}
+
+.cloud-hero-copy,
+.cloud-overview-card,
+.cloud-panel,
+.cloud-node-card,
+.cloud-empty-state {
+  border: 1px solid rgba(255, 247, 238, 0.08);
+  border-radius: 20px;
+  background: rgba(22, 23, 26, 0.84);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.24);
+}
+
+.cloud-hero-copy,
+.cloud-overview-card,
+.cloud-empty-state,
+.cloud-node-card {
+  padding: 22px;
+}
+
+.cloud-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border: 1px solid rgba(152, 200, 162, 0.2);
+  border-radius: 999px;
+  background: rgba(152, 200, 162, 0.08);
+  padding: 0 10px;
+  color: #b9d9c0;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cloud-hero-copy h1,
+.cloud-panel-head h2 {
+  margin: 14px 0 0;
+  color: var(--text-strong);
+  font-family: var(--font-serif);
+  font-weight: 600;
+}
+
+.cloud-hero-copy h1 {
+  font-size: clamp(32px, 5vw, 54px);
+  line-height: 0.94;
+}
+
+.cloud-hero-copy p,
+.cloud-node-card p,
+.cloud-empty-state p {
+  margin: 12px 0 0;
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.cloud-hero-copy code,
+.cloud-panel-head code,
+.cloud-empty-state code,
+.cloud-node-meta dd {
+  font-family: var(--font-mono);
+}
+
+.cloud-overview-card {
+  display: grid;
+  align-content: end;
+  gap: 8px;
+}
+
+.cloud-overview-label,
+.cloud-node-meta dt {
+  color: var(--text-faint);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.cloud-overview-card strong {
+  color: var(--text-strong);
+  font-size: clamp(24px, 3vw, 32px);
+}
+
+.cloud-overview-card span:last-child {
+  color: var(--text-muted);
+}
+
+.cloud-panel {
+  padding: 18px;
+}
+
+.cloud-panel-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.cloud-panel-head h2 {
+  font-size: 24px;
+}
+
+.cloud-panel-head code {
+  max-width: min(100%, 420px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.cloud-node-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.cloud-node-card {
+  display: grid;
+  gap: 12px;
+}
+
+.cloud-node-card:has(.cloud-node-status.is-offline) {
+  opacity: 0.72;
+}
+
+.cloud-node-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cloud-node-card-head strong {
+  color: var(--text-strong);
+  font-size: 17px;
+}
+
+.cloud-node-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border: 1px solid rgba(152, 200, 162, 0.18);
+  border-radius: 999px;
+  background: rgba(152, 200, 162, 0.08);
+  padding: 0 10px;
+  color: #b9d9c0;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.cloud-node-status.is-offline {
+  border-color: rgba(255, 196, 161, 0.18);
+  background: rgba(255, 196, 161, 0.08);
+  color: #ffcfb7;
+}
+
+.cloud-node-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.cloud-node-open,
+.cloud-remote-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  border: 1px solid rgba(255, 247, 238, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 247, 238, 0.04);
+  padding: 0 16px;
+  color: var(--text-strong);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.cloud-node-open:hover,
+.cloud-remote-back:hover {
+  border-color: rgba(152, 200, 162, 0.3);
+  background: rgba(152, 200, 162, 0.12);
+}
+
+.cloud-node-meta {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.cloud-node-meta div {
+  display: grid;
+  gap: 4px;
+}
+
+.cloud-node-meta dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.55;
+  word-break: break-word;
+}
+
+.cloud-empty-state strong {
+  color: var(--text-strong);
+  font-size: 18px;
+}
+
+.cloud-remote-shell {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top right, rgba(152, 200, 162, 0.1), transparent 24%),
+    linear-gradient(180deg, #101113 0%, #141619 100%);
+  padding: clamp(16px, 3vw, 28px);
+}
+
+.cloud-remote-header,
+.cloud-remote-stage {
+  width: min(1320px, 100%);
+  margin: 0 auto;
+}
+
+.cloud-remote-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.cloud-remote-copy {
+  display: grid;
+  gap: 12px;
+}
+
+.cloud-remote-copy h1 {
+  margin: 0;
+  color: var(--text-strong);
+  font-family: var(--font-serif);
+  font-size: clamp(28px, 4vw, 44px);
+  line-height: 0.96;
+}
+
+.cloud-remote-copy p {
+  margin: 0;
+  max-width: 720px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.cloud-remote-status {
+  display: grid;
+  justify-items: end;
+  gap: 10px;
+}
+
+.cloud-remote-status code {
+  color: var(--text-soft);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.cloud-remote-stage {
+  border: 1px solid rgba(255, 247, 238, 0.08);
+  border-radius: 24px;
+  background: rgba(12, 13, 16, 0.48);
+  padding: 10px;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.24);
+}
+
 .dock-menubar {
   display: flex;
   align-items: center;
@@ -2418,6 +2709,24 @@ pre {
   .dock-alert-banner {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .cloud-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .cloud-panel-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .cloud-remote-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .cloud-remote-status {
+    justify-items: start;
   }
 }
 

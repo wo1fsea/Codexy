@@ -5,11 +5,10 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-function sanitizeBuildEnv() {
+function sanitizeDevEnv() {
   const env = {
     ...process.env,
-    NODE_ENV: "production",
-    NEXT_DIST_DIR: process.env.NEXT_DIST_DIR?.trim() || ".next-runtime"
+    NEXT_DIST_DIR: process.env.NEXT_DIST_DIR?.trim() || ".next"
   };
 
   for (const key of Object.keys(env)) {
@@ -63,16 +62,43 @@ function restoreManagedFiles(snapshots) {
 }
 
 const trackedSnapshots = repoManagedPaths.map(captureManagedFile);
-
-const child = spawn(process.execPath, [nextBin, "build", "--webpack"], {
+const child = spawn(process.execPath, [nextBin, "dev", ...process.argv.slice(2)], {
   cwd: repoRoot,
-  env: sanitizeBuildEnv(),
+  env: sanitizeDevEnv(),
   stdio: "inherit",
   shell: false
 });
+let restored = false;
+
+function restoreOnce() {
+  if (restored) {
+    return;
+  }
+
+  restored = true;
+  restoreManagedFiles(trackedSnapshots);
+}
+
+function stopChild(signal = "SIGTERM") {
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return;
+  }
+
+  try {
+    child.kill(signal);
+  } catch {}
+}
+
+for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
+  process.on(signal, () => {
+    stopChild(signal);
+    restoreOnce();
+    process.exit(0);
+  });
+}
 
 child.on("exit", (code, signal) => {
-  restoreManagedFiles(trackedSnapshots);
+  restoreOnce();
 
   if (signal) {
     process.kill(process.pid, signal);
@@ -83,7 +109,7 @@ child.on("exit", (code, signal) => {
 });
 
 child.on("error", (error) => {
-  restoreManagedFiles(trackedSnapshots);
+  restoreOnce();
   console.error(error);
   process.exit(1);
 });

@@ -60,6 +60,36 @@ type ConnectionNoticeState =
     }
   | null;
 
+type DockAppProps = {
+  apiBasePath?: string;
+};
+
+function normalizeApiBasePath(value?: string) {
+  const normalized = value?.trim();
+  if (!normalized || normalized === "/api") {
+    return "/api";
+  }
+
+  return normalized.replace(/\/+$/, "");
+}
+
+function buildApiUrl(apiBasePath: string, suffix: string) {
+  const normalizedSuffix = suffix.startsWith("/") ? suffix : `/${suffix}`;
+  if (apiBasePath === "/api") {
+    return `/api${normalizedSuffix}`;
+  }
+
+  return `${apiBasePath}${normalizedSuffix}`;
+}
+
+function resolveApiAssetUrl(apiBasePath: string, url: string) {
+  if (!url.startsWith("/api/")) {
+    return url;
+  }
+
+  return buildApiUrl(apiBasePath, url.slice("/api".length));
+}
+
 function getProjectName(cwd: string) {
   const parts = cwd.replace(/\\/g, "/").split("/");
   return parts[parts.length - 1] || cwd;
@@ -564,7 +594,7 @@ function updateItem(
   };
 }
 
-function getUploadAssetUrl(path: string) {
+function getUploadAssetUrl(path: string, apiBasePath = "/api") {
   const normalized = path.replace(/\\/g, "/");
   const markers = ["/.codexy/uploads/"];
 
@@ -580,7 +610,7 @@ function getUploadAssetUrl(path: string) {
       return null;
     }
 
-    return `/api/uploads/${encodeURIComponent(uploadId)}`;
+    return buildApiUrl(apiBasePath, `/uploads/${encodeURIComponent(uploadId)}`);
   }
 
   return null;
@@ -830,10 +860,11 @@ function stripInlineDataImageLines(text: string) {
 function getUserAttachmentPreview(
   entry: DockUserInput,
   key: string,
-  t: TranslateFn
+  t: TranslateFn,
+  apiBasePath: string
 ): AttachmentPreview | null {
   if (entry.type === "localImage") {
-    const src = getUploadAssetUrl(entry.path);
+    const src = getUploadAssetUrl(entry.path, apiBasePath);
 
     if (!src) {
       return null;
@@ -849,7 +880,7 @@ function getUserAttachmentPreview(
   if (entry.type === "image") {
     return {
       key,
-      src: entry.url,
+      src: resolveApiAssetUrl(apiBasePath, entry.url),
       label: getAttachmentLabelFromUrl(entry.url, t)
     };
   }
@@ -868,13 +899,13 @@ function getUserMetaChip(entry: DockUserInput, key: string): UserMetaChip | null
   return null;
 }
 
-function getThreadItemImageSource(value: string) {
+function getThreadItemImageSource(value: string, apiBasePath: string) {
   const normalized = value.trim();
   if (!normalized) {
     return null;
   }
 
-  const uploadAssetUrl = getUploadAssetUrl(normalized);
+  const uploadAssetUrl = getUploadAssetUrl(normalized, apiBasePath);
   if (uploadAssetUrl) {
     return uploadAssetUrl;
   }
@@ -884,7 +915,7 @@ function getThreadItemImageSource(value: string) {
     /^https?:\/\//i.test(normalized) ||
     /^\/api\/uploads\//i.test(normalized)
   ) {
-    return normalized;
+    return resolveApiAssetUrl(apiBasePath, normalized);
   }
 
   return null;
@@ -894,7 +925,8 @@ function getThreadItemImageLabel(
   container: Record<string, unknown> | null,
   sourceValue: string,
   resolvedSource: string,
-  t: TranslateFn
+  t: TranslateFn,
+  apiBasePath: string
 ) {
   if (container) {
     for (const key of ["label", "title", "caption", "alt", "name", "fileName", "filename"]) {
@@ -905,7 +937,7 @@ function getThreadItemImageLabel(
     }
   }
 
-  return getUploadAssetUrl(sourceValue)
+  return getUploadAssetUrl(sourceValue, apiBasePath)
     ? getAttachmentLabelFromPath(sourceValue, t)
     : getAttachmentLabelFromUrl(resolvedSource, t);
 }
@@ -916,9 +948,10 @@ function appendThreadItemImagePreview(
   itemId: string,
   sourceValue: string,
   container: Record<string, unknown> | null,
-  t: TranslateFn
+  t: TranslateFn,
+  apiBasePath: string
 ) {
-  const resolvedSource = getThreadItemImageSource(sourceValue);
+  const resolvedSource = getThreadItemImageSource(sourceValue, apiBasePath);
   if (!resolvedSource || seen.has(resolvedSource)) {
     return;
   }
@@ -927,7 +960,7 @@ function appendThreadItemImagePreview(
   previews.push({
     key: `${itemId}-image-${previews.length}`,
     src: resolvedSource,
-    label: getThreadItemImageLabel(container, sourceValue, resolvedSource, t)
+    label: getThreadItemImageLabel(container, sourceValue, resolvedSource, t, apiBasePath)
   });
 }
 
@@ -952,6 +985,7 @@ function collectThreadItemImagePreviews(
   seen: Set<string>,
   itemId: string,
   t: TranslateFn,
+  apiBasePath: string,
   depth = 0
 ) {
   if (!value || depth > 4) {
@@ -960,7 +994,7 @@ function collectThreadItemImagePreviews(
 
   if (Array.isArray(value)) {
     for (const entry of value) {
-      collectThreadItemImagePreviews(entry, previews, seen, itemId, t, depth + 1);
+      collectThreadItemImagePreviews(entry, previews, seen, itemId, t, apiBasePath, depth + 1);
     }
     return;
   }
@@ -985,7 +1019,7 @@ function collectThreadItemImagePreviews(
         normalizedKey === "filepath" ||
         normalizedKey === "file"
       ) {
-        appendThreadItemImagePreview(previews, seen, itemId, entry, value, t);
+        appendThreadItemImagePreview(previews, seen, itemId, entry, value, t, apiBasePath);
         continue;
       }
 
@@ -996,24 +1030,26 @@ function collectThreadItemImagePreviews(
           itemId,
           `data:${getThreadItemImageMimeType(value)};base64,${entry.trim()}`,
           value,
-          t
+          t,
+          apiBasePath
         );
       }
       continue;
     }
 
-    collectThreadItemImagePreviews(entry, previews, seen, itemId, t, depth + 1);
+    collectThreadItemImagePreviews(entry, previews, seen, itemId, t, apiBasePath, depth + 1);
   }
 }
 
 function getThreadItemImagePreviews(
   item: AssistantImageThreadItem,
-  t: TranslateFn
+  t: TranslateFn,
+  apiBasePath: string
 ) {
   const previews: AttachmentPreview[] = [];
   const seen = new Set<string>();
 
-  collectThreadItemImagePreviews(item, previews, seen, item.id, t);
+  collectThreadItemImagePreviews(item, previews, seen, item.id, t, apiBasePath);
 
   return previews;
 }
@@ -1096,14 +1132,16 @@ function ContextCompactionItemView() {
 }
 
 function UserMessageView({
-  item
+  item,
+  apiBasePath
 }: {
   item: Extract<DockThreadItem, { type: "userMessage" }>;
+  apiBasePath: string;
 }) {
   const { t } = useI18n();
   const attachments = item.content
     .map((entry, index) =>
-      getUserAttachmentPreview(entry, `${item.id}-attachment-${index}`, t)
+      getUserAttachmentPreview(entry, `${item.id}-attachment-${index}`, t, apiBasePath)
     )
     .filter((entry): entry is AttachmentPreview => Boolean(entry));
 
@@ -1366,12 +1404,14 @@ function PlanItemView({
 }
 
 function AssistantImageItemView({
-  item
+  item,
+  apiBasePath
 }: {
   item: AssistantImageThreadItem;
+  apiBasePath: string;
 }) {
   const { t } = useI18n();
-  const attachments = getThreadItemImagePreviews(item, t);
+  const attachments = getThreadItemImagePreviews(item, t, apiBasePath);
   const [activeAttachment, setActiveAttachment] = useState<AttachmentPreview | null>(
     null
   );
@@ -1412,13 +1452,20 @@ function AssistantImageItemView({
   );
 }
 
-function ThreadItemView({ item }: { item: DockThreadItem }) {
+function ThreadItemView({
+  item,
+  apiBasePath
+}: {
+  item: DockThreadItem;
+  apiBasePath: string;
+}) {
   const { t } = useI18n();
 
   if (item.type === "userMessage") {
     return (
       <UserMessageView
         item={item as Extract<DockThreadItem, { type: "userMessage" }>}
+        apiBasePath={apiBasePath}
       />
     );
   }
@@ -1498,6 +1545,7 @@ function ThreadItemView({ item }: { item: DockThreadItem }) {
     return (
       <AssistantImageItemView
         item={item as AssistantImageThreadItem}
+        apiBasePath={apiBasePath}
       />
     );
   }
@@ -1583,8 +1631,9 @@ function getCommandApprovalCwd(
   return fallbackCwd;
 }
 
-export function DockApp() {
+export function DockApp({ apiBasePath = "/api" }: DockAppProps) {
   const { t } = useI18n();
+  const resolvedApiBasePath = normalizeApiBasePath(apiBasePath);
   const [threads, setThreads] = useState<DockThread[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [selectedThread, setSelectedThread] = useState<DockThread | null>(null);
@@ -1643,7 +1692,7 @@ export function DockApp() {
     "";
 
   async function fetchJson<T>(url: string, init?: RequestInit) {
-    const response = await fetch(url, init);
+    const response = await fetch(buildApiUrl(resolvedApiBasePath, url), init);
     const data = (await response.json()) as T & { error?: string };
     if (!response.ok) {
       throw new Error(
@@ -1668,7 +1717,7 @@ export function DockApp() {
     );
 
     const data = await fetchJson<{ data: DockThread[] }>(
-      `/api/threads?${params.toString()}`
+      `/threads?${params.toString()}`
     );
     startTransition(() => {
       setThreads(data.data);
@@ -1717,7 +1766,7 @@ export function DockApp() {
       const requestPromise = (async () => {
         try {
           const data = await fetchJson<{ thread: DockThread }>(
-            `/api/threads/${threadId}`,
+            `/threads/${threadId}`,
             { signal: controller.signal }
           );
           if (selectedThreadIdRef.current !== threadId) {
@@ -2055,7 +2104,7 @@ export function DockApp() {
       setPendingRequests([]);
     });
 
-    void fetchJson<{ data: DockModel[] }>("/api/models")
+    void fetchJson<{ data: DockModel[] }>("/models")
       .then((result) => {
         if (cancelled) {
           return;
@@ -2083,7 +2132,7 @@ export function DockApp() {
         );
       });
 
-    void fetchJson<StatusPayload>("/api/status")
+    void fetchJson<StatusPayload>("/status")
       .then((result) => {
         if (cancelled) {
           return;
@@ -2162,7 +2211,7 @@ export function DockApp() {
   }, [selectedThread, t]);
 
   useEffect(() => {
-    const source = new EventSource("/api/events");
+    const source = new EventSource(buildApiUrl(resolvedApiBasePath, "/events"));
     const clearReconnectNoticeTimer = () => {
       if (reconnectNoticeTimerRef.current !== null) {
         window.clearTimeout(reconnectNoticeTimerRef.current);
@@ -2300,7 +2349,7 @@ export function DockApp() {
       if (selectedThreadId) {
         const attachmentPaths = attachments.map((attachment) => attachment.path);
         const data = await fetchJson<{ turn: DockTurn }>(
-          `/api/threads/${selectedThreadId}/turns`,
+          `/threads/${selectedThreadId}/turns`,
           {
             method: "POST",
             headers: {
@@ -2320,7 +2369,7 @@ export function DockApp() {
         );
       } else {
         const data = await fetchJson<{ thread: DockThread; turn: DockTurn }>(
-          "/api/threads",
+          "/threads",
           {
             method: "POST",
             headers: {
@@ -2382,7 +2431,7 @@ export function DockApp() {
     }
 
     try {
-      const data = await fetchJson<{ uploads: UploadItem[] }>("/api/uploads", {
+      const data = await fetchJson<{ uploads: UploadItem[] }>("/uploads", {
         method: "POST",
         body: formData
       });
@@ -2391,7 +2440,10 @@ export function DockApp() {
         ...current,
         ...data.uploads.map((upload, index) => ({
           ...upload,
-          previewUrl: files[index] ? URL.createObjectURL(files[index]) : upload.url
+          url: resolveApiAssetUrl(resolvedApiBasePath, upload.url),
+          previewUrl: files[index]
+            ? URL.createObjectURL(files[index])
+            : resolveApiAssetUrl(resolvedApiBasePath, upload.url)
         }))
       ]);
     } catch (cause) {
@@ -2415,7 +2467,7 @@ export function DockApp() {
     );
 
     try {
-      await fetchJson(`/api/requests/${request.requestId}`, {
+      await fetchJson(`/requests/${request.requestId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -2458,7 +2510,7 @@ export function DockApp() {
 
     try {
       const data = await fetchJson<{ thread: DockThread }>(
-        `/api/threads/${selectedThreadId}`,
+        `/threads/${selectedThreadId}`,
         {
           method: "PATCH",
           headers: {
@@ -2493,7 +2545,7 @@ export function DockApp() {
 
     try {
       const data = await fetchJson<{ thread: DockThread }>(
-        `/api/threads/${selectedThreadId}`,
+        `/threads/${selectedThreadId}`,
         {
           method: "PATCH",
           headers: {
@@ -2857,7 +2909,7 @@ export function DockApp() {
       onComposerReasoningEffortChange={setComposerReasoningEffort}
       onInterruptCurrentTurn={() => {
         if (!currentActiveTurn || !selectedThreadId) return;
-        void fetchJson(`/api/threads/${selectedThreadId}/interrupt`, {
+        void fetchJson(`/threads/${selectedThreadId}/interrupt`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
@@ -2924,7 +2976,9 @@ export function DockApp() {
       projects={projects}
       prompt={prompt}
       renamingThread={renamingThread}
-      renderThreadItem={(item) => <ThreadItemView item={item} />}
+      renderThreadItem={(item) => (
+        <ThreadItemView apiBasePath={resolvedApiBasePath} item={item} />
+      )}
       search={search}
       selectedThread={selectedThread}
       selectedThreadId={selectedThreadId}

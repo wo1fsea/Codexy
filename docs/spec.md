@@ -2,7 +2,7 @@
 
 ## Product Goal
 
-Codexy is a Tailscale-first web control plane for Codex on a host machine. It should feel visually close to Codex Desktop while remaining usable on desktop, iPad, and phone. The first working release must support:
+Codexy is a Tailscale-first web control plane for Codex on a host machine. The open-source app should also be able to run in a self-hosted cloud mode from the same `codexy` entrypoint. It should feel visually close to Codex Desktop while remaining usable on desktop, iPad, and phone. The first working release must support:
 
 - listing all threads across projects
 - opening any thread and reading full history
@@ -15,6 +15,7 @@ Codexy is a Tailscale-first web control plane for Codex on a host machine. It sh
 - approving command execution and file changes from the web UI
 - surfacing `request_user_input` prompts
 - warning when the web client is about to take over a thread that may already be active elsewhere
+- opening a linked node workspace from cloud mode without requiring the node to expose a directly reachable browser address
 
 The canonical UI contract lives in [visual-spec.md](./visual-spec.md). Product and engineering changes that affect presentation must follow that document.
 
@@ -40,6 +41,7 @@ The canonical UI contract lives in [visual-spec.md](./visual-spec.md). Product a
 - Talks to `codex app-server` over local WebSocket JSON-RPC.
 - Starts the bridge process automatically unless an external bridge URL is configured.
 - Uses Tailscale LocalAPI for host status and serve configuration. On platforms where LocalAPI is not directly reachable from Node, the host adapter may establish a local proxy first.
+- In self-hosted cloud mode, the browser-facing cloud API can proxy node API requests through an outbound node connector instead of relying on direct browser-to-node reachability.
 
 ### Codex Integration
 
@@ -74,6 +76,13 @@ codexy/
 ├─ src/
 │  ├─ app/
 │  │  ├─ api/
+│  │  │  ├─ cloud/connectors/poll/route.ts
+│  │  │  ├─ cloud/connectors/responses/route.ts
+│  │  │  ├─ cloud/connectors/streams/route.ts
+│  │  │  ├─ cloud/status/route.ts
+│  │  │  ├─ cloud/nodes/route.ts
+│  │  │  ├─ cloud/nodes/[nodeId]/route.ts
+│  │  │  ├─ cloud/nodes/[nodeId]/proxy/[...path]/route.ts
 │  │  │  ├─ events/route.ts
 │  │  │  ├─ models/route.ts
 │  │  │  ├─ requests/[requestId]/route.ts
@@ -86,15 +95,20 @@ codexy/
 │  │  │  └─ uploads/[uploadId]/route.ts
 │  │  ├─ globals.css
 │  │  ├─ layout.tsx
+│  │  ├─ nodes/[nodeId]/page.tsx
 │  │  └─ page.tsx
 │  ├─ components/
+│  │  ├─ cloud-app.tsx
 │  │  └─ dock-app.tsx
 │  └─ lib/
+│     ├─ cloud-registry.ts
+│     ├─ cloud-tunnel.ts
 │     ├─ codex/
 │     │  ├─ bridge.ts
 │     │  ├─ env.ts
 │     │  ├─ protocol.ts
 │     │  └─ types.ts
+│     ├─ runtime-mode.ts
 │     ├─ tailscale.ts
 │     └─ uploads.ts
 └─ public/
@@ -167,11 +181,13 @@ codexy/
 ## Deployment Model
 
 - Default local production runtime binds to `0.0.0.0:3000`.
+- Default self-hosted cloud runtime binds to `0.0.0.0:3400`.
 - Default local development runtime binds to `0.0.0.0:3001`.
 - Development mode must allow the machine's active non-loopback hosts plus Tailnet DNS names to reach Next dev assets and websocket endpoints, so remote `http://<tailscale-ip>:3001` access hydrates and interactive controls keep working.
 - On startup/status load, the server should best-effort ensure the node's LocalAPI serve config points the root `https://<node>.ts.net/` route at Codexy's local `127.0.0.1:3000` backend when no existing serve config is present.
 - Recommended remote access is the served HTTPS URL on the node's `.ts.net` name when serve is available, otherwise the direct Tailscale IP with `:3000`.
 - UI should prefer showing the actual served tailnet URL, otherwise the direct Tailscale IP with `:3000`, instead of a bare DNS name.
+- In cloud mode, Codexy should expose a self-hosted dashboard for linked nodes, keep node registration local to the deployment, and proxy node API access through an outbound connector when the node is not directly reachable from the browser.
 
 ## First Implementation Slice
 

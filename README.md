@@ -1,8 +1,11 @@
 # Codexy
 
-Codexy is a web control console for a Codex host. It provides thread lists, thread reading, continued conversations, image input, live output streaming, and approval handling.
+Codexy is a web control console for a Codex host. The open-source app now supports two runtime modes from the same `codexy` entrypoint:
 
-The runtime in this repository is built on Next.js and listens on `0.0.0.0:3000` by default. It is intended to run on the host machine and then be exposed to other devices through Tailscale.
+- node mode: the current local/Tailscale-first Codexy runtime for a host machine
+- cloud mode: a self-hosted single-user cloud entrypoint for registering linked nodes and opening their workspaces through an outbound connector
+
+The runtime in this repository is built on Next.js. Node mode listens on `0.0.0.0:3000` by default, and cloud mode listens on `0.0.0.0:3400` by default.
 
 ## Interface Preview
 
@@ -39,14 +42,27 @@ Current first-run command surface:
 - `codexy status`
 - `codexy logs`
 - `codexy open`
+- `codexy cloud start`
+- `codexy cloud stop`
+- `codexy cloud status`
+- `codexy cloud logs`
+- `codexy cloud open`
 - `codexy link <cloud-url>`
 - `codexy unlink`
+
+To start a local self-hosted cloud entrypoint:
+
+```bash
+codexy cloud start
+```
 
 To point a node at a self-hosted cloud entrypoint:
 
 ```bash
 codexy link https://cloud.example.com
 ```
+
+Start the linked node with `codexy start`, then open that node from the cloud dashboard. The node keeps a cloud connector open in the background, so the browser does not need a directly reachable node address.
 
 This writes local node configuration into the active Codexy home directory, which defaults to `~/.codexy` unless `CODEXY_HOME_DIR` is set.
 
@@ -137,7 +153,8 @@ start.cmd --port 3100
 
 ## Default Port Split
 
-- Production runtime: `3000`
+- Node runtime: `3000`
+- Cloud runtime: `3400`
 - Development runtime: `3001`
 - Direct entrypoints:
   - Windows: `build.cmd`, `dev.cmd`, `start.cmd`
