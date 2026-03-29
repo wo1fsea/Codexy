@@ -21,8 +21,6 @@ Usage:
   codexy status
   codexy logs
   codexy open
-
-Not yet implemented:
   codexy link <cloud-url>
   codexy unlink
 
@@ -72,11 +70,9 @@ switch (command) {
   case "status":
   case "logs":
   case "open":
-    delegate(command, args);
-    break;
   case "link":
   case "unlink":
-    fail("Self-hosted cloud linking is not implemented yet.");
+    delegate(command, args);
     break;
   default:
     fail(`Unknown command: ${command}\n\n${helpText()}`);

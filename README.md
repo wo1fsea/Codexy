@@ -39,6 +39,16 @@ Current first-run command surface:
 - `codexy status`
 - `codexy logs`
 - `codexy open`
+- `codexy link <cloud-url>`
+- `codexy unlink`
+
+To point a node at a self-hosted cloud entrypoint:
+
+```bash
+codexy link https://cloud.example.com
+```
+
+This writes local node configuration into the active Codexy home directory, which defaults to `~/.codexy` unless `CODEXY_HOME_DIR` is set.
 
 ## Install Dependencies
 

@@ -89,6 +89,8 @@ test("codexy help prints the first-run command surface", () => {
   assert.match(result.stdout, /codexy doctor/);
   assert.match(result.stdout, /codexy start/);
   assert.match(result.stdout, /codexy stop/);
+  assert.match(result.stdout, /codexy link <cloud-url>/);
+  assert.match(result.stdout, /codexy unlink/);
 });
 
 test("install.cmd creates a launcher that dispatches to the current checkout", { skip: process.platform !== "win32" }, () => {
@@ -227,6 +229,112 @@ test("codexy lifecycle commands can start, report, and stop the local service", 
 
     assert.notEqual(stoppedStatus.status, 0);
     assert.match(stoppedStatus.stdout + stoppedStatus.stderr, /Codexy is stopped/);
+  } finally {
+    runNodeCli(["stop"], {
+      env: {
+        CODEXY_HOME_DIR: codexyHome
+      },
+      timeout: 20_000
+    });
+    rmSync(codexyHome, { recursive: true, force: true });
+  }
+});
+
+test("codexy link and unlink manage the self-hosted cloud config", () => {
+  const codexyHome = makeTempDir("codexy-cloud-home-");
+
+  try {
+    const linkResult = runNodeCli(["link", "https://cloud.example.test/base/"], {
+      env: {
+        CODEXY_HOME_DIR: codexyHome
+      },
+      timeout: 10_000
+    });
+
+    assert.equal(linkResult.status, 0, linkResult.stdout + linkResult.stderr);
+    assert.match(linkResult.stdout, /Codexy linked to https:\/\/cloud\.example\.test\/base\./);
+    assert.match(linkResult.stdout, /Config:/);
+
+    const configPath = path.join(codexyHome, "config.json");
+    const config = JSON.parse(readFileSync(configPath, "utf8"));
+
+    assert.equal(config.cloud.url, "https://cloud.example.test/base");
+    assert.match(config.cloud.linkedAt, /^\d{4}-\d{2}-\d{2}T/);
+    assert.match(config.node.id, /^[0-9a-f-]{36}$/i);
+    assert.ok(config.node.name);
+
+    const statusResult = runNodeCli(["status"], {
+      env: {
+        CODEXY_HOME_DIR: codexyHome
+      },
+      timeout: 10_000
+    });
+
+    assert.notEqual(statusResult.status, 0);
+    assert.match(statusResult.stdout + statusResult.stderr, /Codexy is stopped/);
+    assert.match(statusResult.stdout + statusResult.stderr, /Cloud: linked to https:\/\/cloud\.example\.test\/base/);
+
+    const doctorResult = runNodeCli(["doctor"], {
+      env: {
+        CODEXY_HOME_DIR: codexyHome
+      },
+      timeout: 20_000
+    });
+
+    assert.match(doctorResult.stdout + doctorResult.stderr, /cloud: https:\/\/cloud\.example\.test\/base/i);
+
+    const unlinkResult = runNodeCli(["unlink"], {
+      env: {
+        CODEXY_HOME_DIR: codexyHome
+      },
+      timeout: 10_000
+    });
+
+    assert.equal(unlinkResult.status, 0, unlinkResult.stdout + unlinkResult.stderr);
+    assert.match(unlinkResult.stdout, /Codexy cloud link cleared/);
+
+    const configAfterUnlink = JSON.parse(readFileSync(configPath, "utf8"));
+    assert.equal(configAfterUnlink.cloud, undefined);
+    assert.equal(configAfterUnlink.node.id, config.node.id);
+  } finally {
+    rmSync(codexyHome, { recursive: true, force: true });
+  }
+});
+
+test("status API includes the current cloud link state", async () => {
+  const codexyHome = makeTempDir("codexy-cloud-status-home-");
+  const port = await getFreePort();
+
+  try {
+    const linkResult = runNodeCli(["link", "https://cloud.example.test"], {
+      env: {
+        CODEXY_HOME_DIR: codexyHome
+      },
+      timeout: 10_000
+    });
+
+    assert.equal(linkResult.status, 0, linkResult.stdout + linkResult.stderr);
+
+    const startResult = runNodeCli(["start", "--port", String(port)], {
+      env: {
+        CODEXY_HOME_DIR: codexyHome
+      },
+      timeout: 180_000
+    });
+
+    assert.equal(startResult.status, 0, startResult.stdout + startResult.stderr);
+
+    const response = await fetch(`http://127.0.0.1:${port}/api/status`, {
+      cache: "no-store"
+    });
+    assert.equal(response.status, 200);
+
+    const payload = await response.json();
+    assert.equal(payload.cloud.linked, true);
+    assert.equal(payload.cloud.url, "https://cloud.example.test");
+    assert.ok(payload.cloud.nodeId);
+    assert.ok(payload.cloud.nodeName);
+    assert.match(payload.cloud.configPath, /config\.json$/);
   } finally {
     runNodeCli(["stop"], {
       env: {

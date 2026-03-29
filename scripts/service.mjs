@@ -18,6 +18,12 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+import {
+  clearCloudLink,
+  getCloudLinkState,
+  writeCloudLink
+} from "./cloud-link.mjs";
+
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
 const runtimeKey = createHash("sha1").update(repoRoot).digest("hex").slice(0, 12);
@@ -242,6 +248,33 @@ function printCheck(kind, label, detail) {
   process.stdout.write("\n");
 }
 
+function printCloudState(prefix = "Cloud") {
+  const cloud = getCloudLinkState();
+  if (cloud.error) {
+    process.stdout.write(`${prefix}: invalid config (${cloud.error})\n`);
+    process.stdout.write(`Config: ${cloud.configPath}\n`);
+    return cloud;
+  }
+
+  if (!cloud.linked || !cloud.url) {
+    process.stdout.write(`${prefix}: not linked\n`);
+    process.stdout.write(`Config: ${cloud.configPath}\n`);
+    return cloud;
+  }
+
+  process.stdout.write(`${prefix}: linked to ${cloud.url}\n`);
+  if (cloud.nodeName || cloud.nodeId) {
+    process.stdout.write(
+      `Node: ${cloud.nodeName || "codexy-node"}${cloud.nodeId ? ` (${cloud.nodeId})` : ""}\n`
+    );
+  }
+  if (cloud.linkedAt) {
+    process.stdout.write(`Linked at: ${cloud.linkedAt}\n`);
+  }
+  process.stdout.write(`Config: ${cloud.configPath}\n`);
+  return cloud;
+}
+
 async function runDoctor() {
   let failures = 0;
 
@@ -277,6 +310,20 @@ async function runDoctor() {
     printCheck("ok", "tailscale", "available");
   } else {
     printCheck("warn", "tailscale", "not found on PATH");
+  }
+
+  const cloud = getCloudLinkState();
+  if (cloud.error) {
+    failures += 1;
+    printCheck("fail", "cloud", cloud.error);
+  } else if (cloud.linked && cloud.url) {
+    printCheck(
+      "ok",
+      "cloud",
+      `${cloud.url}${cloud.nodeId ? ` (${cloud.nodeId})` : ""}`
+    );
+  } else {
+    printCheck("warn", "cloud", "not linked to a self-hosted cloud");
   }
 
   const buildIdPath = path.join(repoRoot, ".next-runtime", "BUILD_ID");
@@ -425,6 +472,7 @@ async function runStatus() {
   if (!metadata?.pid || !isProcessRunning(metadata.pid)) {
     clearMetadata();
     process.stdout.write("Codexy is stopped.\n");
+    printCloudState();
     process.exit(1);
   }
 
@@ -434,6 +482,7 @@ async function runStatus() {
   process.stdout.write(`URL: ${serviceUrl(metadata.port)}\n`);
   process.stdout.write(`Health: ${health?.ok ? "ready" : "starting"}\n`);
   process.stdout.write(`Log file: ${metadata.logPath}\n`);
+  printCloudState();
 }
 
 function runLogs() {
@@ -474,6 +523,44 @@ async function runOpen() {
   process.stdout.write(`Opened ${serviceUrl(metadata.port)}.\n`);
 }
 
+function runLink(argv) {
+  const [rawUrl, ...rest] = argv;
+  if (rest.length) {
+    fail(`Unknown argument: ${rest[0]}`);
+  }
+
+  try {
+    const cloud = writeCloudLink(rawUrl);
+    process.stdout.write(`Codexy linked to ${cloud.url}.\n`);
+    if (cloud.nodeName || cloud.nodeId) {
+      process.stdout.write(
+        `Node: ${cloud.nodeName || "codexy-node"}${cloud.nodeId ? ` (${cloud.nodeId})` : ""}\n`
+      );
+    }
+    process.stdout.write(`Config: ${cloud.configPath}\n`);
+  } catch (error) {
+    fail(error instanceof Error ? error.message : "Failed to link Codexy to the self-hosted cloud.");
+  }
+}
+
+function runUnlink(argv) {
+  if (argv.length) {
+    fail(`Unknown argument: ${argv[0]}`);
+  }
+
+  try {
+    const cloud = clearCloudLink();
+    process.stdout.write("Codexy cloud link cleared.\n");
+    process.stdout.write(`Config: ${cloud.configPath}\n`);
+  } catch (error) {
+    fail(
+      error instanceof Error
+        ? error.message
+        : "Failed to clear the Codexy self-hosted cloud link."
+    );
+  }
+}
+
 const [command = "help", ...argv] = process.argv.slice(2);
 
 switch (command) {
@@ -481,7 +568,7 @@ switch (command) {
   case "--help":
   case "-h":
     process.stdout.write(
-      "Usage: node scripts/service.mjs <doctor|start|stop|status|logs|open> [--port 3000]\n"
+      "Usage: node scripts/service.mjs <doctor|start|stop|status|logs|open|link|unlink> [--port 3000]\n"
     );
     break;
   case "doctor":
@@ -501,6 +588,12 @@ switch (command) {
     break;
   case "open":
     await runOpen();
+    break;
+  case "link":
+    runLink(argv);
+    break;
+  case "unlink":
+    runUnlink(argv);
     break;
   default:
     fail(`Unknown service command: ${command}`);

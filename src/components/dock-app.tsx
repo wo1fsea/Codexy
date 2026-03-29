@@ -35,20 +35,7 @@ import type {
 } from "@/lib/codex/types";
 import { useI18n } from "@/lib/i18n/provider";
 import type { TranslateFn } from "@/lib/i18n/messages";
-import type { TailscaleSummary } from "@/lib/tailscale";
-
-type StatusPayload = {
-  bridge: {
-    connected: boolean;
-    pendingRequests: number;
-  };
-  tailscale: TailscaleSummary;
-  defaults: {
-    cwd: string;
-    approvalPolicy: string;
-    sandbox: string;
-  };
-};
+import type { StatusPayload } from "@/lib/status";
 
 type UploadItem = {
   id: string;

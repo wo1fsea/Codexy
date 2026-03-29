@@ -20,6 +20,15 @@ export const DEFAULT_STATUS = {
     serveHint: "tailscale serve --bg 3000",
     error: null
   },
+  cloud: {
+    linked: false,
+    url: null,
+    linkedAt: null,
+    nodeId: null,
+    nodeName: null,
+    configPath: "C:\\Users\\wo1fsea\\.codexy\\config.json",
+    error: null
+  },
   defaults: {
     cwd: DEFAULT_CWD,
     approvalPolicy: "on-request",
