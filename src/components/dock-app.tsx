@@ -25,6 +25,8 @@ import type {
   DockModel,
   DockPlanStep,
   DockPlanStepStatus,
+  DockPermissionPreset,
+  DockSandboxMode,
   DockServerRequest,
   DockThread,
   DockThreadItem,
@@ -648,6 +650,37 @@ function formatCommandDuration(durationMs: number | null) {
 
   const seconds = Math.round((durationMs / 1000) * 10) / 10;
   return Number.isInteger(seconds) ? `${seconds}s` : `${seconds.toFixed(1)}s`;
+}
+
+function getPermissionPresetConfig(preset: DockPermissionPreset): {
+  approvalPolicy: DockApprovalPolicy;
+  sandbox: DockSandboxMode;
+} {
+  if (preset === "danger-full-access") {
+    return {
+      approvalPolicy: "never",
+      sandbox: "danger-full-access"
+    };
+  }
+
+  return {
+    approvalPolicy: "on-request",
+    sandbox: "workspace-write"
+  };
+}
+
+function getPermissionPresetFromSettings(
+  approvalPolicy: string,
+  sandbox: string
+): DockPermissionPreset {
+  if (
+    sandbox === "danger-full-access" ||
+    approvalPolicy === "never"
+  ) {
+    return "danger-full-access";
+  }
+
+  return "default";
 }
 
 function countDiffLines(unifiedDiff: string | null) {
@@ -1553,8 +1586,8 @@ export function DockApp() {
   const [composerCwd, setComposerCwd] = useState("");
   const [composerModel, setComposerModel] = useState("");
   const [composerReasoningEffort, setComposerReasoningEffort] = useState("");
-  const [composerApprovalPolicy, setComposerApprovalPolicy] =
-    useState<DockApprovalPolicy>("on-request");
+  const [composerPermissionPreset, setComposerPermissionPreset] =
+    useState<DockPermissionPreset>("default");
   const [prompt, setPrompt] = useState("");
   const [attachments, setAttachments] = useState<UploadItem[]>([]);
   const [pendingRequests, setPendingRequests] = useState<DockServerRequest[]>([]);
@@ -2049,8 +2082,11 @@ export function DockApp() {
         startTransition(() => {
           setStatus(result);
           setComposerCwd(result.defaults.cwd);
-          setComposerApprovalPolicy(
-            result.defaults.approvalPolicy as DockApprovalPolicy
+          setComposerPermissionPreset(
+            getPermissionPresetFromSettings(
+              result.defaults.approvalPolicy,
+              result.defaults.sandbox
+            )
           );
         });
       })
@@ -2238,12 +2274,16 @@ export function DockApp() {
     setError(null);
 
     try {
+      const permissionConfig = getPermissionPresetConfig(
+        composerPermissionPreset
+      );
       const payload = {
         prompt,
         cwd: composerCwd || status?.defaults.cwd || "",
         model: effectiveComposerModel || null,
         reasoningEffort: effectiveComposerReasoningEffort || null,
-        approvalPolicy: composerApprovalPolicy,
+        approvalPolicy: permissionConfig.approvalPolicy,
+        sandbox: permissionConfig.sandbox,
         attachmentPaths: attachments.map((attachment) => attachment.path)
       };
 
@@ -2787,9 +2827,9 @@ export function DockApp() {
       archiveFilter={archiveFilter}
       archivingThread={archivingThread}
       attachments={attachments}
-      composerApprovalPolicy={composerApprovalPolicy}
       composerCwd={composerCwd}
       composerModel={effectiveComposerModel}
+      composerPermissionPreset={composerPermissionPreset}
       composerReasoningEffort={effectiveComposerReasoningEffort}
       connectionNotice={connectionNoticeText}
       currentActiveTurn={currentActiveTurn}
@@ -2801,9 +2841,9 @@ export function DockApp() {
       onArchiveFilterChange={setArchiveFilter}
       onArchiveCancel={() => setArchiveConfirmOpen(false)}
       onArchiveConfirm={() => void toggleArchiveSelectedThread()}
-      onComposerApprovalPolicyChange={setComposerApprovalPolicy}
       onComposerCwdChange={setComposerCwd}
       onComposerModelChange={setComposerModel}
+      onComposerPermissionPresetChange={setComposerPermissionPreset}
       onComposerReasoningEffortChange={setComposerReasoningEffort}
       onInterruptCurrentTurn={() => {
         if (!currentActiveTurn || !selectedThreadId) return;

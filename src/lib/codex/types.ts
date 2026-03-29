@@ -9,6 +9,8 @@ export type DockSandboxMode =
   | "workspace-write"
   | "danger-full-access";
 
+export type DockPermissionPreset = "default" | "danger-full-access";
+
 export type DockPlanStepStatus = "pending" | "inProgress" | "completed";
 
 export type DockPlanStep = {

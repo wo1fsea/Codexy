@@ -10,6 +10,7 @@ Codexy is a Tailscale-first web control plane for Codex on a host machine. It sh
 - continuing an existing thread
 - sending prompts with image attachments
 - switching models before a turn
+- choosing a permission preset before a turn
 - streaming assistant output and command output live
 - approving command execution and file changes from the web UI
 - surfacing `request_user_input` prompts
@@ -133,7 +134,7 @@ codexy/
 
 ### New Thread
 
-1. User selects a project path and optional model.
+1. User selects a project path plus optional model and permission preset.
 2. UI uploads image files first, producing local host paths.
 3. Server calls `thread/start`.
 4. Server calls `turn/start` with text + `localImage` inputs.
@@ -144,8 +145,9 @@ codexy/
 1. User opens a thread.
 2. Server reads full thread detail via `thread/read`.
 3. Before a new turn, the bridge calls `thread/resume` if the thread is not already live in the current bridge session.
-4. Server calls `turn/start`.
-5. UI renders `item/started`, delta notifications, approval requests, then `item/completed` and `turn/completed`.
+4. Server maps the selected permission preset onto the underlying approval-policy and sandbox settings for the resumed thread / new turn so continued threads honor the current web control settings.
+5. Server calls `turn/start`.
+6. UI renders `item/started`, delta notifications, approval requests, then `item/completed` and `turn/completed`.
 
 ### Takeover Warning
 
@@ -161,8 +163,9 @@ codexy/
 
 ## Deployment Model
 
-- Local app binds to `0.0.0.0:3000`.
-- Development mode must allow the machine's active non-loopback hosts plus Tailnet DNS names to reach Next dev assets and websocket endpoints, so remote `http://<tailscale-ip>:3000` access hydrates and interactive controls keep working.
+- Default local production runtime binds to `0.0.0.0:3000`.
+- Default local development runtime binds to `0.0.0.0:3001`.
+- Development mode must allow the machine's active non-loopback hosts plus Tailnet DNS names to reach Next dev assets and websocket endpoints, so remote `http://<tailscale-ip>:3001` access hydrates and interactive controls keep working.
 - On startup/status load, the server should best-effort ensure the node's LocalAPI serve config points the root `https://<node>.ts.net/` route at Codexy's local `127.0.0.1:3000` backend when no existing serve config is present.
 - Recommended remote access is the served HTTPS URL on the node's `.ts.net` name when serve is available, otherwise the direct Tailscale IP with `:3000`.
 - UI should prefer showing the actual served tailnet URL, otherwise the direct Tailscale IP with `:3000`, instead of a bare DNS name.

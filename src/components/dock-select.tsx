@@ -176,12 +176,27 @@ export function DockSelect({
                     role="option"
                     type="button"
                   >
-                    <span className="dock-select-option-label">
-                      {option.label}
+                    <span className="dock-select-option-copy">
+                      <span className="dock-select-option-label">
+                        {option.label}
+                      </span>
+                      {option.description ? (
+                        <span className="dock-select-option-description">
+                          {option.description}
+                        </span>
+                      ) : null}
                     </span>
-                    {option.description ? (
-                      <span className="dock-select-option-description">
-                        {option.description}
+                    {isSelected ? (
+                      <span aria-hidden="true" className="dock-select-option-check">
+                        <svg fill="none" viewBox="0 0 16 16">
+                          <path
+                            d="m3.5 8.2 2.5 2.5 6-6"
+                            stroke="currentColor"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="1.7"
+                          />
+                        </svg>
                       </span>
                     ) : null}
                   </button>

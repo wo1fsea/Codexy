@@ -152,6 +152,7 @@ export async function POST(request: Request) {
       model?: string | null;
       reasoningEffort?: string | null;
       approvalPolicy?: "untrusted" | "on-failure" | "on-request" | "never";
+      sandbox?: "read-only" | "workspace-write" | "danger-full-access";
       attachmentPaths?: string[];
     };
 
@@ -169,6 +170,7 @@ export async function POST(request: Request) {
       model: body.model ?? null,
       reasoningEffort: body.reasoningEffort ?? null,
       approvalPolicy: body.approvalPolicy ?? "on-request",
+      sandbox: body.sandbox ?? "workspace-write",
       attachmentPaths: body.attachmentPaths ?? []
     });
 

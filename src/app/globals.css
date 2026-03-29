@@ -556,14 +556,23 @@ pre {
 }
 
 .dock-select-option {
-  display: grid;
-  gap: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   width: 100%;
   border: 0;
   border-radius: 7px;
   background: transparent;
   color: var(--text);
   padding: 7px 8px;
+  text-align: left;
+}
+
+.dock-select-option-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
   text-align: left;
 }
 
@@ -586,6 +595,21 @@ pre {
   color: var(--text-faint);
   font-size: var(--text-11);
   line-height: 1.35;
+}
+
+.dock-select-option-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: var(--text);
+  flex: 0 0 auto;
+}
+
+.dock-select-option-check svg {
+  width: 14px;
+  height: 14px;
 }
 
 .dock-sidebar-select {
@@ -962,6 +986,18 @@ pre {
   background: rgba(255, 247, 238, 0.05);
   box-shadow: none;
   color: var(--text);
+}
+
+.dock-status-select-shell.is-danger .dock-select-trigger {
+  color: #e2a35d;
+}
+
+.dock-status-select-shell.is-danger .dock-select-trigger:hover,
+.dock-status-select-shell.is-danger .dock-select-trigger:focus-visible,
+.dock-status-select-shell.is-danger.is-open .dock-select-trigger {
+  border-color: rgba(226, 163, 93, 0.28);
+  background: rgba(226, 163, 93, 0.08);
+  color: #f0b97d;
 }
 
 .dock-rename-strip {

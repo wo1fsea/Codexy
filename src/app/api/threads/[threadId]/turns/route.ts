@@ -18,6 +18,8 @@ export async function POST(request: Request, context: Params) {
       model?: string | null;
       reasoningEffort?: string | null;
       cwd?: string | null;
+      approvalPolicy?: "untrusted" | "on-failure" | "on-request" | "never";
+      sandbox?: "read-only" | "workspace-write" | "danger-full-access";
       attachmentPaths?: string[];
     };
 
@@ -35,6 +37,8 @@ export async function POST(request: Request, context: Params) {
       model: body.model ?? null,
       reasoningEffort: body.reasoningEffort ?? null,
       cwd: body.cwd ?? null,
+      approvalPolicy: body.approvalPolicy ?? null,
+      sandbox: body.sandbox ?? null,
       attachmentPaths: body.attachmentPaths ?? []
     });
 

@@ -18,6 +18,7 @@ import type {
   DockApprovalPolicy,
   DockBridgeEvent,
   DockModel,
+  DockSandboxMode,
   DockServerRequest,
   DockThread,
   DockUserInput,
@@ -333,6 +334,18 @@ function createPromptInput(
   return inputs;
 }
 
+function createSandboxPolicy(mode: DockSandboxMode) {
+  if (mode === "read-only") {
+    return { type: "readOnly" as const };
+  }
+
+  if (mode === "danger-full-access") {
+    return { type: "dangerFullAccess" as const };
+  }
+
+  return { type: "workspaceWrite" as const };
+}
+
 function extractThreadIdFromPayload(value: unknown): string | undefined {
   if (!value || typeof value !== "object") {
     return undefined;
@@ -569,6 +582,7 @@ class CodexBridge extends EventEmitter {
     model?: string | null;
     reasoningEffort?: string | null;
     approvalPolicy?: DockApprovalPolicy;
+    sandbox?: DockSandboxMode;
     attachmentPaths?: string[];
   }) {
     const threadResponse = await this.request<ThreadStartResponse>("thread/start", {
@@ -577,7 +591,7 @@ class CodexBridge extends EventEmitter {
       reasoningEffort: input.reasoningEffort ?? null,
       modelProvider: "openai",
       approvalPolicy: input.approvalPolicy ?? dockEnv.defaultApprovalPolicy,
-      sandbox: dockEnv.defaultSandboxMode,
+      sandbox: input.sandbox ?? dockEnv.defaultSandboxMode,
       experimentalRawEvents: true,
       persistExtendedHistory: true
     });
@@ -601,17 +615,23 @@ class CodexBridge extends EventEmitter {
     model?: string | null;
     reasoningEffort?: string | null;
     cwd?: string | null;
+    approvalPolicy?: DockApprovalPolicy | null;
+    sandbox?: DockSandboxMode | null;
     attachmentPaths?: string[];
   }) {
     await this.ensureThreadLoaded(input.threadId, {
       cwd: input.cwd ?? null,
       model: input.model ?? null,
-      reasoningEffort: input.reasoningEffort ?? null
+      reasoningEffort: input.reasoningEffort ?? null,
+      approvalPolicy: input.approvalPolicy ?? null,
+      sandbox: input.sandbox ?? null
     });
 
     return this.request<TurnStartResponse>("turn/start", {
       threadId: input.threadId,
       input: createPromptInput(input.prompt, input.attachmentPaths ?? []),
+      approvalPolicy: input.approvalPolicy ?? null,
+      sandboxPolicy: input.sandbox ? createSandboxPolicy(input.sandbox) : null,
       model: input.model ?? null,
       reasoningEffort: input.reasoningEffort ?? null,
       cwd: input.cwd ?? null
@@ -694,6 +714,8 @@ class CodexBridge extends EventEmitter {
       cwd?: string | null;
       model?: string | null;
       reasoningEffort?: string | null;
+      approvalPolicy?: DockApprovalPolicy | null;
+      sandbox?: DockSandboxMode | null;
     }
   ) {
     if (this.loadedThreads.has(threadId)) {
@@ -706,6 +728,8 @@ class CodexBridge extends EventEmitter {
         cwd: overrides?.cwd ?? null,
         model: overrides?.model ?? null,
         reasoningEffort: overrides?.reasoningEffort ?? null,
+        approvalPolicy: overrides?.approvalPolicy ?? null,
+        sandbox: overrides?.sandbox ?? null,
         experimentalRawEvents: true,
         persistExtendedHistory: true
       });
@@ -715,6 +739,8 @@ class CodexBridge extends EventEmitter {
         cwd: overrides?.cwd ?? null,
         model: overrides?.model ?? null,
         reasoningEffort: overrides?.reasoningEffort ?? null,
+        approvalPolicy: overrides?.approvalPolicy ?? null,
+        sandbox: overrides?.sandbox ?? null,
         persistExtendedHistory: true
       });
     }

@@ -47,6 +47,19 @@ async function pasteImageIntoComposer(page: Page, fileName: string) {
   );
 }
 
+async function chooseSelectOption(
+  page: Page,
+  ariaLabel: string,
+  optionLabel: string
+) {
+  await page.getByRole("button", { name: ariaLabel }).click();
+  await page.getByRole("option", { name: optionLabel }).click();
+}
+
+async function choosePermissionPreset(page: Page, optionLabel: string) {
+  await chooseSelectOption(page, "Permission mode", optionLabel);
+}
+
 test("sending a prompt enters transcript context immediately", async ({ page }) => {
   await installDockApiMock(page);
 
@@ -209,6 +222,81 @@ test("pasting an image into composer creates an attachment chip", async ({ page 
   await pasteImageIntoComposer(page, "clipboard-image.png");
 
   await expect(page.locator(".dock-upload-chip")).toContainText("clipboard-image.png");
+});
+
+test("new thread sends the full access permission preset", async ({
+  page
+}) => {
+  await installDockApiMock(page);
+  await gotoDock(page);
+
+  await choosePermissionPreset(page, "Full access permission");
+  await page.locator("textarea.dock-composer-input").fill("permission wiring");
+
+  const requestPromise = page.waitForRequest((request) => {
+    const url = new URL(request.url());
+    return url.pathname === "/api/threads" && request.method() === "POST";
+  });
+
+  await page.locator("button.dock-send-button").click();
+
+  const request = await requestPromise;
+  expect(request.postDataJSON()).toMatchObject({
+    prompt: "permission wiring",
+    approvalPolicy: "never",
+    sandbox: "danger-full-access"
+  });
+});
+
+test("existing thread sends the default permission preset mapping", async ({
+  page
+}) => {
+  await installDockApiMock(page, {
+    threads: [
+      {
+        id: "thread-permission-controls",
+        preview: "permission controls",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000100,
+        updatedAt: 1774000200,
+        status: { type: "idle" },
+        path: null,
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "session",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: "permission controls",
+        turns: []
+      }
+    ]
+  });
+
+  await gotoDock(page);
+  await page.getByRole("button", { name: /permission controls/i }).click();
+  await expect(page.locator(".dock-stage-title")).toContainText("permission controls");
+
+  await choosePermissionPreset(page, "Default permission");
+  await page.locator("textarea.dock-composer-input").fill("continue permissions");
+
+  const requestPromise = page.waitForRequest((request) => {
+    const url = new URL(request.url());
+    return (
+      url.pathname === "/api/threads/thread-permission-controls/turns" &&
+      request.method() === "POST"
+    );
+  });
+
+  await page.locator("button.dock-send-button").click();
+
+  const request = await requestPromise;
+  expect(request.postDataJSON()).toMatchObject({
+    prompt: "continue permissions",
+    approvalPolicy: "on-request",
+    sandbox: "workspace-write"
+  });
 });
 
 test("image attachments render as thumbnails without raw data urls", async ({ page }) => {

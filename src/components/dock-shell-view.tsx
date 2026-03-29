@@ -13,8 +13,8 @@ import {
 import { AppIcon, SIDEBAR_ITEMS } from "@/components/dock-icons";
 import { DockSelect, type DockSelectOption } from "@/components/dock-select";
 import type {
-  DockApprovalPolicy,
   DockModel,
+  DockPermissionPreset,
   DockServerRequest,
   DockThread,
   DockThreadItem,
@@ -66,9 +66,9 @@ type DockShellViewProps = {
   archiveFilter: ArchiveFilter;
   archivingThread: boolean;
   attachments: UploadItem[];
-  composerApprovalPolicy: DockApprovalPolicy;
   composerCwd: string;
   composerModel: string;
+  composerPermissionPreset: DockPermissionPreset;
   composerReasoningEffort: string;
   connectionNotice: string | null;
   currentActiveTurn: DockTurn | null;
@@ -94,9 +94,9 @@ type DockShellViewProps = {
   onArchiveFilterChange: (value: ArchiveFilter) => void;
   onArchiveCancel: () => void;
   onArchiveConfirm: () => void;
-  onComposerApprovalPolicyChange: (value: DockApprovalPolicy) => void;
   onComposerCwdChange: (value: string) => void;
   onComposerModelChange: (value: string) => void;
+  onComposerPermissionPresetChange: (value: DockPermissionPreset) => void;
   onComposerReasoningEffortChange: (value: string) => void;
   onInterruptCurrentTurn: () => void;
   onNewThread: () => void;
@@ -346,11 +346,12 @@ export function DockShellView(props: DockShellViewProps) {
     { value: "archived", label: t("filters.archived") },
     { value: "all", label: t("filters.all") }
   ];
-  const approvalPolicyOptions: DockSelectOption[] = [
-    { value: "on-request", label: t("policies.on-request") },
-    { value: "untrusted", label: t("policies.untrusted") },
-    { value: "on-failure", label: t("policies.on-failure") },
-    { value: "never", label: t("policies.never") }
+  const permissionPresetOptions: DockSelectOption[] = [
+    { value: "default", label: t("permissions.default") },
+    {
+      value: "danger-full-access",
+      label: t("permissions.danger-full-access")
+    }
   ];
   const projectOptions: DockSelectOption[] = [
     { value: "all", label: t("filters.allProjects") },
@@ -1168,15 +1169,21 @@ export function DockShellView(props: DockShellViewProps) {
               <div className="dock-status-footer">
                 <div className="dock-status-group">
                   <DockSelect
-                    ariaLabel={t("aria.approvalPolicy")}
-                    className="dock-status-select-shell"
+                    ariaLabel={t("aria.permissionPreset")}
+                    className={clsx(
+                      "dock-status-select-shell",
+                      props.composerPermissionPreset === "danger-full-access" &&
+                        "is-danger"
+                    )}
                     onChange={(value) =>
-                      props.onComposerApprovalPolicyChange(value as DockApprovalPolicy)
+                      props.onComposerPermissionPresetChange(
+                        value as DockPermissionPreset
+                      )
                     }
-                    options={approvalPolicyOptions}
+                    options={permissionPresetOptions}
                     placement="top"
                     prefix={<AppIcon className="dock-inline-icon" name="security" />}
-                    value={props.composerApprovalPolicy}
+                    value={props.composerPermissionPreset}
                   />
                 </div>
                 <div className="dock-status-group">

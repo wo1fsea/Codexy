@@ -2,6 +2,9 @@ import { defineConfig } from "@playwright/test";
 
 const playwrightWebPort = Number(process.env.PLAYWRIGHT_WEB_PORT ?? "3100");
 const playwrightBaseUrl = `http://127.0.0.1:${playwrightWebPort}`;
+const shouldReuseExistingServer =
+  process.env.CI !== "true" &&
+  process.env.PLAYWRIGHT_REUSE_EXISTING_SERVER !== "false";
 
 export default defineConfig({
   testDir: "./tests",
@@ -17,7 +20,7 @@ export default defineConfig({
   webServer: {
     command: `npx next dev --hostname 127.0.0.1 --port ${playwrightWebPort}`,
     url: playwrightBaseUrl,
-    reuseExistingServer: false,
+    reuseExistingServer: shouldReuseExistingServer,
     timeout: 120_000
   }
 });
