@@ -166,10 +166,15 @@ The product should not rely on only `primary / muted / soft`. It needs a stable 
 - Prefer one time representation per row. Do not show duplicated timestamp formats in the same compact row.
 - Row-level archive controls live in the thread row instead of the stage header.
 - Live rows keep the archive control hidden until hover or focus.
-- Thread-row archive actions align to the right edge of the second metadata line rather than floating beside both rows.
+- Compact thread rows reserve the right column for metadata: timestamp on the first line, archive action on the second line, both right-aligned inside the card.
+- Use terse locale-appropriate compact timestamps in sidebar rows, such as `3h` in English or `3小时` in Simplified Chinese, rather than longer relative prose.
+- Keep that right column visually narrow in the resting state; do not reserve a broad gutter just to accommodate the transient confirm pill.
+- The archive control sits inside the thread card chrome, aligned to the right edge of the second metadata line.
+- At rest the control is an icon-only affordance; hover should reveal a custom dark tooltip bubble to the right of the control rather than the browser's default title popup, and that tooltip should float above the sidebar-stage split instead of being clipped by it.
 - Archived rows are visually distinct, keep the same row-action control persistently visible, and do not act as transcript-navigation targets.
 - The row action itself carries archived state. Do not add a second archived badge beside it.
-- The first press enters an inline confirm state in place; do not open a separate confirmation popover.
+- The first press enters an inline red confirm pill in place; leaving that confirm control cancels it. Keep the pill borderless, visually tight, driven mainly by its fill color, and use a distinctly darker red label than the fill. Do not open a separate confirmation popover.
+- Entering the inline confirm state should not cause the compact row to resize, change height, or visibly jerk.
 
 ### Stage Header
 

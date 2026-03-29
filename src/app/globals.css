@@ -713,34 +713,43 @@ pre {
 }
 
 .dock-thread-row-shell {
+  --dock-thread-row-side-width: max(36px, 4ch);
+  --dock-thread-row-meta-height: 20px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) var(--dock-thread-row-side-width);
   grid-template-rows: auto auto;
   align-items: center;
-  column-gap: 8px;
-}
-
-.dock-thread-row {
-  display: grid;
-  gap: 3px;
+  column-gap: 6px;
+  row-gap: 3px;
   width: 100%;
-  grid-column: 1;
-  grid-row: 1 / 3;
   border: 1px solid transparent;
   border-radius: 10px;
   background: transparent;
   padding: 7px 9px;
+  min-width: 0;
+}
+
+.dock-thread-row {
+  display: grid;
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  gap: 3px;
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
   color: inherit;
   text-align: left;
   justify-self: stretch;
 }
 
-.dock-thread-row.is-selected {
+.dock-thread-row-shell.is-selected {
   background: rgba(255, 247, 238, 0.06);
   border-color: var(--line);
 }
 
-.dock-thread-row.is-archived {
+.dock-thread-row-shell.is-archived {
   background: rgba(255, 247, 238, 0.025);
   border-color: rgba(255, 247, 238, 0.06);
 }
@@ -750,15 +759,14 @@ pre {
   opacity: 1;
 }
 
-.dock-thread-row-head,
-.dock-thread-row-meta {
+.dock-thread-row-title,
+.dock-thread-row-status,
+.dock-thread-row-time {
   min-width: 0;
 }
 
-.dock-thread-row strong {
+.dock-thread-row-title {
   display: block;
-  min-width: 0;
-  flex: 1 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -771,47 +779,116 @@ pre {
   margin: 0;
 }
 
-.dock-thread-row-head span {
-  flex: none;
+.dock-thread-row-status,
+.dock-thread-row-time {
+  color: var(--text-soft);
+  font-size: var(--text-11);
+}
+
+.dock-thread-row-status {
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.dock-thread-row-head span,
-.dock-thread-row-meta {
-  color: var(--text-soft);
-  font-size: var(--text-11);
+.dock-thread-row-time {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: 100%;
+  min-height: var(--dock-thread-row-meta-height);
+  justify-self: end;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+  white-space: nowrap;
+  line-height: 1;
 }
 
 .dock-thread-row-action-shell {
   grid-column: 2;
   grid-row: 2;
   display: inline-flex;
+  position: relative;
   align-items: center;
+  justify-content: flex-end;
   justify-self: end;
-  align-self: center;
-  margin-right: 8px;
+  width: 100%;
+  min-height: var(--dock-thread-row-meta-height);
+  overflow: visible;
 }
 
 .dock-thread-row-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  margin-left: auto;
   opacity: 0;
   pointer-events: none;
   border: 0;
   background: transparent;
+  min-height: var(--dock-thread-row-meta-height);
   padding: 0;
   color: var(--text-faint);
+  border-radius: 999px;
   transform: translateY(1px);
   transition:
     opacity 160ms ease,
     transform 160ms ease,
-    color 160ms ease;
+    background 160ms ease,
+    padding 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .dock-thread-row-action-text {
-  min-height: 18px;
+  min-height: var(--dock-thread-row-meta-height);
+  padding: 0 6px;
   font-size: var(--text-11);
-  font-weight: 500;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.dock-thread-row-action-icon {
+  width: 18px;
+  height: var(--dock-thread-row-meta-height);
+  padding: 0;
+}
+
+.dock-thread-row-action-icon .dock-inline-icon {
+  width: 15px;
+  height: 15px;
+}
+
+.dock-thread-row-action-tooltip {
+  position: fixed;
+  left: 0;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 247, 238, 0.12);
+  border-radius: 999px;
+  background: rgba(38, 32, 33, 0.96);
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: var(--text-11);
+  font-weight: 600;
   line-height: 1;
   white-space: nowrap;
+  pointer-events: none;
+  transform: translate(0, -50%);
+  transform-origin: 0 50%;
+  z-index: 1500;
 }
 
 .dock-thread-row-shell:hover .dock-thread-row-action,
@@ -833,7 +910,15 @@ pre {
 }
 
 .dock-thread-row-action.is-confirming {
-  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, rgba(82, 58, 61, 0.95));
+  box-shadow: none;
+  color: color-mix(in srgb, var(--danger) 74%, black 26%);
+}
+
+.dock-thread-row-shell:hover .dock-thread-row-action.is-confirming,
+.dock-thread-row-shell:focus-within .dock-thread-row-action.is-confirming,
+.dock-thread-row-shell.is-confirm-open .dock-thread-row-action.is-confirming {
+  color: color-mix(in srgb, var(--danger) 74%, black 26%);
 }
 
 .dock-thread-row-action.is-busy {

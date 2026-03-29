@@ -10,6 +10,7 @@ import {
   type KeyboardEvent,
   type ReactNode
 } from "react";
+import { createPortal } from "react-dom";
 
 import { AppIcon, SIDEBAR_ITEMS } from "@/components/dock-icons";
 import { DockSelect, type DockSelectOption } from "@/components/dock-select";
@@ -55,6 +56,11 @@ type ThreadGroup = {
   name: string;
   items: DockThread[];
   updatedAt: number;
+};
+
+type ArchiveTooltipState = {
+  label: string;
+  style: CSSProperties;
 };
 
 type TranscriptEntry =
@@ -104,6 +110,7 @@ type DockShellViewProps = {
   threadNameDraft: string;
   workspaceLabel: string;
   onArchiveFilterChange: (value: ArchiveFilter) => void;
+  onArchiveCancel: () => void;
   onArchiveConfirm: (threadId: string) => void;
   onComposerCwdChange: (value: string) => void;
   onComposerModelChange: (value: string) => void;
@@ -230,20 +237,17 @@ function getArchiveButtonLabel(
   return archived ? t("actions.unarchive") : t("actions.archive");
 }
 
-function getArchiveButtonTitle(
+function getArchiveButtonTooltip(
   archived: boolean,
-  confirming: boolean,
   t: TranslateFn
 ) {
-  if (confirming) {
-    return archived
-      ? t("archive.confirmUnarchiveTitle")
-      : t("archive.confirmArchiveTitle");
-  }
-
   return archived
-    ? t("archive.confirmUnarchiveBody")
-    : t("archive.confirmArchiveBody");
+    ? t("archive.tooltipUnarchive")
+    : t("archive.tooltipArchive");
+}
+
+function shouldShowArchiveButtonText(confirming: boolean, busy: boolean) {
+  return confirming || busy;
 }
 
 function isSidebarArchivedThread(
@@ -437,7 +441,7 @@ function getLatestPlanItem(
 
 export function DockShellView(props: DockShellViewProps) {
   const {
-    formatRelativeTime,
+    formatSidebarTime,
     locale,
     localeOptions,
     setLocale,
@@ -450,6 +454,10 @@ export function DockShellView(props: DockShellViewProps) {
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [archiveTooltip, setArchiveTooltip] = useState<ArchiveTooltipState | null>(
+    null
+  );
   const resizeStateRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const stageScrollRef = useRef<HTMLElement | null>(null);
   const stageScrollBodyRef = useRef<HTMLDivElement | null>(null);
@@ -557,6 +565,10 @@ export function DockShellView(props: DockShellViewProps) {
   }
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
     const savedWidth = window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
     if (!savedWidth) {
       return;
@@ -608,6 +620,24 @@ export function DockShellView(props: DockShellViewProps) {
       };
     });
   }, [props.selectedThread]);
+
+  useEffect(() => {
+    if (!archiveTooltip) {
+      return;
+    }
+
+    function clearTooltip() {
+      setArchiveTooltip(null);
+    }
+
+    window.addEventListener("resize", clearTooltip);
+    window.addEventListener("scroll", clearTooltip, true);
+
+    return () => {
+      window.removeEventListener("resize", clearTooltip);
+      window.removeEventListener("scroll", clearTooltip, true);
+    };
+  }, [archiveTooltip]);
 
   useEffect(() => {
     let frameId: number | null = null;
@@ -799,6 +829,21 @@ export function DockShellView(props: DockShellViewProps) {
     "--dock-sidebar-width": `${sidebarWidth}px`
   } as CSSProperties;
 
+  function showArchiveTooltip(target: HTMLButtonElement, label: string) {
+    const rect = target.getBoundingClientRect();
+    setArchiveTooltip({
+      label,
+      style: {
+        left: rect.right + 8,
+        top: rect.top + rect.height / 2
+      }
+    });
+  }
+
+  function hideArchiveTooltip() {
+    setArchiveTooltip(null);
+  }
+
   return (
     <div className="dock-app">
       <div
@@ -940,60 +985,106 @@ export function DockShellView(props: DockShellViewProps) {
                             archiveConfirmOpen,
                             t
                           );
-                          const archiveButtonTitle = getArchiveButtonTitle(
+                          const archiveButtonTooltip = getArchiveButtonTooltip(
                             threadArchived,
-                            archiveConfirmOpen,
                             t
                           );
+                          const archiveButtonShowsText =
+                            shouldShowArchiveButtonText(
+                              archiveConfirmOpen,
+                              archivingThread
+                            );
 
                           return (
                             <div
                               className={clsx(
                                 "dock-thread-row-shell",
+                                !threadArchived &&
+                                  props.selectedThreadId === thread.id &&
+                                  "is-selected",
                                 threadArchived && "is-archived",
                                 archiveConfirmOpen && "is-confirm-open"
                               )}
                               key={thread.id}
                             >
                               <button
-                                className={clsx(
-                                  "dock-thread-row",
-                                  !threadArchived &&
-                                    props.selectedThreadId === thread.id &&
-                                    "is-selected",
-                                  threadArchived && "is-archived"
-                                )}
+                                className="dock-thread-row"
                                 disabled={threadArchived}
                                 onClick={() => props.onSelectThread(thread)}
                                 type="button"
                               >
-                                <div className="dock-thread-row-head">
-                                  <strong>{getThreadLabel(thread, t)}</strong>
-                                  <span>{formatRelativeTime(thread.updatedAt)}</span>
-                                </div>
-                                <div className="dock-thread-row-meta">
-                                  <span>{getThreadStatusText(thread, t)}</span>
-                                </div>
+                                <strong className="dock-thread-row-title">
+                                  {getThreadLabel(thread, t)}
+                                </strong>
+                                <span className="dock-thread-row-status">
+                                  {getThreadStatusText(thread, t)}
+                                </span>
                               </button>
-                              <div className="dock-thread-row-action-shell">
+                              <span className="dock-thread-row-time">
+                                {formatSidebarTime(thread.updatedAt)}
+                              </span>
+                              <div
+                                className="dock-thread-row-action-shell"
+                              >
                                 <button
                                   className={clsx(
                                     "dock-thread-row-action",
-                                    "dock-thread-row-action-text",
+                                    archiveButtonShowsText &&
+                                      "dock-thread-row-action-text",
+                                    !archiveButtonShowsText &&
+                                      "dock-thread-row-action-icon",
                                     archiveConfirmOpen && "is-confirming",
                                     archivingThread && "is-busy",
                                     threadArchived && "is-persistent"
                                   )}
-                                  disabled={archivingThread}
-                                  onClick={() =>
-                                    archiveConfirmOpen
-                                      ? props.onArchiveConfirm(thread.id)
-                                      : props.onToggleArchive(thread.id)
+                                  aria-label={
+                                    archiveButtonShowsText
+                                      ? archiveButtonLabel
+                                      : archiveButtonTooltip
                                   }
-                                  title={archiveButtonTitle}
+                                  disabled={archivingThread}
+                                  onBlur={hideArchiveTooltip}
+                                  onClick={() => {
+                                    hideArchiveTooltip();
+                                    if (archiveConfirmOpen) {
+                                      props.onArchiveConfirm(thread.id);
+                                      return;
+                                    }
+
+                                    props.onToggleArchive(thread.id);
+                                  }}
+                                  onFocus={(event) => {
+                                    if (!archiveButtonShowsText) {
+                                      showArchiveTooltip(
+                                        event.currentTarget,
+                                        archiveButtonTooltip
+                                      );
+                                    }
+                                  }}
+                                  onPointerEnter={(event) => {
+                                    if (!archiveButtonShowsText) {
+                                      showArchiveTooltip(
+                                        event.currentTarget,
+                                        archiveButtonTooltip
+                                      );
+                                    }
+                                  }}
+                                  onPointerLeave={() => {
+                                    hideArchiveTooltip();
+                                    if (archiveConfirmOpen && !archivingThread) {
+                                      props.onArchiveCancel();
+                                    }
+                                  }}
                                   type="button"
                                 >
-                                  {archiveButtonLabel}
+                                  {archiveButtonShowsText ? (
+                                    archiveButtonLabel
+                                  ) : (
+                                    <AppIcon
+                                      className="dock-inline-icon"
+                                      name="archive"
+                                    />
+                                  )}
                                 </button>
                               </div>
                             </div>
@@ -1436,6 +1527,18 @@ export function DockShellView(props: DockShellViewProps) {
           </section>
         </main>
       </div>
+      {mounted && archiveTooltip
+        ? createPortal(
+            <span
+              aria-hidden="true"
+              className="dock-thread-row-action-tooltip"
+              style={archiveTooltip.style}
+            >
+              {archiveTooltip.label}
+            </span>,
+            document.body
+          )
+        : null}
     </div>
   );
 }

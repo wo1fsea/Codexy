@@ -728,8 +728,86 @@ test("archiving the current thread jumps back to new thread and removes it from 
 
   const threadRowShell = page.locator(".dock-thread-row-shell").first();
   await threadRowShell.hover();
-  const archiveButton = threadRowShell.locator("button.dock-thread-row-action-text");
-  await expect(archiveButton).toHaveText("Archive");
+  const threadTime = threadRowShell.locator(".dock-thread-row-time");
+  const actionShell = threadRowShell.locator(".dock-thread-row-action-shell");
+  const archiveButton = threadRowShell.locator("button.dock-thread-row-action");
+  const archiveTooltip = page.locator(".dock-thread-row-action-tooltip");
+  const [timeBox, actionShellBox, actionBox] = await Promise.all([
+    threadTime.boundingBox(),
+    actionShell.boundingBox(),
+    archiveButton.boundingBox()
+  ]);
+
+  expect(timeBox).not.toBeNull();
+  expect(actionShellBox).not.toBeNull();
+  expect(actionBox).not.toBeNull();
+  await expect(threadTime).toHaveText(/^\d+[mhdj]$/);
+  expect(actionShellBox!.width).toBeLessThanOrEqual(40);
+  expect(
+    Math.abs(
+      timeBox!.x + timeBox!.width - (actionBox!.x + actionBox!.width)
+    )
+  ).toBeLessThanOrEqual(1);
+  expect(actionBox!.y).toBeGreaterThan(timeBox!.y);
+  const rowBox = await threadRowShell.boundingBox();
+
+  expect(rowBox).not.toBeNull();
+  await archiveButton.hover();
+  await expect(archiveTooltip).toBeVisible();
+  await expect(archiveTooltip).toHaveText("Archive thread");
+  await archiveButton.click();
+  await expect(archiveButton).toHaveText("Confirm");
+  const [confirmRowBox, confirmTimeBox, confirmActionBox] = await Promise.all([
+    threadRowShell.boundingBox(),
+    threadTime.boundingBox(),
+    archiveButton.boundingBox()
+  ]);
+
+  expect(confirmRowBox).not.toBeNull();
+  expect(confirmTimeBox).not.toBeNull();
+  expect(confirmActionBox).not.toBeNull();
+  expect(Math.abs(confirmTimeBox!.x - timeBox!.x)).toBeLessThanOrEqual(6);
+  expect(
+    Math.abs(
+      confirmActionBox!.x +
+        confirmActionBox!.width -
+        (actionBox!.x + actionBox!.width)
+    )
+  ).toBeLessThanOrEqual(6);
+  const confirmButtonStyles = await archiveButton.evaluate((element) => {
+    const style = window.getComputedStyle(element);
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    if (context) {
+      context.fillStyle = style.color;
+    }
+    const normalizedColor =
+      context && typeof context.fillStyle === "string"
+        ? context.fillStyle
+        : String(style.color);
+    return {
+      borderTopWidth: style.borderTopWidth,
+      backgroundColor: style.backgroundColor,
+      color: normalizedColor
+    };
+  });
+  const confirmColorMatch = confirmButtonStyles.color.match(/[0-9a-f]{2}/gi);
+
+  expect(confirmButtonStyles.borderTopWidth).toBe("0px");
+  expect(confirmActionBox!.height).toBeLessThanOrEqual(22);
+  expect(Math.abs(confirmRowBox!.height - rowBox!.height)).toBeLessThanOrEqual(1);
+  expect(confirmButtonStyles.backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
+  expect(confirmColorMatch).not.toBeNull();
+  const [confirmRed, confirmGreen, confirmBlue] = confirmColorMatch!
+    .slice(0, 3)
+    .map((value: string) => Number.parseInt(value, 16));
+  expect(confirmRed - confirmGreen).toBeGreaterThanOrEqual(20);
+  expect(confirmRed - confirmBlue).toBeGreaterThanOrEqual(10);
+  await page.locator(".dock-thread-row").first().hover({ position: { x: 24, y: 12 } });
+  await expect(archiveButton).not.toHaveClass(/is-confirming/);
+  await expect(archiveTooltip).toBeHidden();
+
+  await threadRowShell.hover();
   await archiveButton.click();
   await expect(archiveButton).toHaveText("Confirm");
   await archiveButton.click();
@@ -773,16 +851,21 @@ test("archived rows stay unselectable and keep a persistent unarchive action", a
 
   const threadRow = page.locator(".dock-thread-row").first();
   const unarchiveButton = page
-    .locator("button.dock-thread-row-action-text.is-persistent")
+    .locator("button.dock-thread-row-action.is-persistent")
     .first();
+  const unarchiveTooltip = page.locator(".dock-thread-row-action-tooltip");
 
   await expect(threadRow).toBeDisabled();
   await expect(unarchiveButton).toBeVisible();
-  await expect(unarchiveButton).toHaveText("Unarchive");
   await expect(page.locator(".dock-thread-row-badge")).toHaveCount(0);
+  await unarchiveButton.hover();
+  await expect(unarchiveTooltip).toBeVisible();
+  await expect(unarchiveTooltip).toHaveText("Unarchive thread");
 
   await unarchiveButton.click();
   await expect(unarchiveButton).toHaveText("Confirm");
+  await page.locator(".dock-thread-row").first().hover({ position: { x: 24, y: 12 } });
+  await expect(unarchiveButton).not.toHaveClass(/is-confirming/);
 
   await expect(page.locator(".dock-stage-title")).toHaveText("New thread");
   await expect(page.locator(".dock-error")).toHaveCount(0);

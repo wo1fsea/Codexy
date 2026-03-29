@@ -71,6 +71,8 @@ const en = {
     "It will move out of the live list until you unarchive it.",
   "archive.confirmUnarchiveTitle": "Unarchive thread?",
   "archive.confirmUnarchiveBody": "It will return to the live list.",
+  "archive.tooltipArchive": "Archive thread",
+  "archive.tooltipUnarchive": "Unarchive thread",
   "takeover.detectedTitle": "This thread is active somewhere else.",
   "takeover.detectedBody":
     "Confirm to take over from the web and continue this session.",
@@ -171,7 +173,10 @@ const en = {
   "plan.summary": "{count} tasks, {completed} completed",
   "time.minutesAgo": "{count}m ago",
   "time.hoursAgo": "{count}h ago",
-  "time.daysAgo": "{count}d ago"
+  "time.daysAgo": "{count}d ago",
+  "time.minutesCompact": "{count}m",
+  "time.hoursCompact": "{count}h",
+  "time.daysCompact": "{count}d"
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -237,6 +242,8 @@ export const MESSAGES: Record<DockLocale, MessageCatalog> = {
     "archive.confirmArchiveBody": "归档后它会从进行中列表移走，直到你再次取消归档。",
     "archive.confirmUnarchiveTitle": "取消归档这个线程？",
     "archive.confirmUnarchiveBody": "取消归档后它会重新回到进行中列表。",
+    "archive.tooltipArchive": "归档线程",
+    "archive.tooltipUnarchive": "取消归档线程",
     "takeover.detectedTitle": "检测到这个 thread 正在其他端活跃。",
     "takeover.detectedBody": "确认后会从网页端接管并继续本轮会话。",
     "takeover.notice": "这个 thread 当前处于活动状态。你下一次发送会接管当前会话。",
@@ -328,7 +335,10 @@ export const MESSAGES: Record<DockLocale, MessageCatalog> = {
     "plan.summary": "共 {count} 个任务，已完成 {completed} 个",
     "time.minutesAgo": "{count} 分钟前",
     "time.hoursAgo": "{count} 小时前",
-    "time.daysAgo": "{count} 天前"
+    "time.daysAgo": "{count} 天前",
+    "time.minutesCompact": "{count}分钟",
+    "time.hoursCompact": "{count}小时",
+    "time.daysCompact": "{count}天"
   },
   ja: {
     "language.label": "言語",
@@ -386,6 +396,8 @@ export const MESSAGES: Record<DockLocale, MessageCatalog> = {
     "archive.confirmArchiveBody": "再表示するまでライブ一覧から外れます。",
     "archive.confirmUnarchiveTitle": "このスレッドをアーカイブ解除しますか？",
     "archive.confirmUnarchiveBody": "解除するとライブ一覧に戻ります。",
+    "archive.tooltipArchive": "スレッドをアーカイブ",
+    "archive.tooltipUnarchive": "アーカイブを解除",
     "takeover.detectedTitle": "このスレッドは別の場所でアクティブです。",
     "takeover.detectedBody":
       "Web から引き継いでこのセッションを続行するには確認してください。",
@@ -487,7 +499,10 @@ export const MESSAGES: Record<DockLocale, MessageCatalog> = {
     "plan.summary": "{count} 件のタスク、完了 {completed} 件",
     "time.minutesAgo": "{count} 分前",
     "time.hoursAgo": "{count} 時間前",
-    "time.daysAgo": "{count} 日前"
+    "time.daysAgo": "{count} 日前",
+    "time.minutesCompact": "{count}分",
+    "time.hoursCompact": "{count}時間",
+    "time.daysCompact": "{count}日"
   },
   es: {
     "language.label": "Idioma",
@@ -545,6 +560,8 @@ export const MESSAGES: Record<DockLocale, MessageCatalog> = {
     "archive.confirmArchiveBody": "Saldrá de la lista activa hasta que lo desarchives.",
     "archive.confirmUnarchiveTitle": "¿Desarchivar este hilo?",
     "archive.confirmUnarchiveBody": "Volverá a la lista activa.",
+    "archive.tooltipArchive": "Archivar hilo",
+    "archive.tooltipUnarchive": "Desarchivar hilo",
     "takeover.detectedTitle": "Este hilo está activo en otro lugar.",
     "takeover.detectedBody":
       "Confirma para tomar el control desde la web y continuar esta sesión.",
@@ -651,7 +668,10 @@ export const MESSAGES: Record<DockLocale, MessageCatalog> = {
     "plan.summary": "{count} tareas, {completed} completadas",
     "time.minutesAgo": "hace {count} min",
     "time.hoursAgo": "hace {count} h",
-    "time.daysAgo": "hace {count} d"
+    "time.daysAgo": "hace {count} d",
+    "time.minutesCompact": "{count}m",
+    "time.hoursCompact": "{count}h",
+    "time.daysCompact": "{count}d"
   },
   fr: {
     "language.label": "Langue",
@@ -710,6 +730,8 @@ export const MESSAGES: Record<DockLocale, MessageCatalog> = {
     "archive.confirmArchiveBody": "Il quittera la liste active jusqu’à ce que vous le désarchiviez.",
     "archive.confirmUnarchiveTitle": "Désarchiver ce fil ?",
     "archive.confirmUnarchiveBody": "Il reviendra dans la liste active.",
+    "archive.tooltipArchive": "Archiver le fil",
+    "archive.tooltipUnarchive": "Désarchiver le fil",
     "takeover.detectedTitle": "Ce fil est actif ailleurs.",
     "takeover.detectedBody":
       "Confirmez pour reprendre depuis le web et continuer cette session.",
@@ -819,7 +841,10 @@ export const MESSAGES: Record<DockLocale, MessageCatalog> = {
     "plan.summary": "{count} tâches, {completed} terminées",
     "time.minutesAgo": "il y a {count} min",
     "time.hoursAgo": "il y a {count} h",
-    "time.daysAgo": "il y a {count} j"
+    "time.daysAgo": "il y a {count} j",
+    "time.minutesCompact": "{count}m",
+    "time.hoursCompact": "{count}h",
+    "time.daysCompact": "{count}j"
   }
 };
 

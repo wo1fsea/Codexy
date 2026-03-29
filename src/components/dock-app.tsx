@@ -3011,48 +3011,49 @@ export function DockApp() {
 
     return (
       <DockShellView
-      archiveConfirmThreadId={archiveConfirmThreadId}
-      archiveFilter={archiveFilter}
-      archivingThreadId={archivingThreadId}
-      attachments={attachments}
-      composerCwd={composerCwd}
-      composerModel={effectiveComposerModel}
-      composerPermissionPreset={composerPermissionPreset}
-      composerReasoningEffort={effectiveComposerReasoningEffort}
-      connectionNotice={connectionNoticeText}
-      currentActiveTurn={currentActiveTurn}
-      currentRequests={currentRequests}
-      error={error}
-      groupedThreads={groupedThreads}
-      loadingThread={loadingThread}
-      models={models}
-      onArchiveFilterChange={(value) => {
-        setArchiveConfirmThreadId(null);
-        setArchiveFilter(value);
-      }}
-      onArchiveConfirm={(threadId) => void toggleArchiveThread(threadId)}
-      onComposerCwdChange={setComposerCwd}
-      onComposerModelChange={setComposerModel}
-      onComposerPermissionPresetChange={setComposerPermissionPreset}
-      onComposerReasoningEffortChange={setComposerReasoningEffort}
-      onInterruptCurrentTurn={() => {
-        if (!currentActiveTurn || !selectedThreadId) return;
-        void fetchJson(`/api/threads/${selectedThreadId}/interrupt`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            turnId: currentActiveTurn.id
-          })
-        }).catch((cause) =>
-          setError(
-            cause instanceof Error
-              ? localizeRuntimeMessage(cause.message, t)
-              : t("error.interruptFailed")
-          )
-        );
-      }}
+        archiveConfirmThreadId={archiveConfirmThreadId}
+        archiveFilter={archiveFilter}
+        archivingThreadId={archivingThreadId}
+        attachments={attachments}
+        composerCwd={composerCwd}
+        composerModel={effectiveComposerModel}
+        composerPermissionPreset={composerPermissionPreset}
+        composerReasoningEffort={effectiveComposerReasoningEffort}
+        connectionNotice={connectionNoticeText}
+        currentActiveTurn={currentActiveTurn}
+        currentRequests={currentRequests}
+        error={error}
+        groupedThreads={groupedThreads}
+        loadingThread={loadingThread}
+        models={models}
+        onArchiveFilterChange={(value) => {
+          setArchiveConfirmThreadId(null);
+          setArchiveFilter(value);
+        }}
+        onArchiveCancel={() => setArchiveConfirmThreadId(null)}
+        onArchiveConfirm={(threadId) => void toggleArchiveThread(threadId)}
+        onComposerCwdChange={setComposerCwd}
+        onComposerModelChange={setComposerModel}
+        onComposerPermissionPresetChange={setComposerPermissionPreset}
+        onComposerReasoningEffortChange={setComposerReasoningEffort}
+        onInterruptCurrentTurn={() => {
+          if (!currentActiveTurn || !selectedThreadId) return;
+          void fetchJson(`/api/threads/${selectedThreadId}/interrupt`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              turnId: currentActiveTurn.id
+            })
+          }).catch((cause) =>
+            setError(
+              cause instanceof Error
+                ? localizeRuntimeMessage(cause.message, t)
+                : t("error.interruptFailed")
+            )
+          );
+        }}
       onNewThread={handleNewThread}
       onOpenSidebar={() => setSidebarOpen(true)}
       onProjectFilterChange={setProjectFilter}
