@@ -128,6 +128,10 @@ function humanizeIdentifier(value: string) {
   return withSpaces.charAt(0).toUpperCase() + withSpaces.slice(1);
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
 function localizeRuntimeMessage(message: string, t: TranslateFn) {
   const normalized = message.trim();
 
@@ -593,10 +597,15 @@ function getUploadAssetUrl(path: string) {
   return null;
 }
 
-type UserAttachmentPreview = {
+type AttachmentPreview = {
   key: string;
   src: string;
   label: string;
+};
+
+type AssistantImageThreadItem = DockThreadItem & {
+  type: "imageView" | "imageGeneration";
+  id: string;
 };
 
 type UserMetaChip = {
@@ -802,7 +811,7 @@ function getUserAttachmentPreview(
   entry: DockUserInput,
   key: string,
   t: TranslateFn
-): UserAttachmentPreview | null {
+): AttachmentPreview | null {
   if (entry.type === "localImage") {
     const src = getUploadAssetUrl(entry.path);
 
@@ -839,6 +848,214 @@ function getUserMetaChip(entry: DockUserInput, key: string): UserMetaChip | null
   return null;
 }
 
+function getThreadItemImageSource(value: string) {
+  const normalized = value.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  const uploadAssetUrl = getUploadAssetUrl(normalized);
+  if (uploadAssetUrl) {
+    return uploadAssetUrl;
+  }
+
+  if (
+    /^data:image\//i.test(normalized) ||
+    /^https?:\/\//i.test(normalized) ||
+    /^\/api\/uploads\//i.test(normalized)
+  ) {
+    return normalized;
+  }
+
+  return null;
+}
+
+function getThreadItemImageLabel(
+  container: Record<string, unknown> | null,
+  sourceValue: string,
+  resolvedSource: string,
+  t: TranslateFn
+) {
+  if (container) {
+    for (const key of ["label", "title", "caption", "alt", "name", "fileName", "filename"]) {
+      const rawValue = container[key];
+      if (typeof rawValue === "string" && rawValue.trim()) {
+        return rawValue.trim();
+      }
+    }
+  }
+
+  return getUploadAssetUrl(sourceValue)
+    ? getAttachmentLabelFromPath(sourceValue, t)
+    : getAttachmentLabelFromUrl(resolvedSource, t);
+}
+
+function appendThreadItemImagePreview(
+  previews: AttachmentPreview[],
+  seen: Set<string>,
+  itemId: string,
+  sourceValue: string,
+  container: Record<string, unknown> | null,
+  t: TranslateFn
+) {
+  const resolvedSource = getThreadItemImageSource(sourceValue);
+  if (!resolvedSource || seen.has(resolvedSource)) {
+    return;
+  }
+
+  seen.add(resolvedSource);
+  previews.push({
+    key: `${itemId}-image-${previews.length}`,
+    src: resolvedSource,
+    label: getThreadItemImageLabel(container, sourceValue, resolvedSource, t)
+  });
+}
+
+function getThreadItemImageMimeType(container: Record<string, unknown> | null) {
+  if (!container) {
+    return "image/png";
+  }
+
+  for (const key of ["mimeType", "mime_type", "contentType", "content_type"]) {
+    const rawValue = container[key];
+    if (typeof rawValue === "string" && /^image\//i.test(rawValue.trim())) {
+      return rawValue.trim();
+    }
+  }
+
+  return "image/png";
+}
+
+function collectThreadItemImagePreviews(
+  value: unknown,
+  previews: AttachmentPreview[],
+  seen: Set<string>,
+  itemId: string,
+  t: TranslateFn,
+  depth = 0
+) {
+  if (!value || depth > 4) {
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      collectThreadItemImagePreviews(entry, previews, seen, itemId, t, depth + 1);
+    }
+    return;
+  }
+
+  if (!isRecord(value)) {
+    return;
+  }
+
+  for (const [key, entry] of Object.entries(value)) {
+    if (typeof entry === "string") {
+      const normalizedKey = key.replace(/[_-]/g, "").toLowerCase();
+
+      if (
+        normalizedKey === "url" ||
+        normalizedKey === "src" ||
+        normalizedKey === "uri" ||
+        normalizedKey === "href" ||
+        normalizedKey === "image" ||
+        normalizedKey === "imageurl" ||
+        normalizedKey === "imageuri" ||
+        normalizedKey === "path" ||
+        normalizedKey === "filepath" ||
+        normalizedKey === "file"
+      ) {
+        appendThreadItemImagePreview(previews, seen, itemId, entry, value, t);
+        continue;
+      }
+
+      if (normalizedKey === "b64json" && entry.trim()) {
+        appendThreadItemImagePreview(
+          previews,
+          seen,
+          itemId,
+          `data:${getThreadItemImageMimeType(value)};base64,${entry.trim()}`,
+          value,
+          t
+        );
+      }
+      continue;
+    }
+
+    collectThreadItemImagePreviews(entry, previews, seen, itemId, t, depth + 1);
+  }
+}
+
+function getThreadItemImagePreviews(
+  item: AssistantImageThreadItem,
+  t: TranslateFn
+) {
+  const previews: AttachmentPreview[] = [];
+  const seen = new Set<string>();
+
+  collectThreadItemImagePreviews(item, previews, seen, item.id, t);
+
+  return previews;
+}
+
+function AttachmentLightbox({
+  attachment,
+  onClose
+}: {
+  attachment: AttachmentPreview;
+  onClose: () => void;
+}) {
+  const { t } = useI18n();
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <div
+      aria-modal="true"
+      className="dock-lightbox"
+      onClick={onClose}
+      role="dialog"
+    >
+      <div
+        className="dock-lightbox-panel"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <button
+          className="dock-lightbox-close"
+          onClick={onClose}
+          type="button"
+        >
+          {t("actions.close")}
+        </button>
+        <img
+          alt={attachment.label}
+          className="dock-lightbox-image"
+          src={attachment.src}
+        />
+        <div className="dock-lightbox-caption">{attachment.label}</div>
+      </div>
+    </div>
+  );
+}
+
+function ArtifactItemView({ item }: { item: DockThreadItem }) {
+  return (
+    <div className="dock-artifact">
+      <div className="dock-artifact-head">{humanizeIdentifier(item.type)}</div>
+      <pre>{JSON.stringify(item, null, 2)}</pre>
+    </div>
+  );
+}
+
 function UserMessageView({
   item
 }: {
@@ -849,7 +1066,7 @@ function UserMessageView({
     .map((entry, index) =>
       getUserAttachmentPreview(entry, `${item.id}-attachment-${index}`, t)
     )
-    .filter((entry): entry is UserAttachmentPreview => Boolean(entry));
+    .filter((entry): entry is AttachmentPreview => Boolean(entry));
 
   const textEntries = item.content
     .filter(
@@ -865,23 +1082,9 @@ function UserMessageView({
     .map((entry, index) => getUserMetaChip(entry, `${item.id}-meta-${index}`))
     .filter((entry): entry is UserMetaChip => Boolean(entry));
 
-  const [activeAttachment, setActiveAttachment] =
-    useState<UserAttachmentPreview | null>(null);
-
-  useEffect(() => {
-    if (!activeAttachment) {
-      return;
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setActiveAttachment(null);
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeAttachment]);
+  const [activeAttachment, setActiveAttachment] = useState<AttachmentPreview | null>(
+    null
+  );
 
   return (
     <>
@@ -923,31 +1126,10 @@ function UserMessageView({
       </div>
 
       {activeAttachment ? (
-        <div
-          aria-modal="true"
-          className="dock-lightbox"
-          onClick={() => setActiveAttachment(null)}
-          role="dialog"
-        >
-          <div
-            className="dock-lightbox-panel"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <button
-              className="dock-lightbox-close"
-              onClick={() => setActiveAttachment(null)}
-              type="button"
-            >
-              {t("actions.close")}
-            </button>
-            <img
-              alt={activeAttachment.label}
-              className="dock-lightbox-image"
-              src={activeAttachment.src}
-            />
-            <div className="dock-lightbox-caption">{activeAttachment.label}</div>
-          </div>
-        </div>
+        <AttachmentLightbox
+          attachment={activeAttachment}
+          onClose={() => setActiveAttachment(null)}
+        />
       ) : null}
     </>
   );
@@ -1144,6 +1326,53 @@ function PlanItemView({
   );
 }
 
+function AssistantImageItemView({
+  item
+}: {
+  item: AssistantImageThreadItem;
+}) {
+  const { t } = useI18n();
+  const attachments = getThreadItemImagePreviews(item, t);
+  const [activeAttachment, setActiveAttachment] = useState<AttachmentPreview | null>(
+    null
+  );
+
+  if (!attachments.length) {
+    return <ArtifactItemView item={item} />;
+  }
+
+  return (
+    <>
+      <div className="dock-artifact dock-image-artifact">
+        <div className="dock-artifact-head">{humanizeIdentifier(item.type)}</div>
+        <div className="dock-assistant-image-grid">
+          {attachments.map((attachment) => (
+            <figure className="dock-assistant-image-card" key={attachment.key}>
+              <button
+                className="dock-assistant-image-button"
+                onClick={() => setActiveAttachment(attachment)}
+                type="button"
+              >
+                <img alt={attachment.label} src={attachment.src} />
+              </button>
+              <figcaption className="dock-assistant-image-caption">
+                {attachment.label}
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      </div>
+
+      {activeAttachment ? (
+        <AttachmentLightbox
+          attachment={activeAttachment}
+          onClose={() => setActiveAttachment(null)}
+        />
+      ) : null}
+    </>
+  );
+}
+
 function ThreadItemView({ item }: { item: DockThreadItem }) {
   const { t } = useI18n();
 
@@ -1226,12 +1455,15 @@ function ThreadItemView({ item }: { item: DockThreadItem }) {
     );
   }
 
-  return (
-    <div className="dock-artifact">
-      <div className="dock-artifact-head">{humanizeIdentifier(item.type)}</div>
-      <pre>{JSON.stringify(item, null, 2)}</pre>
-    </div>
-  );
+  if (item.type === "imageView" || item.type === "imageGeneration") {
+    return (
+      <AssistantImageItemView
+        item={item as AssistantImageThreadItem}
+      />
+    );
+  }
+
+  return <ArtifactItemView item={item} />;
 }
 
 function getApprovePayload(method: DockServerRequest["method"]) {

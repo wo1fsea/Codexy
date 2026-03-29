@@ -1156,6 +1156,47 @@ pre {
   object-fit: cover;
 }
 
+.dock-assistant-image-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.dock-assistant-image-card {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.dock-assistant-image-button {
+  display: block;
+  overflow: hidden;
+  border: 1px solid rgba(255, 247, 238, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 247, 238, 0.025);
+  padding: 0;
+}
+
+.dock-assistant-image-button:hover {
+  border-color: rgba(255, 247, 238, 0.18);
+  transform: translateY(-1px);
+}
+
+.dock-assistant-image-button img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.dock-assistant-image-caption {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--text-12);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .dock-user-bubble {
   width: fit-content;
   max-width: min(100%, 560px);
@@ -1599,6 +1640,10 @@ pre {
 .dock-artifact {
   max-width: min(100%, 860px);
   padding: 10px 12px;
+}
+
+.dock-image-artifact {
+  width: min(100%, 860px);
 }
 
 .dock-artifact-head {
@@ -2384,6 +2429,10 @@ pre {
   .dock-composer-plan-panel {
     --dock-plan-overlap-clearance: calc(82px + env(safe-area-inset-bottom));
     max-height: min(24vh, 180px);
+  }
+
+  .dock-assistant-image-grid {
+    grid-template-columns: 1fr;
   }
 
   .dock-status-footer {

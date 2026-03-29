@@ -6,12 +6,17 @@ import {
   installDockApiMock
 } from "./support/dock-api-mock";
 
+const VALID_PNG_BASE64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=";
+
 const VALID_PNG_BYTES = Array.from(
   Buffer.from(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=",
+    VALID_PNG_BASE64,
     "base64"
   )
 );
+
+const VALID_PNG_DATA_URL = `data:image/png;base64,${VALID_PNG_BASE64}`;
 
 async function pasteImageIntoComposer(page: Page, fileName: string) {
   const composer = page.locator("textarea.dock-composer-input");
@@ -225,6 +230,133 @@ test("image attachments render as thumbnails without raw data urls", async ({ pa
   await attachmentTile.click();
   await expect(page.locator(".dock-lightbox")).toBeVisible();
   await expect(page.locator(".dock-lightbox-image")).toBeVisible();
+});
+
+test("assistant image items render image cards and lightbox previews", async ({ page }) => {
+  await installDockApiMock(page, {
+    threads: [
+      {
+        id: "thread-assistant-images-1",
+        preview: "assistant image render",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000000,
+        updatedAt: 1774003600,
+        status: { type: "idle" },
+        path: null,
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "session",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: "assistant image render",
+        turns: [
+          {
+            id: "turn-assistant-images-1",
+            status: "completed",
+            error: null,
+            items: [
+              {
+                type: "userMessage",
+                id: "item-user",
+                content: [
+                  {
+                    type: "text",
+                    text: "show me the generated images",
+                    text_elements: []
+                  }
+                ]
+              },
+              {
+                type: "imageView",
+                id: "item-image-view",
+                title: "Assistant preview",
+                url: VALID_PNG_DATA_URL
+              },
+              {
+                type: "imageGeneration",
+                id: "item-image-generation",
+                result: {
+                  caption: "Generated concept",
+                  b64_json: VALID_PNG_BASE64
+                }
+              },
+              {
+                type: "agentMessage",
+                id: "item-agent",
+                text: "Here are the image results.",
+                phase: "final_answer"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  });
+
+  await gotoDock(page);
+  await page.locator(".dock-thread-row").first().click();
+
+  await expect(page.locator(".dock-assistant-image-button")).toHaveCount(2);
+  await expect(page.locator(".dock-assistant-image-caption")).toContainText([
+    "Assistant preview",
+    "Generated concept"
+  ]);
+  await expect(page.locator(".dock-image-artifact pre")).toHaveCount(0);
+
+  await page.locator(".dock-assistant-image-button").nth(1).click();
+  await expect(page.locator(".dock-lightbox")).toBeVisible();
+  await expect(page.locator(".dock-lightbox-caption")).toContainText(
+    "Generated concept"
+  );
+});
+
+test("assistant image items without a usable source fall back to the raw artifact view", async ({
+  page
+}) => {
+  await installDockApiMock(page, {
+    threads: [
+      {
+        id: "thread-assistant-image-fallback-1",
+        preview: "assistant image fallback",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000000,
+        updatedAt: 1774003600,
+        status: { type: "idle" },
+        path: null,
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "session",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: "assistant image fallback",
+        turns: [
+          {
+            id: "turn-assistant-image-fallback-1",
+            status: "completed",
+            error: null,
+            items: [
+              {
+                type: "imageView",
+                id: "item-image-view-fallback",
+                prompt: "no renderable source"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  });
+
+  await gotoDock(page);
+  await page.locator(".dock-thread-row").first().click();
+
+  await expect(page.locator(".dock-assistant-image-button")).toHaveCount(0);
+  const artifact = page.locator(".dock-artifact").filter({ hasText: "Image View" }).first();
+  await expect(artifact).toContainText("no renderable source");
 });
 
 test("file change items render compact edit summaries from raw diffs", async ({ page }) => {
