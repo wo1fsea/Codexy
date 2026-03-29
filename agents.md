@@ -96,6 +96,9 @@ Workflow rules:
 
 Required verification:
 
+- docs-only changes:
+  - read the changed file once after editing
+  - run `git status --short`
 - Baseline changes: `npm run verify`
 - Frontend layout or interaction changes: `npm run verify:e2e`
 

@@ -37,6 +37,11 @@ Implementation must stay inside the approved plan.
 
 Run verification after implementation and before calling the task done.
 
+Docs-only verification:
+
+- read the changed file once after editing
+- `git status --short`
+
 Baseline verification:
 
 - `npm run verify`
@@ -80,6 +85,7 @@ If any verification step is skipped, the task remains incomplete.
 
 ## Default Command Matrix
 
+- docs-only changes: read the changed file once, then run `git status --short`
 - non-UI changes: `npm run verify`
 - UI layout or interaction changes: `npm run verify:e2e`
 - release or handoff candidate: run both commands again from a clean shell
