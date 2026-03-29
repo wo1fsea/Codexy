@@ -75,7 +75,7 @@ Codexy is organized around a small set of runtime agents and ownership boundarie
   - Do not mix behavior changes, refactors, and documentation rewrites in one patch unless the plan is updated first.
 - Keep docs aligned with reality:
   - When ownership boundaries, invariants, or contracts change, update the relevant source-of-truth docs in the same patch.
-  - Use [docs/engineering-governance.md](./docs/engineering-governance.md) for the expanded engineering rules, [spec.md](./spec.md) for product behavior, and [visual-spec.md](./visual-spec.md) for UI contract changes.
+  - Use [docs/engineering-governance.md](./docs/engineering-governance.md) for the expanded engineering rules, [docs/spec.md](./docs/spec.md) for product behavior, and [docs/visual-spec.md](./docs/visual-spec.md) for UI contract changes.
 
 ## Required Change Workflow
 

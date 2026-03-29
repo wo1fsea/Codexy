@@ -8,8 +8,8 @@ Use the smallest document set that answers the current question:
 
 - `agents.md`: runtime ownership boundaries and mandatory repository workflow
 - `docs/engineering-governance.md`: code orthogonality, simplicity, dependency direction, and context discipline
-- `spec.md`: product behavior and required integration surface
-- `visual-spec.md`: normative UI contract for layout, density, and interaction
+- `docs/spec.md`: product behavior and required integration surface
+- `docs/visual-spec.md`: normative UI contract for layout, density, and interaction
 
 If a change updates a rule in one layer, update the matching source-of-truth document in the same patch.
 

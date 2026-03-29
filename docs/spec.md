@@ -16,7 +16,7 @@ Codexy is a Tailscale-first web control plane for Codex on a host machine. It sh
 - surfacing `request_user_input` prompts
 - warning when the web client is about to take over a thread that may already be active elsewhere
 
-The canonical UI contract lives in [visual-spec.md](C:\Users\wo1fsea\Documents\codex_mw\visual-spec.md). Product and engineering changes that affect presentation must follow that document.
+The canonical UI contract lives in [visual-spec.md](./visual-spec.md). Product and engineering changes that affect presentation must follow that document.
 
 ## Non-Goals For The First Slice
 
@@ -65,7 +65,9 @@ The canonical UI contract lives in [visual-spec.md](C:\Users\wo1fsea\Documents\c
 ```text
 codexy/
 ├─ agents.md
-├─ spec.md
+├─ docs/
+│  ├─ spec.md
+│  └─ visual-spec.md
 ├─ package.json
 ├─ next.config.ts
 ├─ tsconfig.json

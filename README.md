@@ -138,4 +138,4 @@ npm run verify:e2e
 - Live execution and approval flows must go through the Codex protocol, not ad hoc shell wrappers.
 - Engineering rules for orthogonality, simplicity, and context discipline live in [docs/engineering-governance.md](./docs/engineering-governance.md).
 
-For detailed runtime ownership boundaries, see [agents.md](./agents.md). For product requirements, see [spec.md](./spec.md).
+For detailed runtime ownership boundaries, see [agents.md](./agents.md). For product requirements, see [docs/spec.md](./docs/spec.md). For the normative UI contract, see [docs/visual-spec.md](./docs/visual-spec.md).

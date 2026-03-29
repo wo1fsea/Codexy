@@ -27,7 +27,7 @@ Keep the plan narrow. If scope changes during implementation, update the plan be
 Implementation must stay inside the approved plan.
 
 - avoid opportunistic refactors unless they are required to complete the task safely
-- keep runtime ownership boundaries from [agents.md](../agents.md)
+- keep runtime ownership boundaries from [../agents.md](../agents.md)
 - keep engineering rules from [engineering-governance.md](./engineering-governance.md)
 - prefer changes that preserve stable browser-facing contracts
 - prefer local, explicit code over cross-layer abstractions created only to remove small duplication
