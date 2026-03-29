@@ -262,7 +262,7 @@ async function runDoctor() {
     printCheck(
       "fail",
       "dependencies",
-      "repos/codexy-app/node_modules is missing. Run `cd repos/codexy-app && npm install`."
+      "node_modules is missing. Run `npm install` in this Codexy checkout."
     );
   }
 

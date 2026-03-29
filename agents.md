@@ -99,6 +99,9 @@ Required verification:
 - docs-only changes:
   - read the changed file once after editing
   - run `git status --short`
+- first-run bootstrap or CLI changes:
+  - `npm run verify:first-run`
+  - `git status --short`
 - Baseline changes: `npm run verify`
 - Frontend layout or interaction changes: `npm run verify:e2e`
 

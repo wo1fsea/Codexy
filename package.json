@@ -8,7 +8,9 @@
     "start": "node scripts/next-start.mjs",
     "restart:3001": "node scripts/restart-3001.mjs",
     "typecheck": "tsc --noEmit",
+    "test:first-run": "node --test tests/first-run.test.mjs",
     "test:e2e": "playwright test",
+    "verify:first-run": "npm run test:first-run",
     "verify": "node scripts/verify.mjs",
     "verify:e2e": "node scripts/verify.mjs --e2e"
   },

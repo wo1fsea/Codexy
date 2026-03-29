@@ -24,6 +24,22 @@ The runtime in this repository is built on Next.js and listens on `0.0.0.0:3000`
 - Node.js 20+
 - npm 10+
 
+## First Run
+
+1. Run `install.cmd` on Windows or `./install.sh` on macOS/Linux.
+2. Run `codexy doctor`.
+3. Run `codexy start`.
+
+Current first-run command surface:
+
+- `codexy help`
+- `codexy doctor`
+- `codexy start`
+- `codexy stop`
+- `codexy status`
+- `codexy logs`
+- `codexy open`
+
 ## Install Dependencies
 
 ```bash
