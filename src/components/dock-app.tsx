@@ -1089,6 +1089,25 @@ function ArtifactItemView({ item }: { item: DockThreadItem }) {
   );
 }
 
+function ContextCompactionItemView() {
+  const { t } = useI18n();
+
+  return (
+    <div
+      aria-label={t("event.contextCompaction")}
+      className="dock-context-compaction"
+      role="note"
+    >
+      <span aria-hidden="true" className="dock-context-compaction-line" />
+      <span className="dock-context-compaction-label">
+        <AppIcon className="dock-context-compaction-icon" name="compact" />
+        <span>{t("event.contextCompaction")}</span>
+      </span>
+      <span aria-hidden="true" className="dock-context-compaction-line" />
+    </div>
+  );
+}
+
 function UserMessageView({
   item
 }: {
@@ -1494,6 +1513,10 @@ function ThreadItemView({ item }: { item: DockThreadItem }) {
         item={item as AssistantImageThreadItem}
       />
     );
+  }
+
+  if (item.type === "contextCompaction") {
+    return <ContextCompactionItemView />;
   }
 
   return <ArtifactItemView item={item} />;

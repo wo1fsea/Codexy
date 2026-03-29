@@ -1247,6 +1247,42 @@ pre {
   padding: 2px 0;
 }
 
+.dock-context-compaction {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 860px;
+  padding: 6px 0 2px;
+}
+
+.dock-context-compaction-line {
+  height: 1px;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(255, 247, 238, 0),
+      rgba(255, 247, 238, 0.12) 18%,
+      rgba(255, 247, 238, 0.08)
+    );
+}
+
+.dock-context-compaction-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(255, 247, 238, 0.56);
+  font-size: var(--text-12);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.dock-context-compaction-icon {
+  width: 14px;
+  height: 14px;
+}
+
 .dock-agent-response .dock-entry-text {
   margin: 0;
 }

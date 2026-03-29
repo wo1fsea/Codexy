@@ -480,6 +480,73 @@ test("assistant image items without a usable source fall back to the raw artifac
   await expect(artifact).toContainText("no renderable source");
 });
 
+test("context compaction items render as an inline transcript divider", async ({
+  page
+}) => {
+  await installDockApiMock(page, {
+    threads: [
+      {
+        id: "thread-context-compaction-1",
+        preview: "context compaction",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000000,
+        updatedAt: 1774003600,
+        status: { type: "idle" },
+        path: null,
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "session",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: "context compaction",
+        turns: [
+          {
+            id: "turn-context-compaction-1",
+            status: "completed",
+            error: null,
+            items: [
+              {
+                type: "userMessage",
+                id: "item-user-context-compaction",
+                content: [
+                  {
+                    type: "text",
+                    text: "keep going with the task",
+                    text_elements: []
+                  }
+                ]
+              },
+              {
+                type: "contextCompaction",
+                id: "item-context-compaction"
+              },
+              {
+                type: "agentMessage",
+                id: "item-agent-context-compaction",
+                text: "Continuing with the refreshed context.",
+                phase: "final_answer"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  });
+
+  await gotoDock(page);
+  await page.locator(".dock-thread-row").first().click();
+
+  const divider = page.locator(".dock-context-compaction");
+  await expect(divider).toBeVisible();
+  await expect(divider).toContainText("Background context auto-compacted");
+  await expect(divider.locator(".dock-context-compaction-line")).toHaveCount(2);
+  await expect(
+    page.locator(".dock-artifact").filter({ hasText: "Context Compaction" })
+  ).toHaveCount(0);
+});
+
 test("file change items render compact edit summaries from raw diffs", async ({ page }) => {
   await installDockApiMock(page, {
     threads: [

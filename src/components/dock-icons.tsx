@@ -1,6 +1,7 @@
 type IconName =
   | "codex"
   | "chevron"
+  | "compact"
   | "new-thread"
   | "automation"
   | "skills"
@@ -83,6 +84,13 @@ export function AppIcon({
       return (
         <svg {...props}>
           <path d="m9 6 6 6-6 6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
+        </svg>
+      );
+    case "compact":
+      return (
+        <svg {...props}>
+          <path d="M7 7.5h7.5v7H7z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" />
+          <path d="M9.5 5.5H17v7.5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" />
         </svg>
       );
     case "automation":
