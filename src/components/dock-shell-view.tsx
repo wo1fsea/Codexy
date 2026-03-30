@@ -311,6 +311,8 @@ export function DockShellView(props: DockShellViewProps) {
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [heroCwdOpen, setHeroCwdOpen] = useState(false);
+  const [heroCwdDraft, setHeroCwdDraft] = useState("");
   const resizeStateRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const stageScrollRef = useRef<HTMLElement | null>(null);
   const stageScrollBodyRef = useRef<HTMLDivElement | null>(null);
@@ -324,6 +326,7 @@ export function DockShellView(props: DockShellViewProps) {
   const primaryActionLabel = primaryActionIsStop
     ? t("actions.stop")
     : t("actions.send");
+  const heroDefaultCwd = props.composerCwd || props.status?.defaults.cwd || "";
   const latestPlanItem = getLatestPlanItem(props.selectedThread);
   const hasBottomPanels =
     props.connectionNotice ||
@@ -367,6 +370,26 @@ export function DockShellView(props: DockShellViewProps) {
         t
       )
     })) ?? [];
+
+  function handleHeroCwdSubmit() {
+    const nextCwd = heroCwdDraft.trim();
+    if (!nextCwd) {
+      return;
+    }
+
+    props.onComposerCwdChange(nextCwd);
+    props.onNewThread();
+    setHeroCwdOpen(false);
+  }
+
+  function handleHeroCwdKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    event.preventDefault();
+    handleHeroCwdSubmit();
+  }
 
   function handleComposerPaste(event: ClipboardEvent<HTMLTextAreaElement>) {
     const clipboardItems = [...event.clipboardData.items];
@@ -469,6 +492,12 @@ export function DockShellView(props: DockShellViewProps) {
       };
     });
   }, [props.selectedThread]);
+
+  useEffect(() => {
+    if (props.selectedThread || props.loadingThread) {
+      setHeroCwdOpen(false);
+    }
+  }, [props.selectedThread, props.loadingThread]);
 
   useEffect(() => {
     let frameId: number | null = null;
@@ -975,6 +1004,57 @@ export function DockShellView(props: DockShellViewProps) {
                   <div className="dock-hero-wordmark">Codexy</div>
                   <strong>{t("stage.startBuilding")}</strong>
                   <div className="dock-hero-project">{props.workspaceLabel}</div>
+                  <div className="dock-hero-actions">
+                    <button
+                      className="dock-ghost-action dock-hero-action"
+                      onClick={() => {
+                        if (!heroCwdOpen) {
+                          setHeroCwdDraft(heroDefaultCwd);
+                        }
+                        setHeroCwdOpen((current) => !current);
+                      }}
+                      type="button"
+                    >
+                      <AppIcon className="dock-inline-icon" name="folder" />
+                      {t("actions.choosePath")}
+                    </button>
+                  </div>
+                  {heroCwdOpen ? (
+                    <div className="dock-hero-cwd">
+                      <label
+                        className="dock-hero-cwd-label"
+                        htmlFor="dock-hero-cwd-input"
+                      >
+                        {t("request.workingDirectory")}
+                      </label>
+                      <input
+                        autoFocus
+                        className="dock-sidebar-input dock-hero-input"
+                        id="dock-hero-cwd-input"
+                        onChange={(event) => setHeroCwdDraft(event.target.value)}
+                        onKeyDown={handleHeroCwdKeyDown}
+                        placeholder={t("request.workingDirectory")}
+                        value={heroCwdDraft}
+                      />
+                      <div className="dock-hero-cwd-actions">
+                        <button
+                          className="dock-request-action is-primary"
+                          disabled={!heroCwdDraft.trim()}
+                          onClick={handleHeroCwdSubmit}
+                          type="button"
+                        >
+                          {t("actions.usePath")}
+                        </button>
+                        <button
+                          className="dock-ghost-action is-muted"
+                          onClick={() => setHeroCwdOpen(false)}
+                          type="button"
+                        >
+                          {t("actions.cancel")}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
 

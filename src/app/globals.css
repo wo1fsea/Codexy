@@ -1959,6 +1959,58 @@ pre {
   letter-spacing: 0.02em;
 }
 
+.dock-hero-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.dock-hero-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  border: 1px solid rgba(255, 247, 238, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 247, 238, 0.04);
+  padding: 0 12px;
+  font-size: var(--text-13);
+}
+
+.dock-hero-action .dock-inline-icon {
+  width: var(--icon-support);
+  height: var(--icon-support);
+}
+
+.dock-hero-cwd {
+  width: min(420px, 90%);
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  text-align: left;
+}
+
+.dock-hero-cwd-label {
+  color: var(--text-faint);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dock-hero-input {
+  width: 100%;
+}
+
+.dock-hero-cwd-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .dock-transcript {
   display: grid;
   gap: 14px;
