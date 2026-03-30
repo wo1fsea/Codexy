@@ -125,6 +125,7 @@ pre {
 }
 
 .dock-app {
+  position: relative;
   height: 100vh;
   overflow: hidden;
   background: transparent;
@@ -421,9 +422,12 @@ pre {
 }
 
 .cloud-overview-card {
-  display: grid;
-  align-content: end;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
   gap: 8px;
+  min-height: 100%;
 }
 
 .cloud-overview-label,
@@ -439,13 +443,37 @@ pre {
   font-size: clamp(24px, 3vw, 32px);
 }
 
-.cloud-overview-card span:last-child {
+.cloud-overview-count {
   color: var(--text-muted);
 }
 
 .cloud-overview-card form,
 .cloud-remote-status form {
   margin: 0;
+}
+
+.cloud-overview-actions {
+  display: flex;
+  width: 100%;
+  margin-top: auto;
+  justify-content: flex-end;
+  padding-top: 18px;
+}
+
+.cloud-overview-logout-shell {
+  align-self: flex-end;
+}
+
+.cloud-overview-logout-button {
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  min-height: 38px;
+}
+
+.dock-toolbar-confirm-popover.is-upward {
+  top: auto;
+  bottom: calc(100% + 6px);
 }
 
 .cloud-panel {
@@ -460,8 +488,36 @@ pre {
   margin-bottom: 16px;
 }
 
+.cloud-panel-head-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 0;
+}
+
 .cloud-panel-head h2 {
   font-size: 24px;
+}
+
+.cloud-panel-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  border: 1px solid rgba(255, 247, 238, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 247, 238, 0.04);
+  padding: 0 12px;
+  color: var(--text-strong);
+  font-size: 12px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.cloud-panel-link:hover {
+  border-color: rgba(152, 200, 162, 0.3);
+  background: rgba(152, 200, 162, 0.12);
 }
 
 .cloud-panel-head code {
@@ -475,7 +531,7 @@ pre {
 
 .cloud-node-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
 }
 
@@ -591,6 +647,245 @@ pre {
 .cloud-empty-state strong {
   color: var(--text-strong);
   font-size: 18px;
+}
+
+.cloud-wall-shell {
+  height: 100dvh;
+  min-height: 0;
+  display: block;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 10px;
+  background:
+    radial-gradient(circle at top left, rgba(152, 200, 162, 0.12), transparent 24%),
+    linear-gradient(180deg, #101113 0%, #141619 100%);
+}
+
+.cloud-wall-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin: 0 auto 10px;
+  border: 1px solid rgba(255, 247, 238, 0.08);
+  border-radius: 16px;
+  background: rgba(18, 20, 24, 0.94);
+  padding: 8px 10px;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
+}
+
+.cloud-wall-header-copy {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.cloud-wall-header-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  color: var(--text-strong);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cloud-wall-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: none;
+  flex-wrap: nowrap;
+  justify-self: end;
+}
+
+.cloud-wall-header-count {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-soft);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.cloud-wall-grid {
+  width: 100%;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 12px;
+}
+
+.cloud-wall-pane {
+  position: relative;
+  min-width: 0;
+  min-height: 420px;
+  display: flex;
+  flex-direction: column;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid transparent;
+  border-radius: 18px;
+  background: rgba(22, 23, 26, 0.92);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.22);
+}
+
+.cloud-wall-pane::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  border: 1px solid rgba(255, 247, 238, 0.08);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.cloud-wall-pane[data-cloud-wall-pane-mode="mobile"] {
+  aspect-ratio: 1 / 1.5;
+  min-height: 640px;
+}
+
+.cloud-wall-pane.is-offline {
+  border-color: transparent;
+}
+
+.cloud-wall-pane.is-offline::after {
+  border-color: rgba(255, 196, 161, 0.2);
+}
+
+.cloud-wall-pane-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(255, 247, 238, 0.06);
+  background: rgba(18, 20, 24, 0.9);
+  overflow: hidden;
+}
+
+.cloud-wall-pane-copy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.cloud-wall-pane-label {
+  flex: none;
+  color: var(--text-faint);
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.cloud-wall-pane-name {
+  display: block;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-strong);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.cloud-wall-pane-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 0 1 auto;
+  justify-self: end;
+}
+
+.cloud-wall-pane-select {
+  min-width: 0;
+  width: auto;
+  max-width: clamp(92px, 34%, 168px);
+  flex: 0 1 auto;
+}
+
+.cloud-wall-pane-select .dock-select-trigger {
+  min-height: 30px;
+  border: 1px solid rgba(255, 247, 238, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 247, 238, 0.03);
+  padding-left: 8px;
+  padding-right: 8px;
+  color: var(--text);
+  font-size: 12px;
+}
+
+.cloud-wall-pane-select .dock-select-value {
+  max-width: 100%;
+}
+
+.cloud-wall-pane-body {
+  position: relative;
+  z-index: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  background: #0f1012;
+}
+
+.cloud-wall-pane-body > * {
+  height: 100%;
+  min-height: 0;
+}
+
+.cloud-wall-pane-body .dock-app,
+.cloud-wall-pane-body .dock-shell {
+  height: 100%;
+  min-height: 0;
+}
+
+.cloud-wall-empty-pane {
+  height: 100%;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+  background:
+    radial-gradient(circle at top, rgba(152, 200, 162, 0.09), transparent 28%),
+    linear-gradient(180deg, rgba(17, 18, 20, 0.96) 0%, rgba(20, 22, 25, 0.98) 100%);
+}
+
+.cloud-wall-empty-pane strong {
+  color: var(--text-strong);
+  font-size: 18px;
+}
+
+.cloud-wall-empty-pane p {
+  margin: 0;
+  max-width: 360px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.cloud-wall-empty-pane.is-warning strong {
+  color: #ffcfb7;
 }
 
 .cloud-remote-shell {
@@ -2896,6 +3191,87 @@ pre {
   display: none;
 }
 
+.dock-app[data-dock-responsive-strategy="container"][data-dock-responsive-mode="compact"] .dock-shell,
+.dock-app[data-dock-responsive-strategy="container"][data-dock-responsive-mode="mobile"] .dock-shell {
+  grid-template-columns: var(--dock-sidebar-width, 284px) minmax(0, 1fr);
+}
+
+.dock-app[data-dock-responsive-strategy="container"][data-dock-responsive-mode="compact"] .dock-stage,
+.dock-app[data-dock-responsive-strategy="container"][data-dock-responsive-mode="mobile"] .dock-stage {
+  --stage-inline-pad: 18px;
+}
+
+.dock-app[data-dock-responsive-strategy="container"][data-dock-responsive-mode="compact"] .dock-stage-scroll-body,
+.dock-app[data-dock-responsive-strategy="container"][data-dock-responsive-mode="compact"] .dock-bottom-center,
+.dock-app[data-dock-responsive-strategy="container"][data-dock-responsive-mode="mobile"] .dock-stage-scroll-body,
+.dock-app[data-dock-responsive-strategy="container"][data-dock-responsive-mode="mobile"] .dock-bottom-center {
+  width: 100%;
+}
+
+.dock-app[data-dock-responsive-strategy="container"][data-dock-responsive-mode="mobile"] {
+  background: var(--stage-bg);
+}
+
+.dock-app[data-dock-responsive-strategy="container"][data-dock-responsive-mode="mobile"] .dock-mobile-backdrop {
+  position: absolute;
+  inset: 0;
+}
+
+.dock-app[data-dock-responsive-strategy="container"][data-dock-responsive-mode="mobile"] .dock-shell {
+  position: relative;
+  grid-template-columns: minmax(0, 1fr);
+  background: var(--stage-bg);
+}
+
+.dock-app[data-dock-responsive-strategy="container"][data-dock-responsive-mode="mobile"] .dock-left-stack {
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: 40;
+  width: min(88%, 280px);
+  height: 100%;
+  transform: translateX(-104%);
+  transition: transform 180ms ease;
+  box-shadow: none;
+}
+
+.dock-app[data-dock-responsive-strategy="container"][data-dock-responsive-mode="mobile"] .dock-sidebar-resize-handle {
+  display: none;
+}
+
+.dock-app[data-dock-responsive-strategy="container"][data-dock-responsive-mode="mobile"] .dock-left-stack.is-open {
+  transform: translateX(0);
+  box-shadow: var(--shadow);
+}
+
+.dock-app[data-dock-responsive-strategy="container"][data-dock-responsive-mode="mobile"] .dock-stage {
+  min-height: 100%;
+  --stage-inline-pad: 10px;
+}
+
+.dock-app[data-dock-responsive-strategy="container"][data-dock-responsive-mode="mobile"] .dock-stage-header {
+  align-items: center;
+  background: var(--stage-bg);
+}
+
+.dock-app[data-dock-responsive-strategy="container"][data-dock-responsive-mode="mobile"] .dock-mobile-only {
+  display: inline-grid;
+}
+
+.dock-app[data-dock-responsive-strategy="container"][data-dock-responsive-mode="mobile"] .dock-stage-heading {
+  align-items: center;
+}
+
+.dock-app[data-dock-responsive-strategy="container"][data-dock-responsive-mode="mobile"] .dock-stage-toolbar {
+  width: auto;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.dock-app[data-dock-responsive-strategy="container"][data-dock-responsive-mode="mobile"] .dock-alert-banner {
+  flex-direction: column;
+  align-items: stretch;
+}
+
 @media (max-width: 1100px) {
   .dock-shell {
     grid-template-columns: var(--dock-sidebar-width, 284px) minmax(0, 1fr);
@@ -2993,6 +3369,15 @@ pre {
     flex-direction: column;
   }
 
+  .cloud-panel-head-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .cloud-node-grid {
+    grid-template-columns: 1fr;
+  }
+
   .cloud-remote-header {
     flex-direction: column;
     align-items: stretch;
@@ -3000,6 +3385,29 @@ pre {
 
   .cloud-remote-status {
     justify-content: flex-start;
+  }
+}
+
+@media (max-width: 980px) {
+  .cloud-wall-pane-head {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .cloud-wall-pane-controls {
+    width: auto;
+    justify-content: flex-end;
+  }
+
+  .cloud-wall-pane-select {
+    max-width: clamp(78px, 30%, 132px);
+    flex: 0 1 auto;
+  }
+}
+
+@media (max-width: 1100px) {
+  .cloud-wall-grid {
+    grid-template-columns: 1fr;
   }
 }
 

@@ -147,6 +147,29 @@ async function waitForCloudProxyStatus(
   throw new Error(`Timed out waiting for cloud proxy status at ${url}.`);
 }
 
+async function fetchLinkedNodes(cloudUrl: string, cookieHeader: string) {
+  const response = await fetch(`${cloudUrl}/api/cloud/nodes`, {
+    cache: "no-store",
+    headers: {
+      cookie: cookieHeader
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch linked nodes from ${cloudUrl}.`);
+  }
+
+  const payload = (await response.json()) as {
+    nodes?: Array<{
+      displayName: string;
+      nodeId: string;
+      status: string;
+    }>;
+  };
+
+  return Array.isArray(payload.nodes) ? payload.nodes : [];
+}
+
 async function bindCloudAuthenticator(page: Page, cloudUrl: string, cloudHome: string) {
   await page.goto(cloudUrl, {
     waitUntil: "domcontentloaded"
@@ -187,6 +210,11 @@ test("cloud mode requires TOTP setup before showing the dashboard", async ({ pag
     await expect(page.getByText("No nodes linked yet.")).toBeVisible();
 
     await page.getByRole("button", { name: "Log out" }).click();
+    await expect(page.getByText("Log out of this cloud session?")).toBeVisible();
+    await page
+      .locator(".dock-toolbar-confirm-popover")
+      .getByRole("button", { name: "Log out" })
+      .click();
     await expect(page.getByRole("heading", { name: "Enter your authenticator code" })).toBeVisible();
 
     const loginCode = generateTotpCode(readCloudAuthSecret(cloudHome));
@@ -207,6 +235,11 @@ test("cloud dashboard refreshes when a new node links in", async ({ page }) => {
   const runtimeSuffix = Date.now().toString();
 
   try {
+    await page.setViewportSize({
+      width: 1400,
+      height: 900
+    });
+
     const cloudStart = runNodeCli(
       ["cloud", "start", "--port", String(cloudPort)],
       cloudHome,
@@ -230,9 +263,14 @@ test("cloud dashboard refreshes when a new node links in", async ({ page }) => {
     await expect(page.getByText("1 linked node")).toBeVisible({
       timeout: 15_000
     });
-    await expect(page.getByRole("link", { name: "Open" })).toBeVisible({
+    await expect(page.getByRole("link", { name: "Open", exact: true })).toBeVisible({
       timeout: 15_000
     });
+    const nodeGridBox = await page.locator(".cloud-node-grid").boundingBox();
+    const nodeCardBox = await page.locator(".cloud-node-card").boundingBox();
+    expect(nodeGridBox).not.toBeNull();
+    expect(nodeCardBox).not.toBeNull();
+    expect(nodeCardBox?.width ?? 0).toBeLessThan((nodeGridBox?.width ?? 0) * 0.7);
   } finally {
     runNodeCli(["unlink"], nodeHome, 20_000);
     runNodeCli(["cloud", "stop"], cloudHome, 20_000);
@@ -298,6 +336,207 @@ test("cloud mode can open a linked node workspace through the proxy", async ({ p
     await expect(page.getByText("Log out of this cloud session?")).toBeVisible();
     await page.getByRole("button", { name: "Cancel" }).click();
     await expect(page.getByText("Log out of this cloud session?")).toHaveCount(0);
+  } finally {
+    runNodeCli(["stop"], nodeHome, 20_000);
+    runNodeCli(["cloud", "stop"], cloudHome, 20_000);
+    rmSync(nodeHome, { recursive: true, force: true });
+    rmSync(cloudHome, { recursive: true, force: true });
+  }
+});
+
+test("cloud wall can show the same linked node in multiple panes", async ({ page }) => {
+  const cloudHome = makeTempDir("codexy-cloud-wall-home-");
+  const nodeHome = makeTempDir("codexy-cloud-wall-node-");
+  const cloudPort = await getFreePort();
+  const nodePort = await getFreePort();
+  const cloudUrl = `http://127.0.0.1:${cloudPort}`;
+  const runtimeSuffix = Date.now().toString();
+
+  try {
+    const cloudStart = runNodeCli(
+      ["cloud", "start", "--port", String(cloudPort)],
+      cloudHome,
+      180_000,
+      {
+        NEXT_DIST_DIR: `.next-runtime-cloud-playwright-${runtimeSuffix}`
+      }
+    );
+    expect(cloudStart.status, cloudStart.stdout + cloudStart.stderr).toBe(0);
+
+    await bindCloudAuthenticator(page, cloudUrl, cloudHome);
+    const sessionCookie = await getSessionCookieHeader(page, cloudUrl);
+    const linkResult = runNodeCli(
+      ["link", cloudUrl, "--code", generateTotpCode(readCloudAuthSecret(cloudHome))],
+      nodeHome
+    );
+    expect(linkResult.status, linkResult.stdout + linkResult.stderr).toBe(0);
+
+    const nodeStart = runNodeCli(
+      ["start", "--port", String(nodePort)],
+      nodeHome,
+      180_000,
+      {
+        NEXT_DIST_DIR: `.next-runtime-node-playwright-${runtimeSuffix}`
+      }
+    );
+    expect(nodeStart.status, nodeStart.stdout + nodeStart.stderr).toBe(0);
+
+    const nodeIdMatch = linkResult.stdout.match(/\(([0-9a-f-]{36})\)/i);
+    expect(nodeIdMatch).not.toBeNull();
+    const nodeId = nodeIdMatch?.[1] ?? "";
+
+    await waitForCloudProxyStatus(
+      `${cloudUrl}/api/cloud/nodes/${encodeURIComponent(nodeId)}/proxy/status`,
+      sessionCookie
+    );
+
+    const nodes = await fetchLinkedNodes(cloudUrl, sessionCookie);
+    expect(nodes.length).toBeGreaterThan(0);
+    const nodeName = nodes[0]?.displayName ?? "";
+
+    await page.setViewportSize({
+      width: 2000,
+      height: 1100
+    });
+    await page.goto(`${cloudUrl}/wall`, {
+      waitUntil: "domcontentloaded"
+    });
+
+    await expect(page.getByText("Workspace wall", { exact: true })).toBeVisible();
+    await expect(page.locator("[data-cloud-wall-pane]")).toHaveCount(4);
+    await expect(page.locator('[data-cloud-wall-connected=\"true\"]')).toHaveCount(1);
+    await expect(page.locator(".cloud-wall-pane .dock-shell")).toHaveCount(1);
+
+    await page.getByRole("button", { name: "Wall pane 2 node" }).click();
+    await page.getByRole("option", { name: nodeName }).click();
+
+    await expect(page.locator('[data-cloud-wall-connected=\"true\"]')).toHaveCount(2);
+    await expect(page.locator(".cloud-wall-pane .dock-shell")).toHaveCount(2);
+
+    const wideFirstPane = page.locator("[data-cloud-wall-pane]").nth(0);
+    const wideSecondPane = page.locator("[data-cloud-wall-pane]").nth(1);
+    const wideFirstBox = await wideFirstPane.boundingBox();
+    const wideSecondBox = await wideSecondPane.boundingBox();
+
+    expect(wideFirstBox).not.toBeNull();
+    expect(wideSecondBox).not.toBeNull();
+    expect(Math.abs((wideSecondBox?.y ?? 0) - (wideFirstBox?.y ?? 0))).toBeLessThan(4);
+    await expect(wideFirstPane.locator(".dock-app")).toHaveAttribute(
+      "data-dock-responsive-mode",
+      "compact"
+    );
+
+    await page.setViewportSize({
+      width: 1200,
+      height: 900
+    });
+    await page.goto(`${cloudUrl}/wall`, {
+      waitUntil: "domcontentloaded"
+    });
+
+    const mediumFirstPane = page.locator("[data-cloud-wall-pane]").nth(0);
+    const mediumSecondPane = page.locator("[data-cloud-wall-pane]").nth(1);
+    const mediumFirstBox = await mediumFirstPane.boundingBox();
+    const mediumSecondBox = await mediumSecondPane.boundingBox();
+
+    expect(mediumFirstBox).not.toBeNull();
+    expect(mediumSecondBox).not.toBeNull();
+    expect(Math.abs((mediumSecondBox?.y ?? 0) - (mediumFirstBox?.y ?? 0))).toBeLessThan(4);
+    await expect(mediumFirstPane.locator(".dock-app")).toHaveAttribute(
+      "data-dock-responsive-mode",
+      "mobile"
+    );
+    await expect(mediumFirstPane).toHaveAttribute("data-cloud-wall-pane-mode", "mobile");
+    expect(mediumFirstBox?.height ?? 0).toBeGreaterThanOrEqual((mediumFirstBox?.width ?? 0) * 1.45);
+    await expect(
+      mediumFirstPane.locator(".cloud-wall-pane-head").evaluate((element) =>
+        window.getComputedStyle(element).flexWrap
+      )
+    ).resolves.toBe("nowrap");
+    const mediumLabelBox = await mediumFirstPane.locator(".cloud-wall-pane-label").boundingBox();
+    const mediumNameBox = await mediumFirstPane.locator(".cloud-wall-pane-name").boundingBox();
+    expect(mediumLabelBox).not.toBeNull();
+    expect(mediumNameBox).not.toBeNull();
+    expect(Math.abs((mediumNameBox?.y ?? 0) - (mediumLabelBox?.y ?? 0))).toBeLessThan(4);
+    const emptyPane = page.locator("[data-cloud-wall-pane]").nth(2);
+    await expect(emptyPane).toHaveAttribute("data-cloud-wall-pane-mode", "mobile");
+    const emptyCopyBox = await emptyPane.locator(".cloud-wall-pane-copy").boundingBox();
+    const emptyControlsBox = await emptyPane.locator(".cloud-wall-pane-controls").boundingBox();
+    expect(emptyCopyBox).not.toBeNull();
+    expect(emptyControlsBox).not.toBeNull();
+    expect((emptyCopyBox?.x ?? 0) + (emptyCopyBox?.width ?? 0)).toBeLessThanOrEqual(
+      (emptyControlsBox?.x ?? 0) + 1
+    );
+    const emptyHeadMetrics = await emptyPane.locator(".cloud-wall-pane-head").evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth
+    }));
+    expect(emptyHeadMetrics.scrollWidth).toBeLessThanOrEqual(emptyHeadMetrics.clientWidth + 1);
+
+    await page.setViewportSize({
+      width: 1050,
+      height: 900
+    });
+    await page.goto(`${cloudUrl}/wall`, {
+      waitUntil: "domcontentloaded"
+    });
+
+    const firstPane = page.locator("[data-cloud-wall-pane]").nth(0);
+    const secondPane = page.locator("[data-cloud-wall-pane]").nth(1);
+    const firstBox = await firstPane.boundingBox();
+    const secondBox = await secondPane.boundingBox();
+
+    expect(firstBox).not.toBeNull();
+    expect(secondBox).not.toBeNull();
+    expect(secondBox?.y ?? 0).toBeGreaterThan((firstBox?.y ?? 0) + (firstBox?.height ?? 0) - 2);
+    expect(firstBox?.height ?? 0).toBeGreaterThanOrEqual((firstBox?.width ?? 0) * 0.74);
+
+    const shellScroll = await page.locator(".cloud-wall-shell").evaluate((element) => ({
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight
+    }));
+    expect(shellScroll.scrollHeight).toBeGreaterThan(shellScroll.clientHeight);
+
+    const shellScrollTop = await page.locator(".cloud-wall-shell").evaluate((element) => {
+      element.scrollTop = 240;
+      return element.scrollTop;
+    });
+    expect(shellScrollTop).toBeGreaterThan(0);
+
+    await page.setViewportSize({
+      width: 900,
+      height: 900
+    });
+    await page.goto(`${cloudUrl}/wall`, {
+      waitUntil: "domcontentloaded"
+    });
+
+    const narrowFirstPane = page.locator("[data-cloud-wall-pane]").nth(0);
+    await expect(narrowFirstPane).toHaveAttribute("data-cloud-wall-pane-mode", "mobile");
+    await expect(narrowFirstPane.locator(".dock-app")).toHaveAttribute(
+      "data-dock-responsive-mode",
+      "mobile"
+    );
+    await expect(
+      narrowFirstPane.locator(".dock-stage-heading .dock-mobile-only")
+    ).toBeVisible();
+    await expect(
+      narrowFirstPane.locator(".dock-left-stack").evaluate((element) =>
+        window.getComputedStyle(element).position
+      )
+    ).resolves.toBe("absolute");
+    const wallHeaderCopyBox = await page.locator(".cloud-wall-header-copy").boundingBox();
+    const wallHeaderActionsBox = await page.locator(".cloud-wall-header-actions").boundingBox();
+    expect(wallHeaderCopyBox).not.toBeNull();
+    expect(wallHeaderActionsBox).not.toBeNull();
+    expect(Math.abs((wallHeaderActionsBox?.y ?? 0) - (wallHeaderCopyBox?.y ?? 0))).toBeLessThan(4);
+    const wallHeaderCountMetrics = await page.locator(".cloud-wall-header-count").evaluate((element) => ({
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight
+    }));
+    expect(wallHeaderCountMetrics.scrollHeight).toBeLessThanOrEqual(
+      wallHeaderCountMetrics.clientHeight + 1
+    );
   } finally {
     runNodeCli(["stop"], nodeHome, 20_000);
     runNodeCli(["cloud", "stop"], cloudHome, 20_000);

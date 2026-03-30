@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { startTransition, useEffect, useState } from "react";
 
+import { CloudLogoutAction } from "@/components/cloud-logout-action";
 import type { CloudNodeRecord, CloudRegistrySnapshot } from "@/lib/cloud-registry";
 
 const CLOUD_DASHBOARD_REFRESH_MS = 2_000;
@@ -102,13 +103,17 @@ export function CloudAppClient({
         <div className="cloud-overview-card">
           <span className="cloud-overview-label">Deployment</span>
           <strong>{initialDeploymentName}</strong>
-          <span>{nodes.length} linked node{nodes.length === 1 ? "" : "s"}</span>
-          <form action="/api/cloud/auth/logout" method="post">
-            <input name="returnTo" type="hidden" value="/auth/login" />
-            <button className="cloud-session-action" type="submit">
-              Log out
-            </button>
-          </form>
+          <span className="cloud-overview-count">
+            {nodes.length} linked node{nodes.length === 1 ? "" : "s"}
+          </span>
+          <div className="cloud-overview-actions">
+            <CloudLogoutAction
+              buttonClassName="cloud-overview-logout-button"
+              popoverClassName="is-upward"
+              returnTo="/auth/login"
+              shellClassName="cloud-overview-logout-shell"
+            />
+          </div>
         </div>
       </section>
 
@@ -118,7 +123,12 @@ export function CloudAppClient({
             <span className="cloud-eyebrow">Node directory</span>
             <h2>Linked nodes</h2>
           </div>
-          <code>{nodesPath}</code>
+          <div className="cloud-panel-head-actions">
+            <Link className="cloud-panel-link" href="/wall">
+              Open wall
+            </Link>
+            <code>{nodesPath}</code>
+          </div>
         </div>
 
         {nodes.length ? (

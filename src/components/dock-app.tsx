@@ -35,6 +35,11 @@ import type {
 } from "@/lib/codex/types";
 import { useI18n } from "@/lib/i18n/provider";
 import type { TranslateFn } from "@/lib/i18n/messages";
+import {
+  getDockResponsiveMode,
+  type DockResponsiveMode,
+  type DockResponsiveStrategy
+} from "@/lib/dock-responsive";
 import type { StatusPayload } from "@/lib/status";
 
 type UploadItem = {
@@ -62,6 +67,8 @@ type ConnectionNoticeState =
 
 type DockAppProps = {
   apiBasePath?: string;
+  responsiveStrategy?: DockResponsiveStrategy;
+  responsiveModeOverride?: DockResponsiveMode;
 };
 
 function normalizeApiBasePath(value?: string) {
@@ -1631,9 +1638,14 @@ function getCommandApprovalCwd(
   return fallbackCwd;
 }
 
-export function DockApp({ apiBasePath = "/api" }: DockAppProps) {
+export function DockApp({
+  apiBasePath = "/api",
+  responsiveStrategy = "viewport",
+  responsiveModeOverride
+}: DockAppProps) {
   const { t } = useI18n();
   const resolvedApiBasePath = normalizeApiBasePath(apiBasePath);
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const [threads, setThreads] = useState<DockThread[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [selectedThread, setSelectedThread] = useState<DockThread | null>(null);
@@ -1664,6 +1676,7 @@ export function DockApp({ apiBasePath = "/api" }: DockAppProps) {
     useState<ConnectionNoticeState>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitScrollToken, setSubmitScrollToken] = useState(0);
+  const [responsiveMode, setResponsiveMode] = useState<DockResponsiveMode>("desktop");
   const reconnectNoticeTimerRef = useRef<number | null>(null);
   const backgroundSyncInFlightRef = useRef(false);
   const inFlightThreadSyncRef = useRef<{
@@ -1680,6 +1693,60 @@ export function DockApp({ apiBasePath = "/api" }: DockAppProps) {
     setArchiveConfirmOpen(false);
     setArchivingThread(false);
   }, [selectedThreadId]);
+
+  useEffect(() => {
+    let resizeObserver: ResizeObserver | null = null;
+
+    if (responsiveModeOverride) {
+      return;
+    }
+
+    const updateResponsiveMode = (width: number) => {
+      const nextMode = getDockResponsiveMode(width, responsiveStrategy);
+      setResponsiveMode((current) => (current === nextMode ? current : nextMode));
+    };
+
+    if (responsiveStrategy === "container") {
+      const element = rootRef.current;
+      if (!element) {
+        return;
+      }
+
+      updateResponsiveMode(element.clientWidth);
+      resizeObserver = new ResizeObserver((entries) => {
+        const entry = entries[0];
+        if (!entry) {
+          return;
+        }
+
+        updateResponsiveMode(entry.contentRect.width);
+      });
+      resizeObserver.observe(element);
+
+      return () => {
+        resizeObserver?.disconnect();
+      };
+    }
+
+    const handleViewportResize = () => {
+      updateResponsiveMode(window.innerWidth);
+    };
+
+    handleViewportResize();
+    window.addEventListener("resize", handleViewportResize, { passive: true });
+
+    return () => {
+      window.removeEventListener("resize", handleViewportResize);
+    };
+  }, [responsiveModeOverride, responsiveStrategy]);
+
+  const activeResponsiveMode = responsiveModeOverride ?? responsiveMode;
+
+  useEffect(() => {
+    if (activeResponsiveMode !== "mobile" && sidebarOpen) {
+      setSidebarOpen(false);
+    }
+  }, [activeResponsiveMode, sidebarOpen]);
 
   const deferredSearch = useDeferredValue(search.trim().toLowerCase());
   const selectedModel =
@@ -2884,6 +2951,12 @@ export function DockApp({ apiBasePath = "/api" }: DockAppProps) {
     .sort((left, right) => right.updatedAt - left.updatedAt);
 
     return (
+      <div
+        className="dock-app"
+        data-dock-responsive-mode={activeResponsiveMode}
+        data-dock-responsive-strategy={responsiveStrategy}
+        ref={rootRef}
+      >
       <DockShellView
       archiveConfirmOpen={archiveConfirmOpen}
       archiveFilter={archiveFilter}
@@ -2982,6 +3055,7 @@ export function DockApp({ apiBasePath = "/api" }: DockAppProps) {
       search={search}
       selectedThread={selectedThread}
       selectedThreadId={selectedThreadId}
+      responsiveMode={activeResponsiveMode}
       sidebarOpen={sidebarOpen}
       status={status}
       submitScrollToken={submitScrollToken}
@@ -2990,5 +3064,6 @@ export function DockApp({ apiBasePath = "/api" }: DockAppProps) {
       threadNameDraft={threadNameDraft}
       workspaceLabel={workspaceLabel}
     />
+      </div>
   );
 }

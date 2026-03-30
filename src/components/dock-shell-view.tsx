@@ -72,6 +72,7 @@ type DockShellViewProps = {
   search: string;
   selectedThread: DockThread | null;
   selectedThreadId: string | null;
+  responsiveMode: "desktop" | "compact" | "mobile";
   sidebarOpen: boolean;
   status: StatusPayload | null;
   submitScrollToken: number;
@@ -660,14 +661,19 @@ export function DockShellView(props: DockShellViewProps) {
   } as CSSProperties;
 
   return (
-    <div className="dock-app">
+    <>
       <div
         className={clsx("dock-mobile-backdrop", props.sidebarOpen && "is-visible")}
         onClick={props.onSidebarClose}
       />
 
       <div
-        className={clsx("dock-shell", isResizingSidebar && "is-resizing")}
+        className={clsx(
+          "dock-shell",
+          isResizingSidebar && "is-resizing",
+          props.responsiveMode === "compact" && "is-compact",
+          props.responsiveMode === "mobile" && "is-mobile"
+        )}
         style={shellStyle}
       >
         <div className={clsx("dock-left-stack", props.sidebarOpen && "is-open")}>
@@ -820,7 +826,7 @@ export function DockShellView(props: DockShellViewProps) {
             aria-hidden="true"
             className="dock-sidebar-resize-handle"
             onPointerDown={(event) => {
-              if (window.matchMedia("(max-width: 860px)").matches) {
+              if (props.responsiveMode === "mobile") {
                 return;
               }
 
@@ -1222,6 +1228,6 @@ export function DockShellView(props: DockShellViewProps) {
           </section>
         </main>
       </div>
-    </div>
+    </>
   );
 }

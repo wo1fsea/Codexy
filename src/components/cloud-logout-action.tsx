@@ -6,9 +6,15 @@ import { useEffect, useRef, useState } from "react";
 import { AppIcon } from "@/components/dock-icons";
 
 export function CloudLogoutAction({
-  returnTo
+  buttonClassName,
+  popoverClassName,
+  returnTo,
+  shellClassName
 }: {
+  buttonClassName?: string;
+  popoverClassName?: string;
   returnTo: string;
+  shellClassName?: string;
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const shellRef = useRef<HTMLDivElement | null>(null);
@@ -41,7 +47,11 @@ export function CloudLogoutAction({
 
   return (
     <div
-      className={clsx("dock-toolbar-confirm-shell", confirmOpen && "is-open")}
+      className={clsx(
+        "dock-toolbar-confirm-shell",
+        shellClassName,
+        confirmOpen && "is-open"
+      )}
       ref={shellRef}
     >
       <button
@@ -49,6 +59,7 @@ export function CloudLogoutAction({
         className={clsx(
           "dock-icon-button",
           "cloud-remote-icon-button",
+          buttonClassName,
           confirmOpen && "is-armed"
         )}
         onClick={() => setConfirmOpen((current) => !current)}
@@ -61,7 +72,7 @@ export function CloudLogoutAction({
       {confirmOpen ? (
         <div
           aria-modal="false"
-          className="dock-toolbar-confirm-popover"
+          className={clsx("dock-toolbar-confirm-popover", popoverClassName)}
           role="dialog"
         >
           <div className="dock-toolbar-confirm-copy">
