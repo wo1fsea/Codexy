@@ -730,6 +730,7 @@ pre {
 .cloud-wall-pane {
   position: relative;
   min-width: 0;
+  max-width: 100%;
   min-height: 420px;
   display: flex;
   flex-direction: column;
@@ -766,6 +767,7 @@ pre {
 }
 
 .cloud-wall-pane-head {
+  flex: none;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
