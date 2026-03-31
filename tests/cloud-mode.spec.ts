@@ -5,7 +5,7 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 const repoRoot = process.cwd();
 const cliScript = path.join(repoRoot, "scripts", "codexy.mjs");
@@ -168,6 +168,13 @@ async function fetchLinkedNodes(cloudUrl: string, cookieHeader: string) {
   };
 
   return Array.isArray(payload.nodes) ? payload.nodes : [];
+}
+
+async function getElementOverflow(locator: Locator) {
+  return await locator.evaluate((element) => ({
+    horizontal: element.scrollWidth - element.clientWidth,
+    vertical: element.scrollHeight - element.clientHeight
+  }));
 }
 
 async function bindCloudAuthenticator(page: Page, cloudUrl: string, cloudHome: string) {
@@ -430,6 +437,46 @@ test("cloud wall can show the same linked node in multiple panes", async ({ page
       width: 1200,
       height: 900
     });
+    const dynamicFirstBox = await wideFirstPane.boundingBox();
+    const dynamicSecondBox = await wideSecondPane.boundingBox();
+    expect(dynamicFirstBox).not.toBeNull();
+    expect(dynamicSecondBox).not.toBeNull();
+    expect(Math.abs((dynamicSecondBox?.y ?? 0) - (dynamicFirstBox?.y ?? 0))).toBeLessThan(4);
+    await expect(wideFirstPane.locator(".dock-app")).toHaveAttribute(
+      "data-dock-responsive-mode",
+      "mobile"
+    );
+    await expect(wideFirstPane).toHaveAttribute("data-cloud-wall-pane-mode", "mobile");
+    const dynamicStageHeaderOverflow = await getElementOverflow(
+      wideFirstPane.locator(".dock-stage-header")
+    );
+    expect(dynamicStageHeaderOverflow.horizontal).toBeLessThanOrEqual(1);
+    const dynamicEmptyPaneOverflow = await getElementOverflow(
+      page.locator("[data-cloud-wall-pane]").nth(2).locator(".cloud-wall-pane-head")
+    );
+    expect(dynamicEmptyPaneOverflow.horizontal).toBeLessThanOrEqual(1);
+    const dynamicShellBounds = await wideFirstPane.evaluate((pane) => {
+      const body = pane.querySelector(".cloud-wall-pane-body");
+      const shell = pane.querySelector(".dock-shell");
+      if (!(body instanceof HTMLElement) || !(shell instanceof HTMLElement)) {
+        return null;
+      }
+
+      const bodyRect = body.getBoundingClientRect();
+      const shellRect = shell.getBoundingClientRect();
+      return {
+        rightGap: shellRect.right - bodyRect.right,
+        bottomGap: shellRect.bottom - bodyRect.bottom
+      };
+    });
+    expect(dynamicShellBounds).not.toBeNull();
+    expect(dynamicShellBounds?.rightGap ?? 0).toBeLessThanOrEqual(1);
+    expect(dynamicShellBounds?.bottomGap ?? 0).toBeLessThanOrEqual(1);
+
+    await page.setViewportSize({
+      width: 1200,
+      height: 900
+    });
     await page.goto(`${cloudUrl}/wall`, {
       waitUntil: "domcontentloaded"
     });
@@ -488,8 +535,13 @@ test("cloud wall can show the same linked node in multiple panes", async ({ page
 
     expect(firstBox).not.toBeNull();
     expect(secondBox).not.toBeNull();
-    expect(secondBox?.y ?? 0).toBeGreaterThan((firstBox?.y ?? 0) + (firstBox?.height ?? 0) - 2);
-    expect(firstBox?.height ?? 0).toBeGreaterThanOrEqual((firstBox?.width ?? 0) * 0.74);
+    expect(Math.abs((secondBox?.y ?? 0) - (firstBox?.y ?? 0))).toBeLessThan(4);
+    expect(firstBox?.height ?? 0).toBeGreaterThanOrEqual((firstBox?.width ?? 0) * 1.45);
+    await expect(firstPane).toHaveAttribute("data-cloud-wall-pane-mode", "mobile");
+    await expect(firstPane.locator(".dock-app")).toHaveAttribute(
+      "data-dock-responsive-mode",
+      "mobile"
+    );
 
     const shellScroll = await page.locator(".cloud-wall-shell").evaluate((element) => ({
       clientHeight: element.clientHeight,
@@ -504,7 +556,7 @@ test("cloud wall can show the same linked node in multiple panes", async ({ page
     expect(shellScrollTop).toBeGreaterThan(0);
 
     await page.setViewportSize({
-      width: 900,
+      width: 720,
       height: 900
     });
     await page.goto(`${cloudUrl}/wall`, {
@@ -512,6 +564,14 @@ test("cloud wall can show the same linked node in multiple panes", async ({ page
     });
 
     const narrowFirstPane = page.locator("[data-cloud-wall-pane]").nth(0);
+    const narrowSecondPane = page.locator("[data-cloud-wall-pane]").nth(1);
+    const narrowFirstBox = await narrowFirstPane.boundingBox();
+    const narrowSecondBox = await narrowSecondPane.boundingBox();
+    expect(narrowFirstBox).not.toBeNull();
+    expect(narrowSecondBox).not.toBeNull();
+    expect(narrowSecondBox?.y ?? 0).toBeGreaterThan(
+      (narrowFirstBox?.y ?? 0) + (narrowFirstBox?.height ?? 0) - 2
+    );
     await expect(narrowFirstPane).toHaveAttribute("data-cloud-wall-pane-mode", "mobile");
     await expect(narrowFirstPane.locator(".dock-app")).toHaveAttribute(
       "data-dock-responsive-mode",

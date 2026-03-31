@@ -6,6 +6,7 @@ import {
   useDeferredValue,
   useEffect,
   useEffectEvent,
+  useLayoutEffect,
   useRef,
   useState
 } from "react";
@@ -1694,7 +1695,7 @@ export function DockApp({
     setArchivingThread(false);
   }, [selectedThreadId]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     let resizeObserver: ResizeObserver | null = null;
 
     if (responsiveModeOverride) {

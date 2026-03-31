@@ -25,7 +25,6 @@ import {
 } from "@/lib/dock-responsive";
 
 const CLOUD_WALL_REFRESH_MS = 2_000;
-const CLOUD_WALL_SINGLE_COLUMN_BREAKPOINT = 1_100;
 const WALL_PANE_COUNT = 4;
 
 function buildInitialPaneNodeIds(nodes: CloudNodeRecord[]) {
@@ -33,14 +32,12 @@ function buildInitialPaneNodeIds(nodes: CloudNodeRecord[]) {
 }
 
 function CloudWallPane({
-  forceMobile,
   index,
   node,
   nodeId,
   nodeOptions,
   onNodeChange
 }: {
-  forceMobile: boolean;
   index: number;
   node: CloudNodeRecord | null;
   nodeId: string;
@@ -59,9 +56,7 @@ function CloudWallPane({
     }
 
     const updatePaneMode = (width: number) => {
-      const nextMode = forceMobile
-        ? "mobile"
-        : getDockResponsiveMode(width, "container");
+      const nextMode = getDockResponsiveMode(width, "container");
       setPaneMode((current) => (current === nextMode ? current : nextMode));
     };
 
@@ -79,7 +74,7 @@ function CloudWallPane({
     return () => {
       resizeObserver.disconnect();
     };
-  }, [forceMobile]);
+  }, []);
 
   return (
     <section
@@ -141,7 +136,6 @@ function CloudWallPane({
         ) : (
           <DockApp
             apiBasePath={`/api/cloud/nodes/${encodeURIComponent(node.nodeId)}/proxy`}
-            responsiveModeOverride={paneMode}
             responsiveStrategy="container"
           />
         )}
@@ -159,24 +153,6 @@ export function CloudWallClient({
 }) {
   const [nodes, setNodes] = useState(initialNodes);
   const [paneNodeIds, setPaneNodeIds] = useState(() => buildInitialPaneNodeIds(initialNodes));
-  const [forceMobilePanes, setForceMobilePanes] = useState(false);
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia(
-      `(max-width: ${CLOUD_WALL_SINGLE_COLUMN_BREAKPOINT}px)`
-    );
-
-    const updateForceMobilePanes = () => {
-      setForceMobilePanes(mediaQuery.matches);
-    };
-
-    updateForceMobilePanes();
-    mediaQuery.addEventListener("change", updateForceMobilePanes);
-
-    return () => {
-      mediaQuery.removeEventListener("change", updateForceMobilePanes);
-    };
-  }, []);
 
   useEffect(() => {
     let active = true;
@@ -275,7 +251,6 @@ export function CloudWallClient({
 
           return (
             <CloudWallPane
-              forceMobile={forceMobilePanes}
               index={index}
               key={`pane-${index + 1}`}
               node={node}
