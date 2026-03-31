@@ -37,6 +37,7 @@ const en = {
   "aria.sandboxMode": "Sandbox mode",
   "aria.jumpToBottom": "Jump to bottom",
   "aria.toggleTasks": "Toggle task visibility",
+  "aria.toggleProcessedSteps": "Toggle processed steps",
   "aria.language": "Language",
   "thread.untitled": "Untitled thread",
   "thread.new": "New thread",
@@ -46,6 +47,7 @@ const en = {
   "stage.threadTitlePlaceholder": "Thread title",
   "actions.saveTitle": "Save title",
   "actions.cancel": "Cancel",
+  "actions.confirm": "Confirm",
   "actions.choosePath": "Choose path",
   "actions.usePath": "Use path",
   "actions.remove": "Remove",
@@ -71,6 +73,8 @@ const en = {
     "It will move out of the live list until you unarchive it.",
   "archive.confirmUnarchiveTitle": "Unarchive thread?",
   "archive.confirmUnarchiveBody": "It will return to the live list.",
+  "archive.tooltipArchive": "Archive thread",
+  "archive.tooltipUnarchive": "Unarchive thread",
   "takeover.detectedTitle": "This thread is active somewhere else.",
   "takeover.detectedBody":
     "Confirm to take over from the web and continue this session.",
@@ -97,6 +101,8 @@ const en = {
   "turn.status.interrupted": "Interrupted",
   "turn.status.failed": "Failed",
   "turn.status.inProgress": "In progress",
+  "turn.processed": "Processed",
+  "turn.processedWithDuration": "Processed {duration}",
   "reasoningEffort.low": "Low",
   "reasoningEffort.low.description": "Faster replies with lighter reasoning",
   "reasoningEffort.medium": "Medium",
@@ -169,7 +175,10 @@ const en = {
   "plan.summary": "{count} tasks, {completed} completed",
   "time.minutesAgo": "{count}m ago",
   "time.hoursAgo": "{count}h ago",
-  "time.daysAgo": "{count}d ago"
+  "time.daysAgo": "{count}d ago",
+  "time.minutesCompact": "{count}m",
+  "time.hoursCompact": "{count}h",
+  "time.daysCompact": "{count}d"
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -202,6 +211,7 @@ export const MESSAGES: Record<DockLocale, MessageCatalog> = {
     "aria.sandboxMode": "沙箱权限",
     "aria.jumpToBottom": "跳到底部",
     "aria.toggleTasks": "切换任务显示",
+    "aria.toggleProcessedSteps": "切换处理步骤显示",
     "aria.language": "语言",
     "thread.untitled": "未命名线程",
     "thread.new": "新线程",
@@ -211,6 +221,7 @@ export const MESSAGES: Record<DockLocale, MessageCatalog> = {
     "stage.threadTitlePlaceholder": "线程标题",
     "actions.saveTitle": "保存标题",
     "actions.cancel": "取消",
+    "actions.confirm": "确认",
     "actions.choosePath": "选择路径",
     "actions.usePath": "使用路径",
     "actions.remove": "移除",
@@ -235,6 +246,8 @@ export const MESSAGES: Record<DockLocale, MessageCatalog> = {
     "archive.confirmArchiveBody": "归档后它会从进行中列表移走，直到你再次取消归档。",
     "archive.confirmUnarchiveTitle": "取消归档这个线程？",
     "archive.confirmUnarchiveBody": "取消归档后它会重新回到进行中列表。",
+    "archive.tooltipArchive": "归档线程",
+    "archive.tooltipUnarchive": "取消归档线程",
     "takeover.detectedTitle": "检测到这个 thread 正在其他端活跃。",
     "takeover.detectedBody": "确认后会从网页端接管并继续本轮会话。",
     "takeover.notice": "这个 thread 当前处于活动状态。你下一次发送会接管当前会话。",
@@ -258,6 +271,8 @@ export const MESSAGES: Record<DockLocale, MessageCatalog> = {
     "turn.status.interrupted": "已中断",
     "turn.status.failed": "失败",
     "turn.status.inProgress": "进行中",
+    "turn.processed": "已处理",
+    "turn.processedWithDuration": "已处理 {duration}",
     "reasoningEffort.low": "低",
     "reasoningEffort.low.description": "更快回复，使用更轻量的推理",
     "reasoningEffort.medium": "中",
@@ -324,7 +339,10 @@ export const MESSAGES: Record<DockLocale, MessageCatalog> = {
     "plan.summary": "共 {count} 个任务，已完成 {completed} 个",
     "time.minutesAgo": "{count} 分钟前",
     "time.hoursAgo": "{count} 小时前",
-    "time.daysAgo": "{count} 天前"
+    "time.daysAgo": "{count} 天前",
+    "time.minutesCompact": "{count}分钟",
+    "time.hoursCompact": "{count}小时",
+    "time.daysCompact": "{count}天"
   },
   ja: {
     "language.label": "言語",
@@ -349,6 +367,7 @@ export const MESSAGES: Record<DockLocale, MessageCatalog> = {
     "aria.sandboxMode": "サンドボックス権限",
     "aria.jumpToBottom": "末尾へ移動",
     "aria.toggleTasks": "タスク表示を切り替える",
+    "aria.toggleProcessedSteps": "処理ステップの表示を切り替える",
     "aria.language": "言語",
     "thread.untitled": "無題のスレッド",
     "thread.new": "新しいスレッド",
@@ -358,6 +377,7 @@ export const MESSAGES: Record<DockLocale, MessageCatalog> = {
     "stage.threadTitlePlaceholder": "スレッドタイトル",
     "actions.saveTitle": "タイトルを保存",
     "actions.cancel": "キャンセル",
+    "actions.confirm": "確認",
     "actions.choosePath": "パスを選択",
     "actions.usePath": "このパスを使う",
     "actions.remove": "削除",
@@ -382,6 +402,8 @@ export const MESSAGES: Record<DockLocale, MessageCatalog> = {
     "archive.confirmArchiveBody": "再表示するまでライブ一覧から外れます。",
     "archive.confirmUnarchiveTitle": "このスレッドをアーカイブ解除しますか？",
     "archive.confirmUnarchiveBody": "解除するとライブ一覧に戻ります。",
+    "archive.tooltipArchive": "スレッドをアーカイブ",
+    "archive.tooltipUnarchive": "アーカイブを解除",
     "takeover.detectedTitle": "このスレッドは別の場所でアクティブです。",
     "takeover.detectedBody":
       "Web から引き継いでこのセッションを続行するには確認してください。",
@@ -408,6 +430,8 @@ export const MESSAGES: Record<DockLocale, MessageCatalog> = {
     "turn.status.interrupted": "中断",
     "turn.status.failed": "失敗",
     "turn.status.inProgress": "進行中",
+    "turn.processed": "処理済み",
+    "turn.processedWithDuration": "処理済み {duration}",
     "reasoningEffort.low": "低",
     "reasoningEffort.low.description": "軽い推論でより速く応答します",
     "reasoningEffort.medium": "中",
@@ -481,7 +505,10 @@ export const MESSAGES: Record<DockLocale, MessageCatalog> = {
     "plan.summary": "{count} 件のタスク、完了 {completed} 件",
     "time.minutesAgo": "{count} 分前",
     "time.hoursAgo": "{count} 時間前",
-    "time.daysAgo": "{count} 日前"
+    "time.daysAgo": "{count} 日前",
+    "time.minutesCompact": "{count}分",
+    "time.hoursCompact": "{count}時間",
+    "time.daysCompact": "{count}日"
   },
   es: {
     "language.label": "Idioma",
@@ -506,6 +533,7 @@ export const MESSAGES: Record<DockLocale, MessageCatalog> = {
     "aria.sandboxMode": "Modo de sandbox",
     "aria.jumpToBottom": "Ir al final",
     "aria.toggleTasks": "Alternar visibilidad de tareas",
+    "aria.toggleProcessedSteps": "Alternar visibilidad de pasos procesados",
     "aria.language": "Idioma",
     "thread.untitled": "Hilo sin título",
     "thread.new": "Nuevo hilo",
@@ -515,6 +543,7 @@ export const MESSAGES: Record<DockLocale, MessageCatalog> = {
     "stage.threadTitlePlaceholder": "Título del hilo",
     "actions.saveTitle": "Guardar título",
     "actions.cancel": "Cancelar",
+    "actions.confirm": "Confirmar",
     "actions.choosePath": "Elegir ruta",
     "actions.usePath": "Usar ruta",
     "actions.remove": "Quitar",
@@ -539,6 +568,8 @@ export const MESSAGES: Record<DockLocale, MessageCatalog> = {
     "archive.confirmArchiveBody": "Saldrá de la lista activa hasta que lo desarchives.",
     "archive.confirmUnarchiveTitle": "¿Desarchivar este hilo?",
     "archive.confirmUnarchiveBody": "Volverá a la lista activa.",
+    "archive.tooltipArchive": "Archivar hilo",
+    "archive.tooltipUnarchive": "Desarchivar hilo",
     "takeover.detectedTitle": "Este hilo está activo en otro lugar.",
     "takeover.detectedBody":
       "Confirma para tomar el control desde la web y continuar esta sesión.",
@@ -565,6 +596,8 @@ export const MESSAGES: Record<DockLocale, MessageCatalog> = {
     "turn.status.interrupted": "Interrumpido",
     "turn.status.failed": "Falló",
     "turn.status.inProgress": "En curso",
+    "turn.processed": "Procesado",
+    "turn.processedWithDuration": "Procesado {duration}",
     "reasoningEffort.low": "Bajo",
     "reasoningEffort.low.description":
       "Respuestas más rápidas con razonamiento ligero",
@@ -643,7 +676,10 @@ export const MESSAGES: Record<DockLocale, MessageCatalog> = {
     "plan.summary": "{count} tareas, {completed} completadas",
     "time.minutesAgo": "hace {count} min",
     "time.hoursAgo": "hace {count} h",
-    "time.daysAgo": "hace {count} d"
+    "time.daysAgo": "hace {count} d",
+    "time.minutesCompact": "{count}m",
+    "time.hoursCompact": "{count}h",
+    "time.daysCompact": "{count}d"
   },
   fr: {
     "language.label": "Langue",
@@ -668,6 +704,7 @@ export const MESSAGES: Record<DockLocale, MessageCatalog> = {
     "aria.sandboxMode": "Mode de sandbox",
     "aria.jumpToBottom": "Aller en bas",
     "aria.toggleTasks": "Basculer la visibilité des tâches",
+    "aria.toggleProcessedSteps": "Basculer l'affichage des étapes traitées",
     "aria.language": "Langue",
     "thread.untitled": "Fil sans titre",
     "thread.new": "Nouveau fil",
@@ -677,6 +714,7 @@ export const MESSAGES: Record<DockLocale, MessageCatalog> = {
     "stage.threadTitlePlaceholder": "Titre du fil",
     "actions.saveTitle": "Enregistrer le titre",
     "actions.cancel": "Annuler",
+    "actions.confirm": "Confirmer",
     "actions.choosePath": "Choisir un chemin",
     "actions.usePath": "Utiliser ce chemin",
     "actions.remove": "Retirer",
@@ -702,6 +740,8 @@ export const MESSAGES: Record<DockLocale, MessageCatalog> = {
     "archive.confirmArchiveBody": "Il quittera la liste active jusqu’à ce que vous le désarchiviez.",
     "archive.confirmUnarchiveTitle": "Désarchiver ce fil ?",
     "archive.confirmUnarchiveBody": "Il reviendra dans la liste active.",
+    "archive.tooltipArchive": "Archiver le fil",
+    "archive.tooltipUnarchive": "Désarchiver le fil",
     "takeover.detectedTitle": "Ce fil est actif ailleurs.",
     "takeover.detectedBody":
       "Confirmez pour reprendre depuis le web et continuer cette session.",
@@ -728,6 +768,8 @@ export const MESSAGES: Record<DockLocale, MessageCatalog> = {
     "turn.status.interrupted": "Interrompu",
     "turn.status.failed": "Échec",
     "turn.status.inProgress": "En cours",
+    "turn.processed": "Traité",
+    "turn.processedWithDuration": "Traité {duration}",
     "reasoningEffort.low": "Faible",
     "reasoningEffort.low.description":
       "Réponses plus rapides avec un raisonnement léger",
@@ -809,7 +851,10 @@ export const MESSAGES: Record<DockLocale, MessageCatalog> = {
     "plan.summary": "{count} tâches, {completed} terminées",
     "time.minutesAgo": "il y a {count} min",
     "time.hoursAgo": "il y a {count} h",
-    "time.daysAgo": "il y a {count} j"
+    "time.daysAgo": "il y a {count} j",
+    "time.minutesCompact": "{count}m",
+    "time.hoursCompact": "{count}h",
+    "time.daysCompact": "{count}j"
   }
 };
 

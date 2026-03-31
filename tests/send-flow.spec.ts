@@ -594,7 +594,8 @@ test("file change items render compact edit summaries from raw diffs", async ({ 
                       type: "update",
                       move_path: null
                     },
-                    diff: "@@ -1,1 +1,3 @@\n-old line\n+new line\n+another new line\n"
+                    diff:
+                      "@@ -1,1 +1,4 @@\n-old line\n+new line\n+another new line\n+This README stays intentionally high-level and points detailed ownership decisions to the docs in this repo and the owning layers.\n"
                   }
                 ]
               },
@@ -614,12 +615,57 @@ test("file change items render compact edit summaries from raw diffs", async ({ 
   await gotoDock(page);
   await page.locator(".dock-thread-row").first().click();
 
-  const chip = page.locator(".dock-filechange-chip").first();
-  await expect(chip).toBeVisible();
-  await expect(chip).toContainText("Edited");
-  await expect(chip).toContainText("dock-app.tsx");
-  await expect(chip).toContainText("+2");
-  await expect(chip).toContainText("-1");
+  const processedSummary = page.locator(".dock-processed-summary");
+  await expect(processedSummary).toBeVisible();
+  await expect(processedSummary).toContainText("Processed");
+  await expect(page.locator(".dock-filechange-card")).toHaveCount(0);
+
+  await processedSummary.click();
+
+  const card = page.locator(".dock-filechange-card").first();
+  const diffOutput = card.locator(".dock-filechange-output");
+
+  await expect(card).toBeVisible();
+  await expect(card).toContainText("Edited");
+  await expect(card).toContainText("dock-app.tsx");
+  await expect(card).toContainText("+3");
+  await expect(card).toContainText("-1");
+  await expect(diffOutput).toBeHidden();
+
+  await card.locator(".dock-filechange-summary").click();
+
+  await expect(diffOutput).toBeVisible();
+  await expect(diffOutput).toContainText("@@ -1,1 +1,4 @@");
+  await expect(diffOutput).toContainText("-old line");
+  await expect(diffOutput).toContainText("+new line");
+  await expect(diffOutput).toContainText("+another new line");
+  await expect(diffOutput).toContainText(
+    "This README stays intentionally high-level"
+  );
+
+  const overflowMetrics = await page.evaluate(() => {
+    const processed = document.querySelector(".dock-processed-items");
+    const card = document.querySelector(".dock-filechange-card");
+    const output = document.querySelector(".dock-filechange-output");
+
+    const processedBox = processed?.getBoundingClientRect();
+    const cardBox = card?.getBoundingClientRect();
+    const outputElement = output as HTMLElement | null;
+
+    return {
+      processedRight: processedBox?.right ?? 0,
+      cardRight: cardBox?.right ?? 0,
+      outputScrollWidth: outputElement?.scrollWidth ?? 0,
+      outputClientWidth: outputElement?.clientWidth ?? 0
+    };
+  });
+
+  expect(overflowMetrics.cardRight).toBeLessThanOrEqual(
+    overflowMetrics.processedRight + 1
+  );
+  expect(overflowMetrics.outputScrollWidth).toBeGreaterThan(
+    overflowMetrics.outputClientWidth
+  );
 });
 
 test("archiving the current thread jumps back to new thread and removes it from the live list", async ({
@@ -680,16 +726,149 @@ test("archiving the current thread jumps back to new thread and removes it from 
   await page.locator(".dock-thread-row").first().click();
   await expect(page.locator(".dock-stage-title")).toHaveText(archivedThreadName);
 
-  await page.locator(".dock-toolbar-confirm-shell > button.dock-icon-button").click();
-  await expect(page.locator(".dock-toolbar-confirm-popover")).toBeVisible();
-  await page
-    .locator(".dock-toolbar-confirm-popover .dock-request-action.is-primary")
-    .click();
+  const threadRowShell = page.locator(".dock-thread-row-shell").first();
+  await threadRowShell.hover();
+  const threadTime = threadRowShell.locator(".dock-thread-row-time");
+  const actionShell = threadRowShell.locator(".dock-thread-row-action-shell");
+  const archiveButton = threadRowShell.locator("button.dock-thread-row-action");
+  const archiveTooltip = page.locator(".dock-thread-row-action-tooltip");
+  const [timeBox, actionShellBox, actionBox] = await Promise.all([
+    threadTime.boundingBox(),
+    actionShell.boundingBox(),
+    archiveButton.boundingBox()
+  ]);
+
+  expect(timeBox).not.toBeNull();
+  expect(actionShellBox).not.toBeNull();
+  expect(actionBox).not.toBeNull();
+  await expect(threadTime).toHaveText(/^\d+[mhdj]$/);
+  expect(actionShellBox!.width).toBeLessThanOrEqual(40);
+  expect(
+    Math.abs(
+      timeBox!.x + timeBox!.width - (actionBox!.x + actionBox!.width)
+    )
+  ).toBeLessThanOrEqual(1);
+  expect(actionBox!.y).toBeGreaterThan(timeBox!.y);
+  const rowBox = await threadRowShell.boundingBox();
+
+  expect(rowBox).not.toBeNull();
+  await archiveButton.hover();
+  await expect(archiveTooltip).toBeVisible();
+  await expect(archiveTooltip).toHaveText("Archive thread");
+  await archiveButton.click();
+  await expect(archiveButton).toHaveText("Confirm");
+  const [confirmRowBox, confirmTimeBox, confirmActionBox] = await Promise.all([
+    threadRowShell.boundingBox(),
+    threadTime.boundingBox(),
+    archiveButton.boundingBox()
+  ]);
+
+  expect(confirmRowBox).not.toBeNull();
+  expect(confirmTimeBox).not.toBeNull();
+  expect(confirmActionBox).not.toBeNull();
+  expect(Math.abs(confirmTimeBox!.x - timeBox!.x)).toBeLessThanOrEqual(6);
+  expect(
+    Math.abs(
+      confirmActionBox!.x +
+        confirmActionBox!.width -
+        (actionBox!.x + actionBox!.width)
+    )
+  ).toBeLessThanOrEqual(6);
+  const confirmButtonStyles = await archiveButton.evaluate((element) => {
+    const style = window.getComputedStyle(element);
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    if (context) {
+      context.fillStyle = style.color;
+    }
+    const normalizedColor =
+      context && typeof context.fillStyle === "string"
+        ? context.fillStyle
+        : String(style.color);
+    return {
+      borderTopWidth: style.borderTopWidth,
+      backgroundColor: style.backgroundColor,
+      color: normalizedColor
+    };
+  });
+  const confirmColorMatch = confirmButtonStyles.color.match(/[0-9a-f]{2}/gi);
+
+  expect(confirmButtonStyles.borderTopWidth).toBe("0px");
+  expect(confirmActionBox!.height).toBeLessThanOrEqual(22);
+  expect(Math.abs(confirmRowBox!.height - rowBox!.height)).toBeLessThanOrEqual(1);
+  expect(confirmButtonStyles.backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
+  expect(confirmColorMatch).not.toBeNull();
+  const [confirmRed, confirmGreen, confirmBlue] = confirmColorMatch!
+    .slice(0, 3)
+    .map((value: string) => Number.parseInt(value, 16));
+  expect(confirmRed - confirmGreen).toBeGreaterThanOrEqual(20);
+  expect(confirmRed - confirmBlue).toBeGreaterThanOrEqual(10);
+  await page.locator(".dock-thread-row").first().hover({ position: { x: 24, y: 12 } });
+  await expect(archiveButton).not.toHaveClass(/is-confirming/);
+  await expect(archiveTooltip).toBeHidden();
+
+  await threadRowShell.hover();
+  await archiveButton.click();
+  await expect(archiveButton).toHaveText("Confirm");
+  await archiveButton.click();
 
   await expect(page.locator(".dock-stage-title")).toHaveText("New thread");
   await expect(page.locator(".dock-hero")).toBeVisible();
   await expect(page.locator(".dock-thread-row")).toHaveCount(0);
   await expect(page.locator(".dock-empty-sidebar")).toContainText("No matching threads");
+});
+
+test("archived rows stay unselectable and keep a persistent unarchive action", async ({
+  page
+}) => {
+  const archivedThreadName = `archived row ${Date.now()}`;
+
+  await installDockApiMock(page, {
+    threads: [
+      {
+        id: "thread-archived-row-1",
+        preview: archivedThreadName,
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000000,
+        updatedAt: 1774003600,
+        status: { type: "notLoaded" },
+        path: null,
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "archive",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: archivedThreadName,
+        turns: []
+      }
+    ]
+  });
+
+  await gotoDock(page);
+  await chooseSelectOption(page, "Thread archive filter", "Archived");
+
+  const threadRow = page.locator(".dock-thread-row").first();
+  const unarchiveButton = page
+    .locator("button.dock-thread-row-action.is-persistent")
+    .first();
+  const unarchiveTooltip = page.locator(".dock-thread-row-action-tooltip");
+
+  await expect(threadRow).toBeDisabled();
+  await expect(unarchiveButton).toBeVisible();
+  await expect(page.locator(".dock-thread-row-badge")).toHaveCount(0);
+  await unarchiveButton.hover();
+  await expect(unarchiveTooltip).toBeVisible();
+  await expect(unarchiveTooltip).toHaveText("Unarchive thread");
+
+  await unarchiveButton.click();
+  await expect(unarchiveButton).toHaveText("Confirm");
+  await page.locator(".dock-thread-row").first().hover({ position: { x: 24, y: 12 } });
+  await expect(unarchiveButton).not.toHaveClass(/is-confirming/);
+
+  await expect(page.locator(".dock-stage-title")).toHaveText("New thread");
+  await expect(page.locator(".dock-error")).toHaveCount(0);
 });
 
 test("approval buttons submit the matching server request payload", async ({ page }) => {
@@ -839,6 +1018,13 @@ test("command execution items keep a visible expand control and reveal output", 
   await gotoDock(page);
   await page.locator(".dock-thread-row").first().click();
 
+  const processedSummary = page.locator(".dock-processed-summary");
+  await expect(processedSummary).toBeVisible();
+  await expect(processedSummary).toContainText("Processed");
+  await expect(page.locator(".dock-command-card")).toHaveCount(0);
+
+  await processedSummary.click();
+
   const card = page.locator(".dock-command-card");
   const summary = card.locator(".dock-command-summary");
   const toggle = card.locator(".dock-command-toggle");
@@ -856,6 +1042,127 @@ test("command execution items keep a visible expand control and reveal output", 
   await expect(detail).toBeVisible();
   await expect(detail).toContainText(DEFAULT_CWD);
   await expect(detail).toContainText("Sunday, March 29, 2026");
+});
+
+test("completed turns collapse processed steps and show turn duration in the disclosure header", async ({
+  page
+}) => {
+  await installDockApiMock(page, {
+    threads: [
+      {
+        id: "thread-processed-steps",
+        preview: "processed steps",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000100,
+        updatedAt: 1774000400,
+        status: { type: "idle" },
+        path: null,
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "session",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: "processed steps",
+        turns: [
+          {
+            id: "turn-processed-steps",
+            status: "completed",
+            error: null,
+            startedAt: 1774000000000,
+            completedAt: 1774000620000,
+            durationMs: 620000,
+            items: [
+              {
+                type: "userMessage",
+                id: "item-user-processed",
+                content: [
+                  {
+                    type: "text",
+                    text: "push the branch and report back",
+                    text_elements: []
+                  }
+                ]
+              },
+              {
+                type: "agentMessage",
+                id: "item-commentary-processed",
+                text:
+                  "I am pushing the local commits to origin/main, then I will verify the processed-step rendering path.",
+                phase: "commentary"
+              },
+              {
+                type: "commandExecution",
+                id: "item-command-processed",
+                command: "git push origin main",
+                cwd: DEFAULT_CWD,
+                processId: "2456",
+                status: "completed",
+                commandActions: [],
+                aggregatedOutput: "To origin/main\n   abc123..def456  main -> main",
+                exitCode: 0,
+                durationMs: 1800
+              },
+              {
+                type: "fileChange",
+                id: "item-file-change-processed",
+                status: "completed",
+                changes: [
+                  {
+                    path: `${DEFAULT_CWD}\\src\\components\\dock-shell-view.tsx`,
+                    type: "update",
+                    additions: 12,
+                    deletions: 3
+                  }
+                ]
+              },
+              {
+                type: "agentMessage",
+                id: "item-final-processed",
+                text: "main is synced to origin/main now.",
+                phase: "final_answer"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  });
+
+  await gotoDock(page);
+  await page.locator(".dock-thread-row").first().click();
+
+  const processedSummary = page.locator(".dock-processed-summary");
+  await expect(processedSummary).toBeVisible();
+  await expect(processedSummary).toContainText("Processed 10m 20s");
+  await expect(page.locator(".dock-processed-items")).toHaveCount(0);
+  await expect(page.locator(".dock-markdown")).toContainText("main is synced to origin/main now.");
+  const labelBox = await page.locator(".dock-processed-label").boundingBox();
+  const toggleBox = await page.locator(".dock-processed-toggle").boundingBox();
+  const lineBoxes = await page.locator(".dock-processed-line").evaluateAll((elements) =>
+    elements.map((element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        left: rect.left,
+        right: rect.right
+      };
+    })
+  );
+  expect(labelBox).not.toBeNull();
+  expect(toggleBox).not.toBeNull();
+  expect(lineBoxes).toHaveLength(2);
+  expect(toggleBox!.x).toBeGreaterThan(labelBox!.x + labelBox!.width);
+  expect(lineBoxes[1].left).toBeGreaterThan(toggleBox!.x + toggleBox!.width);
+
+  await processedSummary.click();
+
+  const processedItems = page.locator(".dock-processed-items");
+  await expect(processedItems).toBeVisible();
+  await expect(processedItems).toContainText("git push origin main");
+  await expect(processedItems).toContainText("I am pushing the local commits");
+  await expect(processedItems).toContainText("Edited");
+  await expect(processedItems).toContainText("dock-shell-view.tsx");
 });
 
 test("latest plan renders above the composer instead of inside the transcript", async ({

@@ -78,21 +78,25 @@ function createDefaultValue(): I18nContextValue {
     },
     formatSidebarTime(unixSeconds) {
       const diff = Date.now() - unixSeconds * 1000;
-      const hour = 60 * 60 * 1000;
+      const minute = 60_000;
+      const hour = minute * 60;
       const day = 24 * hour;
-      const intlLocale = getIntlLocale(locale);
 
-      if (diff < day) {
-        return new Intl.DateTimeFormat(intlLocale, {
-          hour: "numeric",
-          minute: "2-digit"
-        }).format(new Date(unixSeconds * 1000));
+      if (diff < hour) {
+        return t("time.minutesCompact", {
+          count: Math.max(1, Math.round(diff / minute))
+        });
       }
 
-      return new Intl.DateTimeFormat(intlLocale, {
-        month: "short",
-        day: "numeric"
-      }).format(new Date(unixSeconds * 1000));
+      if (diff < day) {
+        return t("time.hoursCompact", {
+          count: Math.max(1, Math.round(diff / hour))
+        });
+      }
+
+      return t("time.daysCompact", {
+        count: Math.max(1, Math.round(diff / day))
+      });
     },
     formatDateTime(unixSeconds) {
       return new Intl.DateTimeFormat(getIntlLocale(locale), {
@@ -162,20 +166,25 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       },
       formatSidebarTime(unixSeconds) {
         const diff = Date.now() - unixSeconds * 1000;
-        const hour = 60 * 60 * 1000;
+        const minute = 60_000;
+        const hour = minute * 60;
         const day = 24 * hour;
 
-        if (diff < day) {
-          return new Intl.DateTimeFormat(intlLocale, {
-            hour: "numeric",
-            minute: "2-digit"
-          }).format(new Date(unixSeconds * 1000));
+        if (diff < hour) {
+          return t("time.minutesCompact", {
+            count: Math.max(1, Math.round(diff / minute))
+          });
         }
 
-        return new Intl.DateTimeFormat(intlLocale, {
-          month: "short",
-          day: "numeric"
-        }).format(new Date(unixSeconds * 1000));
+        if (diff < day) {
+          return t("time.hoursCompact", {
+            count: Math.max(1, Math.round(diff / hour))
+          });
+        }
+
+        return t("time.daysCompact", {
+          count: Math.max(1, Math.round(diff / day))
+        });
       },
       formatDateTime(unixSeconds) {
         return new Intl.DateTimeFormat(intlLocale, {

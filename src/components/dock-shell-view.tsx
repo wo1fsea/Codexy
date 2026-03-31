@@ -10,6 +10,7 @@ import {
   type KeyboardEvent,
   type ReactNode
 } from "react";
+import { createPortal } from "react-dom";
 
 import { AppIcon, SIDEBAR_ITEMS } from "@/components/dock-icons";
 import { DockSelect, type DockSelectOption } from "@/components/dock-select";
@@ -44,15 +45,31 @@ type ThreadGroup = {
   updatedAt: number;
 };
 
+type ArchiveTooltipState = {
+  label: string;
+  style: CSSProperties;
+};
+
+type TranscriptEntry =
+  | {
+      type: "item";
+      item: DockThreadItem;
+    }
+  | {
+      type: "processed";
+      id: string;
+      items: DockThreadItem[];
+    };
+
 const DEFAULT_SIDEBAR_WIDTH = 296;
 const MIN_SIDEBAR_WIDTH = 248;
 const MAX_SIDEBAR_WIDTH = 480;
 const SIDEBAR_WIDTH_STORAGE_KEY = "codexy-sidebar-width";
 
 type DockShellViewProps = {
-  archiveConfirmOpen: boolean;
+  archiveConfirmThreadId: string | null;
   archiveFilter: ArchiveFilter;
-  archivingThread: boolean;
+  archivingThreadId: string | null;
   attachments: UploadItem[];
   composerCwd: string;
   composerModel: string;
@@ -82,7 +99,7 @@ type DockShellViewProps = {
   workspaceLabel: string;
   onArchiveFilterChange: (value: ArchiveFilter) => void;
   onArchiveCancel: () => void;
-  onArchiveConfirm: () => void;
+  onArchiveConfirm: (threadId: string) => void;
   onComposerCwdChange: (value: string) => void;
   onComposerModelChange: (value: string) => void;
   onComposerPermissionPresetChange: (value: DockPermissionPreset) => void;
@@ -98,13 +115,13 @@ type DockShellViewProps = {
   onRenameSave: () => void;
   onResolveRequest: (request: DockServerRequest) => ReactNode;
   onSearchChange: (value: string) => void;
-  onSelectThread: (threadId: string) => void;
+  onSelectThread: (thread: DockThread) => void;
   onSidebarClose: () => void;
   onSubmitPrompt: () => void;
   onTakeoverCancel: () => void;
   onTakeoverConfirm: () => void;
   onThreadNameDraftChange: (value: string) => void;
-  onToggleArchive: () => void;
+  onToggleArchive: (threadId: string) => void;
   onToggleRename: () => void;
   onUploadFiles: (files: FileList | File[] | null) => void;
   renderThreadItem: (item: DockThreadItem) => ReactNode;
@@ -191,6 +208,43 @@ function getThreadStatusText(thread: DockThread, t: TranslateFn) {
     : t("status.active");
 }
 
+function getArchiveButtonLabel(
+  archived: boolean,
+  busy: boolean,
+  confirming: boolean,
+  t: TranslateFn
+) {
+  if (busy) {
+    return t("actions.archiving");
+  }
+
+  if (confirming) {
+    return t("actions.confirm");
+  }
+
+  return archived ? t("actions.unarchive") : t("actions.archive");
+}
+
+function getArchiveButtonTooltip(
+  archived: boolean,
+  t: TranslateFn
+) {
+  return archived
+    ? t("archive.tooltipUnarchive")
+    : t("archive.tooltipArchive");
+}
+
+function shouldShowArchiveButtonText(confirming: boolean, busy: boolean) {
+  return confirming || busy;
+}
+
+function isSidebarArchivedThread(
+  thread: DockThread,
+  archiveFilter: ArchiveFilter
+) {
+  return archiveFilter === "archived" || thread.source === "archive";
+}
+
 function getTurnStatusLabel(status: DockTurn["status"], t: TranslateFn) {
   if (status === "completed") return t("turn.status.completed");
   if (status === "interrupted") return t("turn.status.interrupted");
@@ -265,6 +319,92 @@ function getRenderableTranscriptItems(turn: DockTurn) {
   return getRenderableTurnItems(turn).filter((item) => item.type !== "plan");
 }
 
+function isProcessedTranscriptItem(item: DockThreadItem) {
+  if (item.type === "commandExecution" || item.type === "fileChange") {
+    return true;
+  }
+
+  if (item.type === "agentMessage") {
+    const agentItem = item as Extract<DockThreadItem, { type: "agentMessage" }>;
+    return agentItem.phase === "commentary";
+  }
+
+  return false;
+}
+
+function getTranscriptEntries(turn: DockTurn): TranscriptEntry[] {
+  const entries: TranscriptEntry[] = [];
+  const processedItems: DockThreadItem[] = [];
+  let processedStartIndex = -1;
+  const transcriptItems = getRenderableTranscriptItems(turn);
+
+  const flushProcessedItems = () => {
+    if (!processedItems.length) {
+      return;
+    }
+
+    entries.push({
+      type: "processed",
+      id: `${turn.id}:processed:${processedStartIndex}`,
+      items: [...processedItems]
+    });
+    processedItems.length = 0;
+    processedStartIndex = -1;
+  };
+
+  transcriptItems.forEach((item, index) => {
+    if (isProcessedTranscriptItem(item)) {
+      if (processedStartIndex < 0) {
+        processedStartIndex = index;
+      }
+      processedItems.push(item);
+      return;
+    }
+
+    flushProcessedItems();
+    entries.push({
+      type: "item",
+      item
+    });
+  });
+
+  flushProcessedItems();
+  return entries;
+}
+
+function formatTurnDuration(durationMs: number | null | undefined) {
+  if (!durationMs || durationMs <= 0) {
+    return null;
+  }
+
+  const totalSeconds = Math.max(1, Math.round(durationMs / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+  }
+
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+
+  return `${seconds}s`;
+}
+
+function getProcessedEntryLabel(turn: DockTurn, t: TranslateFn) {
+  const duration = formatTurnDuration(turn.durationMs);
+
+  if (turn.status === "completed") {
+    return duration
+      ? t("turn.processedWithDuration", { duration })
+      : t("turn.processed");
+  }
+
+  return duration ? `${getTurnStatusLabel(turn.status, t)} ${duration}` : getTurnStatusLabel(turn.status, t);
+}
+
 function getLatestPlanItem(
   thread: DockThread | null
 ): Extract<DockThreadItem, { type: "plan" }> | null {
@@ -289,30 +429,25 @@ function getLatestPlanItem(
 
 export function DockShellView(props: DockShellViewProps) {
   const {
-    formatRelativeTime,
+    formatSidebarTime,
     locale,
     localeOptions,
     setLocale,
     t
   } = useI18n();
-  const selectedThreadArchived = props.selectedThread?.source === "archive";
-  const archiveButtonLabel = props.archivingThread
-    ? t("actions.archiving")
-    : selectedThreadArchived
-      ? t("actions.unarchive")
-      : t("actions.archive");
-  const archiveConfirmTitle = selectedThreadArchived
-    ? t("archive.confirmUnarchiveTitle")
-    : t("archive.confirmArchiveTitle");
-  const archiveConfirmBody = selectedThreadArchived
-    ? t("archive.confirmUnarchiveBody")
-    : t("archive.confirmArchiveBody");
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  const [expandedProcessedEntries, setExpandedProcessedEntries] = useState<
+    Record<string, boolean>
+  >({});
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [heroCwdOpen, setHeroCwdOpen] = useState(false);
   const [heroCwdDraft, setHeroCwdDraft] = useState("");
+  const [mounted, setMounted] = useState(false);
+  const [archiveTooltip, setArchiveTooltip] = useState<ArchiveTooltipState | null>(
+    null
+  );
   const resizeStateRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const stageScrollRef = useRef<HTMLElement | null>(null);
   const stageScrollBodyRef = useRef<HTMLDivElement | null>(null);
@@ -441,6 +576,10 @@ export function DockShellView(props: DockShellViewProps) {
   }
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
     const savedWidth = window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
     if (!savedWidth) {
       return;
@@ -498,6 +637,24 @@ export function DockShellView(props: DockShellViewProps) {
       setHeroCwdOpen(false);
     }
   }, [props.selectedThread, props.loadingThread]);
+
+  useEffect(() => {
+    if (!archiveTooltip) {
+      return;
+    }
+
+    function clearTooltip() {
+      setArchiveTooltip(null);
+    }
+
+    window.addEventListener("resize", clearTooltip);
+    window.addEventListener("scroll", clearTooltip, true);
+
+    return () => {
+      window.removeEventListener("resize", clearTooltip);
+      window.removeEventListener("scroll", clearTooltip, true);
+    };
+  }, [archiveTooltip]);
 
   useEffect(() => {
     let frameId: number | null = null;
@@ -689,6 +846,21 @@ export function DockShellView(props: DockShellViewProps) {
     "--dock-sidebar-width": `${sidebarWidth}px`
   } as CSSProperties;
 
+  function showArchiveTooltip(target: HTMLButtonElement, label: string) {
+    const rect = target.getBoundingClientRect();
+    setArchiveTooltip({
+      label,
+      style: {
+        left: rect.right + 8,
+        top: rect.top + rect.height / 2
+      }
+    });
+  }
+
+  function hideArchiveTooltip() {
+    setArchiveTooltip(null);
+  }
+
   return (
     <>
       <div
@@ -820,25 +992,126 @@ export function DockShellView(props: DockShellViewProps) {
                     </button>
                     {!collapsedGroups[group.cwd] ? (
                       <div className="dock-thread-group-items">
-                        {group.items.map((thread) => (
-                          <button
-                            className={clsx(
-                              "dock-thread-row",
-                              props.selectedThreadId === thread.id && "is-selected"
-                            )}
-                            key={thread.id}
-                            onClick={() => props.onSelectThread(thread.id)}
-                            type="button"
-                          >
-                            <div className="dock-thread-row-head">
-                              <strong>{getThreadLabel(thread, t)}</strong>
-                              <span>{formatRelativeTime(thread.updatedAt)}</span>
+                        {group.items.map((thread) => {
+                          const threadArchived = isSidebarArchivedThread(
+                            thread,
+                            props.archiveFilter
+                          );
+                          const archiveConfirmOpen =
+                            props.archiveConfirmThreadId === thread.id;
+                          const archivingThread =
+                            props.archivingThreadId === thread.id;
+                          const archiveButtonLabel = getArchiveButtonLabel(
+                            threadArchived,
+                            archivingThread,
+                            archiveConfirmOpen,
+                            t
+                          );
+                          const archiveButtonTooltip = getArchiveButtonTooltip(
+                            threadArchived,
+                            t
+                          );
+                          const archiveButtonShowsText =
+                            shouldShowArchiveButtonText(
+                              archiveConfirmOpen,
+                              archivingThread
+                            );
+
+                          return (
+                            <div
+                              className={clsx(
+                                "dock-thread-row-shell",
+                                !threadArchived &&
+                                  props.selectedThreadId === thread.id &&
+                                  "is-selected",
+                                threadArchived && "is-archived",
+                                archiveConfirmOpen && "is-confirm-open"
+                              )}
+                              key={thread.id}
+                            >
+                              <button
+                                className="dock-thread-row"
+                                disabled={threadArchived}
+                                onClick={() => props.onSelectThread(thread)}
+                                type="button"
+                              >
+                                <strong className="dock-thread-row-title">
+                                  {getThreadLabel(thread, t)}
+                                </strong>
+                                <span className="dock-thread-row-status">
+                                  {getThreadStatusText(thread, t)}
+                                </span>
+                              </button>
+                              <span className="dock-thread-row-time">
+                                {formatSidebarTime(thread.updatedAt)}
+                              </span>
+                              <div
+                                className="dock-thread-row-action-shell"
+                              >
+                                <button
+                                  className={clsx(
+                                    "dock-thread-row-action",
+                                    archiveButtonShowsText &&
+                                      "dock-thread-row-action-text",
+                                    !archiveButtonShowsText &&
+                                      "dock-thread-row-action-icon",
+                                    archiveConfirmOpen && "is-confirming",
+                                    archivingThread && "is-busy",
+                                    threadArchived && "is-persistent"
+                                  )}
+                                  aria-label={
+                                    archiveButtonShowsText
+                                      ? archiveButtonLabel
+                                      : archiveButtonTooltip
+                                  }
+                                  disabled={archivingThread}
+                                  onBlur={hideArchiveTooltip}
+                                  onClick={() => {
+                                    hideArchiveTooltip();
+                                    if (archiveConfirmOpen) {
+                                      props.onArchiveConfirm(thread.id);
+                                      return;
+                                    }
+
+                                    props.onToggleArchive(thread.id);
+                                  }}
+                                  onFocus={(event) => {
+                                    if (!archiveButtonShowsText) {
+                                      showArchiveTooltip(
+                                        event.currentTarget,
+                                        archiveButtonTooltip
+                                      );
+                                    }
+                                  }}
+                                  onPointerEnter={(event) => {
+                                    if (!archiveButtonShowsText) {
+                                      showArchiveTooltip(
+                                        event.currentTarget,
+                                        archiveButtonTooltip
+                                      );
+                                    }
+                                  }}
+                                  onPointerLeave={() => {
+                                    hideArchiveTooltip();
+                                    if (archiveConfirmOpen && !archivingThread) {
+                                      props.onArchiveCancel();
+                                    }
+                                  }}
+                                  type="button"
+                                >
+                                  {archiveButtonShowsText ? (
+                                    archiveButtonLabel
+                                  ) : (
+                                    <AppIcon
+                                      className="dock-inline-icon"
+                                      name="archive"
+                                    />
+                                  )}
+                                </button>
+                              </div>
                             </div>
-                            <div className="dock-thread-row-meta">
-                              <span>{getThreadStatusText(thread, t)}</span>
-                            </div>
-                          </button>
-                        ))}
+                          );
+                        })}
                       </div>
                     ) : null}
                   </section>
@@ -896,61 +1169,13 @@ export function DockShellView(props: DockShellViewProps) {
 
             <div className="dock-stage-toolbar">
               {props.selectedThread ? (
-                <>
-                  <button
-                    className="dock-icon-button"
-                    onClick={props.onToggleRename}
-                    type="button"
-                  >
-                    <AppIcon className="dock-inline-icon" name="rename" />
-                  </button>
-                  <div
-                    className={clsx(
-                      "dock-toolbar-confirm-shell",
-                      props.archiveConfirmOpen && "is-open"
-                    )}
-                  >
-                    <button
-                      className={clsx(
-                        "dock-icon-button",
-                        props.archiveConfirmOpen && "is-armed",
-                        props.archivingThread && "is-busy"
-                      )}
-                      disabled={props.archivingThread}
-                      onClick={props.onToggleArchive}
-                      title={archiveButtonLabel}
-                      type="button"
-                    >
-                      <AppIcon className="dock-inline-icon" name="archive" />
-                    </button>
-                    {props.archiveConfirmOpen ? (
-                      <div className="dock-toolbar-confirm-popover">
-                        <div className="dock-toolbar-confirm-copy">
-                          <strong>{archiveConfirmTitle}</strong>
-                          <span>{archiveConfirmBody}</span>
-                        </div>
-                        <div className="dock-toolbar-confirm-actions">
-                          <button
-                            className="dock-request-action is-primary"
-                            disabled={props.archivingThread}
-                            onClick={props.onArchiveConfirm}
-                            type="button"
-                          >
-                            {archiveButtonLabel}
-                          </button>
-                          <button
-                            className="dock-ghost-action is-muted"
-                            disabled={props.archivingThread}
-                            onClick={props.onArchiveCancel}
-                            type="button"
-                          >
-                            {t("actions.cancel")}
-                          </button>
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                </>
+                <button
+                  className="dock-icon-button"
+                  onClick={props.onToggleRename}
+                  type="button"
+                >
+                  <AppIcon className="dock-inline-icon" name="rename" />
+                </button>
               ) : null}
               <button
                 className="dock-icon-button"
@@ -1061,10 +1286,10 @@ export function DockShellView(props: DockShellViewProps) {
               {props.selectedThread ? (
                 <div className="dock-transcript">
                   {props.selectedThread.turns.map((turn) => {
-                    const transcriptItems = getRenderableTranscriptItems(turn);
+                    const transcriptEntries = getTranscriptEntries(turn);
                     const showThinkingState = shouldShowThinkingState(turn);
 
-                    if (!transcriptItems.length && !showThinkingState) {
+                    if (!transcriptEntries.length && !showThinkingState) {
                       return null;
                     }
 
@@ -1075,19 +1300,86 @@ export function DockShellView(props: DockShellViewProps) {
                           <code>{turn.id.slice(0, 8)}</code>
                         </div>
                         <div className="dock-turn-items">
-                          {transcriptItems.map((item) => (
-                            <div
-                              className={clsx(
-                                "dock-turn-item",
-                                item.type === "userMessage" && "is-user",
-                                item.type === "agentMessage" && "is-agent",
-                                item.type === "reasoning" && "is-reasoning"
-                              )}
-                              key={item.id}
-                            >
-                              {props.renderThreadItem(item)}
-                            </div>
-                          ))}
+                          {transcriptEntries.map((entry) => {
+                            if (entry.type === "processed") {
+                              const isExpanded =
+                                expandedProcessedEntries[entry.id] ??
+                                (turn.status === "inProgress");
+
+                              return (
+                                <div
+                                  className="dock-turn-item is-processed"
+                                  key={entry.id}
+                                >
+                                  <div className="dock-processed-block">
+                                    <button
+                                      aria-expanded={isExpanded}
+                                      aria-label={t("aria.toggleProcessedSteps")}
+                                      className={clsx(
+                                        "dock-processed-summary",
+                                        isExpanded && "is-expanded"
+                                      )}
+                                      onClick={() =>
+                                        setExpandedProcessedEntries((current) => ({
+                                          ...current,
+                                          [entry.id]: !isExpanded
+                                        }))
+                                      }
+                                      type="button"
+                                    >
+                                      <span className="dock-processed-line" />
+                                      <span className="dock-processed-label-group">
+                                        <span className="dock-processed-label">
+                                          {getProcessedEntryLabel(turn, t)}
+                                        </span>
+                                        <span
+                                          aria-hidden="true"
+                                          className="dock-processed-toggle"
+                                        >
+                                          <AppIcon
+                                            className="dock-processed-toggle-icon"
+                                            name="chevron"
+                                          />
+                                        </span>
+                                      </span>
+                                      <span className="dock-processed-line" />
+                                    </button>
+                                    {isExpanded ? (
+                                      <div className="dock-processed-items">
+                                        {entry.items.map((item) => (
+                                          <div
+                                            className={clsx(
+                                              "dock-processed-item",
+                                              item.type === "agentMessage" && "is-agent"
+                                            )}
+                                            key={item.id}
+                                          >
+                                            {props.renderThreadItem(item)}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            const item = entry.item;
+
+                            return (
+                              <div
+                                className={clsx(
+                                  "dock-turn-item",
+                                  item.type === "userMessage" && "is-user",
+                                  item.type === "agentMessage" && "is-agent",
+                                  item.type === "reasoning" && "is-reasoning"
+                                )}
+                                key={item.id}
+                              >
+                                {props.renderThreadItem(item)}
+                              </div>
+                            );
+                          })}
                         </div>
                         {showThinkingState ? (
                           <div
@@ -1308,6 +1600,18 @@ export function DockShellView(props: DockShellViewProps) {
           </section>
         </main>
       </div>
+      {mounted && archiveTooltip
+        ? createPortal(
+            <span
+              aria-hidden="true"
+              className="dock-thread-row-action-tooltip"
+              style={archiveTooltip.style}
+            >
+              {archiveTooltip.label}
+            </span>,
+            document.body
+          )
+        : null}
     </>
   );
 }

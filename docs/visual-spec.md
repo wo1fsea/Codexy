@@ -175,6 +175,17 @@ The product should not rely on only `primary / muted / soft`. It needs a stable 
 - Metadata size: `11px to 12px`
 - Selected state uses a subtle filled background and visible border.
 - Prefer one time representation per row. Do not show duplicated timestamp formats in the same compact row.
+- Row-level archive controls live in the thread row instead of the stage header.
+- Live rows keep the archive control hidden until hover or focus.
+- Compact thread rows reserve the right column for metadata: timestamp on the first line, archive action on the second line, both right-aligned inside the card.
+- Use terse locale-appropriate compact timestamps in sidebar rows, such as `3h` in English or `3小时` in Simplified Chinese, rather than longer relative prose.
+- Keep that right column visually narrow in the resting state; do not reserve a broad gutter just to accommodate the transient confirm pill.
+- The archive control sits inside the thread card chrome, aligned to the right edge of the second metadata line.
+- At rest the control is an icon-only affordance; hover should reveal a custom dark tooltip bubble to the right of the control rather than the browser's default title popup, and that tooltip should float above the sidebar-stage split instead of being clipped by it.
+- Archived rows are visually distinct, keep the same row-action control persistently visible, and do not act as transcript-navigation targets.
+- The row action itself carries archived state. Do not add a second archived badge beside it.
+- The first press enters an inline red confirm pill in place; leaving that confirm control cancels it. Keep the pill borderless, visually tight, driven mainly by its fill color, and use a distinctly darker red label than the fill. Do not open a separate confirmation popover.
+- Entering the inline confirm state should not cause the compact row to resize, change height, or visibly jerk.
 
 ### Stage Header
 
@@ -182,6 +193,7 @@ The product should not rely on only `primary / muted / soft`. It needs a stable 
 - Stage title size: `15px`, weight `600`
 - Subtitle size: `12px`
 - Toolbar actions use `28px to 32px` hit areas
+- Thread archive and unarchive actions are not owned by the stage header.
 - On phone widths, collapse stage subtitle before wrapping the header into multiple tall rows.
 
 ### Transcript
@@ -189,6 +201,8 @@ The product should not rely on only `primary / muted / soft`. It needs a stable 
 - Turn metadata size: `11px to 12px`
 - User messages align to the right edge of the transcript column
 - Assistant/tool cards align to the left edge
+- Completed-turn processing details may collapse into a centered disclosure row; expanding it should reveal commentary and tool rows without moving the final answer out of transcript order
+- Edited-file cards with diff content use the same inline disclosure language as command cards: compact summary row first, monospace diff body on expand, and no expand affordance when no diff body exists
 - Message card radius: `12px`
 - Artifact/request card radius: `12px`
 - Long text uses `1.5` to `1.6` line height

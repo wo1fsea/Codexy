@@ -23,6 +23,7 @@ import { DockShellView } from "@/components/dock-shell-view";
 import type {
   DockApprovalPolicy,
   DockBridgeEvent,
+  DockFileChangeEntry,
   DockModel,
   DockPlanStep,
   DockPlanStepStatus,
@@ -109,6 +110,13 @@ function getThreadLabel(thread: DockThread, t: TranslateFn) {
 
 function getArchiveState(thread: DockThread) {
   return thread.source === "archive";
+}
+
+function isSidebarArchivedThread(
+  thread: DockThread,
+  archiveFilter: ArchiveFilter
+) {
+  return archiveFilter === "archived" || getArchiveState(thread);
 }
 
 function matchesArchiveFilter(thread: DockThread, archiveFilter: ArchiveFilter) {
@@ -228,18 +236,40 @@ function getActiveTurn(thread: DockThread | null) {
   return [...turns].reverse().find((turn: DockTurn) => turn.status === "inProgress") ?? null;
 }
 
+function withTurnTimingMetadata(turn: DockTurn, previousTurn?: DockTurn | null) {
+  const startedAt =
+    turn.startedAt ??
+    previousTurn?.startedAt ??
+    (turn.status === "inProgress" ? Date.now() : null);
+  const completedAt = turn.completedAt ?? previousTurn?.completedAt ?? null;
+  const durationMs =
+    turn.durationMs ??
+    previousTurn?.durationMs ??
+    (startedAt !== null && completedAt !== null && completedAt >= startedAt
+      ? completedAt - startedAt
+      : null);
+
+  return {
+    ...turn,
+    startedAt,
+    completedAt,
+    durationMs
+  };
+}
+
 function upsertTurn(thread: DockThread, turn: DockTurn) {
   const turns = [...thread.turns];
   const index = turns.findIndex((entry) => entry.id === turn.id);
 
   if (index >= 0) {
+    const nextTurn = withTurnTimingMetadata(turn, turns[index]);
     turns[index] = {
       ...turns[index],
-      ...turn,
-      items: turn.items.length ? turn.items : turns[index].items
+      ...nextTurn,
+      items: nextTurn.items.length ? nextTurn.items : turns[index].items
     };
   } else {
-    turns.push(turn);
+    turns.push(withTurnTimingMetadata(turn));
   }
 
   return {
@@ -394,12 +424,12 @@ function upsertTurnPlan(
     ...thread,
     turns: [
       ...turns,
-      {
+      withTurnTimingMetadata({
         id: turnId,
         items: [nextPlanItem],
         status: "inProgress",
         error: null
-      } satisfies DockTurn
+      } satisfies DockTurn)
     ]
   };
 }
@@ -534,12 +564,15 @@ function mergeTurnPreservingAuxiliaryItems(
     }
   }
 
-  return mergedItems.length === incomingTurn.items.length
-    ? incomingTurn
-    : {
-        ...incomingTurn,
-        items: mergedItems
-      };
+  const nextTurn =
+    mergedItems.length === incomingTurn.items.length
+      ? incomingTurn
+      : {
+          ...incomingTurn,
+          items: mergedItems
+        };
+
+  return withTurnTimingMetadata(nextTurn, currentTurn);
 }
 
 function mergeThreadPreservingRichTurns(
@@ -772,10 +805,72 @@ function getCommandOutputPreview(output: string | null) {
   return output.trim().split(/\r?\n/).slice(0, 12).join("\n");
 }
 
+type FileChangeRow = {
+  key: string;
+  action: string;
+  label: string;
+  additions: number | null;
+  deletions: number | null;
+  diff: string | null;
+};
+
+function getFirstFiniteNumber(...values: Array<number | null | undefined>) {
+  for (const value of values) {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+function getFileChangeDiff(change: DockFileChangeEntry) {
+  const candidates = [change.diff, change.unifiedDiff, change.unified_diff];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function getDiffDisplayLines(diff: string | null) {
+  if (!diff?.trim()) {
+    return [];
+  }
+
+  const normalized = diff.replace(/\r?\n$/, "");
+  return normalized ? normalized.split(/\r?\n/) : [];
+}
+
+function getDiffLineTone(line: string) {
+  if (
+    line.startsWith("@@") ||
+    line.startsWith("diff ") ||
+    line.startsWith("index ") ||
+    line.startsWith("+++ ") ||
+    line.startsWith("--- ")
+  ) {
+    return "meta";
+  }
+
+  if (line.startsWith("+")) {
+    return "added";
+  }
+
+  if (line.startsWith("-")) {
+    return "removed";
+  }
+
+  return "context";
+}
+
 function getFileChangeRows(
   item: Extract<DockThreadItem, { type: "fileChange" }>,
   t: TranslateFn
-) {
+): FileChangeRow[] {
   if (!item.changes.length) {
     return [
       {
@@ -783,7 +878,8 @@ function getFileChangeRows(
         action: t("status.fileEdited"),
         label: t("generic.file"),
         additions: null,
-        deletions: null
+        deletions: null,
+        diff: null
       }
     ];
   }
@@ -811,24 +907,22 @@ function getFileChangeRows(
         : "") ||
       t("generic.fileIndexed", { index: index + 1 });
 
-    const diffCounts = countDiffLines(
-      (typeof change.diff === "string" && change.diff) ||
-        (typeof change.unifiedDiff === "string" && change.unifiedDiff) ||
-        (typeof change.unified_diff === "string" && change.unified_diff) ||
-        null
+    const diff = getFileChangeDiff(change);
+    const diffCounts = countDiffLines(diff);
+
+    const additions = getFirstFiniteNumber(
+      change.additions,
+      change.addedLines,
+      change.insertions,
+      diffCounts.additions
     );
 
-    const additions =
-      (typeof change.additions === "number" && change.additions) ||
-      (typeof change.addedLines === "number" && change.addedLines) ||
-      (typeof change.insertions === "number" && change.insertions) ||
-      diffCounts.additions;
-
-    const deletions =
-      (typeof change.deletions === "number" && change.deletions) ||
-      (typeof change.removals === "number" && change.removals) ||
-      (typeof change.deletedLines === "number" && change.deletedLines) ||
-      diffCounts.deletions;
+    const deletions = getFirstFiniteNumber(
+      change.deletions,
+      change.removals,
+      change.deletedLines,
+      diffCounts.deletions
+    );
 
     const rawAction =
       (typeof change.type === "string" && change.type) ||
@@ -852,9 +946,61 @@ function getFileChangeRows(
       action,
       label: getAttachmentLabelFromPath(path, t),
       additions,
-      deletions
+      deletions,
+      diff
     };
   });
+}
+
+function FileChangeRowView({ change }: { change: FileChangeRow }) {
+  const summaryMeta = (
+    <span className="dock-filechange-meta">
+      <span className="dock-filechange-action">{change.action}</span>
+      <span className="dock-filechange-label">{change.label}</span>
+      {typeof change.additions === "number" ? (
+        <span className="dock-diff-count is-added">+{change.additions}</span>
+      ) : null}
+      {typeof change.deletions === "number" ? (
+        <span className="dock-diff-count is-removed">-{change.deletions}</span>
+      ) : null}
+    </span>
+  );
+
+  if (!change.diff) {
+    return (
+      <div className="dock-filechange-card is-static">
+        <div className="dock-filechange-summary is-static">{summaryMeta}</div>
+      </div>
+    );
+  }
+
+  const diffLines = getDiffDisplayLines(change.diff);
+
+  return (
+    <details className="dock-filechange-card" open={false}>
+      <summary className="dock-filechange-summary">
+        {summaryMeta}
+        <span aria-hidden="true" className="dock-filechange-toggle">
+          <AppIcon className="dock-filechange-toggle-icon" name="chevron" />
+        </span>
+      </summary>
+      <div className="dock-filechange-detail">
+        <pre className="dock-filechange-output">
+          {diffLines.map((line, index) => (
+            <span
+              className={clsx(
+                "dock-filechange-line",
+                `is-${getDiffLineTone(line)}`
+              )}
+              key={`${change.key}:${index}`}
+            >
+              {line || " "}
+            </span>
+          ))}
+        </pre>
+      </div>
+    </details>
+  );
 }
 
 function stripInlineDataImageLines(text: string) {
@@ -1533,17 +1679,7 @@ function ThreadItemView({
     return (
       <div className="dock-filechange-stack">
         {getFileChangeRows(fileChangeItem, t).map((change) => (
-          <div className="dock-filechange-chip" key={change.key}>
-            <span className="dock-filechange-text">
-              {change.action} {change.label}
-            </span>
-            {typeof change.additions === "number" ? (
-              <span className="dock-diff-count is-added">+{change.additions}</span>
-            ) : null}
-            {typeof change.deletions === "number" ? (
-              <span className="dock-diff-count is-removed">-{change.deletions}</span>
-            ) : null}
-          </div>
+          <FileChangeRowView change={change} key={change.key} />
         ))}
       </div>
     );
@@ -1669,8 +1805,10 @@ export function DockApp({
   const [loadingThread, setLoadingThread] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [renamingThread, setRenamingThread] = useState(false);
-  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
-  const [archivingThread, setArchivingThread] = useState(false);
+  const [archiveConfirmThreadId, setArchiveConfirmThreadId] = useState<
+    string | null
+  >(null);
+  const [archivingThreadId, setArchivingThreadId] = useState<string | null>(null);
   const [threadNameDraft, setThreadNameDraft] = useState("");
   const [takeoverPromptOpen, setTakeoverPromptOpen] = useState(false);
   const [connectionNotice, setConnectionNotice] =
@@ -1691,8 +1829,8 @@ export function DockApp({
   selectedThreadIdRef.current = selectedThreadId;
 
   useEffect(() => {
-    setArchiveConfirmOpen(false);
-    setArchivingThread(false);
+    setArchiveConfirmThreadId(null);
+    setArchivingThreadId(null);
   }, [selectedThreadId]);
 
   useLayoutEffect(() => {
@@ -2279,6 +2417,19 @@ export function DockApp({
   }, [selectedThread, t]);
 
   useEffect(() => {
+    const selectedSummary =
+      selectedThreadId
+        ? threads.find((thread) => thread.id === selectedThreadId) ?? null
+        : null;
+
+    if (!selectedSummary || !isSidebarArchivedThread(selectedSummary, archiveFilter)) {
+      return;
+    }
+
+    handleNewThread(selectedSummary.cwd);
+  }, [archiveFilter, selectedThreadId, threads]);
+
+  useEffect(() => {
     const source = new EventSource(buildApiUrl(resolvedApiBasePath, "/events"));
     const clearReconnectNoticeTimer = () => {
       if (reconnectNoticeTimerRef.current !== null) {
@@ -2602,18 +2753,27 @@ export function DockApp({
     }
   }
 
-  async function toggleArchiveSelectedThread() {
-    if (!selectedThreadId || !selectedThread) {
+  function getArchiveTargetThread(threadId: string) {
+    return (
+      threads.find((thread) => thread.id === threadId) ??
+      (selectedThread?.id === threadId ? selectedThread : null)
+    );
+  }
+
+  async function toggleArchiveThread(threadId: string) {
+    const targetThread = getArchiveTargetThread(threadId);
+
+    if (!targetThread) {
       return;
     }
 
-    const nextArchived = !getArchiveState(selectedThread);
-    setArchivingThread(true);
+    const nextArchived = !getArchiveState(targetThread);
+    setArchivingThreadId(threadId);
     setError(null);
 
     try {
       const data = await fetchJson<{ thread: DockThread }>(
-        `/threads/${selectedThreadId}`,
+        `/threads/${threadId}`,
         {
           method: "PATCH",
           headers: {
@@ -2630,11 +2790,14 @@ export function DockApp({
           updateThreadListWithArchiveState(current, data.thread, archiveFilter)
         );
       });
-      setArchiveConfirmOpen(false);
+      setArchiveConfirmThreadId(null);
 
-      if (nextArchived || !matchesArchiveFilter(data.thread, archiveFilter)) {
+      if (
+        selectedThreadId === threadId &&
+        (nextArchived || !matchesArchiveFilter(data.thread, archiveFilter))
+      ) {
         handleNewThread(data.thread.cwd);
-      } else {
+      } else if (selectedThreadId === threadId) {
         setSelectedThread(data.thread);
       }
 
@@ -2652,7 +2815,9 @@ export function DockApp({
           : t("error.archiveFailed")
       );
     } finally {
-      setArchivingThread(false);
+      setArchivingThreadId((current) =>
+        current === threadId ? null : current
+      );
     }
   }
 
@@ -2662,7 +2827,7 @@ export function DockApp({
     setSidebarOpen(false);
     setPrompt("");
     setTakeoverPromptOpen(false);
-    setArchiveConfirmOpen(false);
+    setArchiveConfirmThreadId(null);
     setRenamingThread(false);
     setThreadNameDraft("");
     if (nextCwd) {
@@ -2959,47 +3124,50 @@ export function DockApp({
         ref={rootRef}
       >
       <DockShellView
-      archiveConfirmOpen={archiveConfirmOpen}
-      archiveFilter={archiveFilter}
-      archivingThread={archivingThread}
-      attachments={attachments}
-      composerCwd={composerCwd}
-      composerModel={effectiveComposerModel}
-      composerPermissionPreset={composerPermissionPreset}
-      composerReasoningEffort={effectiveComposerReasoningEffort}
-      connectionNotice={connectionNoticeText}
-      currentActiveTurn={currentActiveTurn}
-      currentRequests={currentRequests}
-      error={error}
-      groupedThreads={groupedThreads}
-      loadingThread={loadingThread}
-      models={models}
-      onArchiveFilterChange={setArchiveFilter}
-      onArchiveCancel={() => setArchiveConfirmOpen(false)}
-      onArchiveConfirm={() => void toggleArchiveSelectedThread()}
-      onComposerCwdChange={setComposerCwd}
-      onComposerModelChange={setComposerModel}
-      onComposerPermissionPresetChange={setComposerPermissionPreset}
-      onComposerReasoningEffortChange={setComposerReasoningEffort}
-      onInterruptCurrentTurn={() => {
-        if (!currentActiveTurn || !selectedThreadId) return;
-        void fetchJson(`/threads/${selectedThreadId}/interrupt`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            turnId: currentActiveTurn.id
-          })
-        }).catch((cause) =>
-          setError(
-            cause instanceof Error
-              ? localizeRuntimeMessage(cause.message, t)
-              : t("error.interruptFailed")
-          )
-        );
-      }}
-      onNewThread={handleNewThread}
+        archiveConfirmThreadId={archiveConfirmThreadId}
+        archiveFilter={archiveFilter}
+        archivingThreadId={archivingThreadId}
+        attachments={attachments}
+        composerCwd={composerCwd}
+        composerModel={effectiveComposerModel}
+        composerPermissionPreset={composerPermissionPreset}
+        composerReasoningEffort={effectiveComposerReasoningEffort}
+        connectionNotice={connectionNoticeText}
+        currentActiveTurn={currentActiveTurn}
+        currentRequests={currentRequests}
+        error={error}
+        groupedThreads={groupedThreads}
+        loadingThread={loadingThread}
+        models={models}
+        onArchiveFilterChange={(value) => {
+          setArchiveConfirmThreadId(null);
+          setArchiveFilter(value);
+        }}
+        onArchiveCancel={() => setArchiveConfirmThreadId(null)}
+        onArchiveConfirm={(threadId) => void toggleArchiveThread(threadId)}
+        onComposerCwdChange={setComposerCwd}
+        onComposerModelChange={setComposerModel}
+        onComposerPermissionPresetChange={setComposerPermissionPreset}
+        onComposerReasoningEffortChange={setComposerReasoningEffort}
+        onInterruptCurrentTurn={() => {
+          if (!currentActiveTurn || !selectedThreadId) return;
+          void fetchJson(`/threads/${selectedThreadId}/interrupt`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              turnId: currentActiveTurn.id
+            })
+          }).catch((cause) =>
+            setError(
+              cause instanceof Error
+                ? localizeRuntimeMessage(cause.message, t)
+                : t("error.interruptFailed")
+            )
+          );
+        }}
+        onNewThread={handleNewThread}
       onOpenSidebar={() => setSidebarOpen(true)}
       onProjectFilterChange={setProjectFilter}
       onPromptChange={setPrompt}
@@ -3021,10 +3189,13 @@ export function DockApp({
       onRenameSave={() => void renameSelectedThread()}
       onResolveRequest={renderRequestCard}
       onSearchChange={setSearch}
-      onSelectThread={(threadId) => {
-        setArchiveConfirmOpen(false);
+      onSelectThread={(thread) => {
+        if (isSidebarArchivedThread(thread, archiveFilter)) {
+          return;
+        }
+        setArchiveConfirmThreadId(null);
         setRenamingThread(false);
-        setSelectedThreadId(threadId);
+        setSelectedThreadId(thread.id);
         setSidebarOpen(false);
       }}
       onSidebarClose={() => setSidebarOpen(false)}
@@ -3032,15 +3203,17 @@ export function DockApp({
       onTakeoverCancel={() => setTakeoverPromptOpen(false)}
       onTakeoverConfirm={() => void submitPrompt({ takeoverConfirmed: true })}
       onThreadNameDraftChange={setThreadNameDraft}
-      onToggleArchive={() => {
-        if (archivingThread) {
+      onToggleArchive={(threadId) => {
+        if (archivingThreadId) {
           return;
         }
         setRenamingThread(false);
-        setArchiveConfirmOpen((current) => !current);
+        setArchiveConfirmThreadId((current) =>
+          current === threadId ? null : threadId
+        );
       }}
       onToggleRename={() => {
-        setArchiveConfirmOpen(false);
+        setArchiveConfirmThreadId(null);
         setRenamingThread((current) => !current);
       }}
       onUploadFiles={(files) => {

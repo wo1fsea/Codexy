@@ -5,9 +5,10 @@
 Codexy is a Tailscale-first web control plane for Codex on a host machine. The open-source app should also be able to run in a self-hosted cloud mode from the same `codexy` entrypoint. It should feel visually close to Codex Desktop while remaining usable on desktop, iPad, and phone. The first working release must support:
 
 - listing all threads across projects
-- opening any thread and reading full history
+- opening any live thread and reading full history
 - creating a new thread
 - continuing an existing thread
+- archiving and unarchiving threads from the sidebar
 - sending prompts with image attachments
 - switching models before a turn
 - choosing a permission preset before a turn
@@ -154,6 +155,7 @@ codexy/
 - method
 - available decisions or answer schema
 - human-readable context for command, file change, or user-input prompt
+- turn detail payloads may include optional `startedAt`, `completedAt`, and `durationMs` metadata for transcript-only UI treatments such as processed-step disclosures
 
 ## Interaction Rules
 
@@ -174,6 +176,13 @@ codexy/
 4. Server maps the selected permission preset onto the underlying approval-policy and sandbox settings for the resumed thread / new turn so continued threads honor the current web control settings.
 5. Server calls `turn/start`.
 6. UI renders `item/started`, delta notifications, approval requests, then `item/completed` and `turn/completed`.
+
+### Archived Thread
+
+1. Archived threads remain visible in listings when the active archive filter includes them.
+2. Archived sidebar rows do not open the transcript directly.
+3. Archived sidebar rows only expose an unarchive action.
+4. A thread must be unarchived before it can re-enter the transcript flow from the sidebar.
 
 ### Takeover Warning
 
