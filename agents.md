@@ -54,6 +54,11 @@ Codexy is organized around a small set of runtime agents and ownership boundarie
 - Mobile approvals are enabled, but every destructive or privileged action must remain explicit in the UI.
 - When desktop and web both touch the same thread, the web client warns and offers a visible "take over" action instead of silently racing.
 
+## Security Rules
+
+- **Auth bypass in production is strictly forbidden.** `CODEXY_DEV_SKIP_AUTH` must only take effect when `NODE_ENV !== "production"`. No env-var override, no flag, no exception may weaken this guard in a production build.
+- This rule applies to all auth-related code paths in both codexy-app and codexy-cloud.
+
 ## Engineering Governance
 
 - Keep dependency direction strict:

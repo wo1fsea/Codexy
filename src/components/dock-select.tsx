@@ -78,8 +78,15 @@ export function DockSelect({
         return;
       }
 
+      const menuMaxW = Math.min(320, window.innerWidth - 24);
+      const menuW = Math.max(rect.width, menuMaxW);
+      let left = rect.left;
+      if (left + menuW > window.innerWidth - 12) {
+        left = Math.max(12, window.innerWidth - 12 - menuW);
+      }
+
       setMenuStyle({
-        left: rect.left,
+        left,
         minWidth: rect.width,
         ...(placement === "top"
           ? { bottom: window.innerHeight - rect.top + 8 }

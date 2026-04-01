@@ -44,7 +44,18 @@ export async function getCloudSessionFromCookies() {
   return getCloudWebSession(cookieStore.get(CLOUD_SESSION_COOKIE_NAME)?.value);
 }
 
+function isDevSkipAuth() {
+  // SECURITY: auth bypass is STRICTLY FORBIDDEN in production builds.
+  // This guard must never be weakened — no env-var override, no flag, no exception.
+  if (process.env.NODE_ENV === "production") return false;
+  return process.env.CODEXY_DEV_SKIP_AUTH === "1";
+}
+
 export async function requireCloudPageSession(returnTo = "/") {
+  if (isDevSkipAuth()) {
+    return { createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 86400000).toISOString(), lastUsedAt: new Date().toISOString() };
+  }
+
   const nextReturnTo = normalizeReturnTo(returnTo);
   const auth = getCloudAuthStatus();
 
@@ -61,6 +72,10 @@ export async function requireCloudPageSession(returnTo = "/") {
 }
 
 export async function requireCloudApiSession() {
+  if (isDevSkipAuth()) {
+    return null;
+  }
+
   const auth = getCloudAuthStatus();
 
   if (!auth.bound) {

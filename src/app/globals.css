@@ -1,32 +1,69 @@
+/* ═══════════════════════════════════════════════════════════════
+   Design Tokens — single source of truth
+   ═══════════════════════════════════════════════════════════════
+   Palette inspired by claude.com/blog: warm dark surfaces,
+   warm off-white text, muted editorial accent.
+
+   Change --c-warm / --c-accent to re-theme the entire UI.
+   All rgba-based fills, borders, and tints derive from these
+   base channels so the palette shifts in one place.
+   ═══════════════════════════════════════════════════════════════ */
+
 :root {
   color-scheme: dark;
-  --app-bg: #121214;
-  --menu-bg: #18171a;
-  --nav-bg: #171519;
-  --sidebar-bg: #19171a;
-  --stage-bg: #141416;
-  --panel-bg: #1b1b1e;
-  --panel-bg-soft: #232126;
-  --panel-bg-strong: #2a282d;
-  --line: rgba(255, 247, 238, 0.08);
-  --line-strong: rgba(255, 247, 238, 0.14);
-  --text: #f2eee8;
-  --text-strong: #fbf8f3;
-  --text-muted: #c4bbb3;
-  --text-soft: #978f87;
-  --text-faint: #7b746e;
-  --text-project: #d8cec6;
-  --accent: #f3f0ea;
+
+  /* ── Base color channels (R, G, B) ─────────────────────────── */
+  --c-warm: 250, 249, 245;        /* warm white · fills & borders  */
+  --c-accent: 200, 186, 152;      /* warm sand  · CTAs & focus     */
+  --c-success: 152, 200, 162;     /* green      · online / success */
+  --c-danger: 241, 142, 127;      /* coral      · error / destruct */
+  --c-warning: 255, 196, 161;     /* amber      · warning / caution*/
+  --c-info: 140, 191, 255;        /* blue       · links & info     */
+  --c-black: 0, 0, 0;             /* pure black · shadows only     */
+
+  /* ── Surface palette ───────────────────────────────────────── */
+  --app-bg: #141413;
+  --menu-bg: #1a1917;
+  --nav-bg: #191816;
+  --sidebar-bg: #1a1917;
+  --stage-bg: #101010;
+  --panel-bg: #1f1e1d;
+  --panel-bg-soft: #262523;
+  --panel-bg-strong: #302f2d;
+
+  /* ── Text scale ────────────────────────────────────────────── */
+  --text: #e8e6e1;
+  --text-strong: #faf9f5;
+  --text-muted: #b3b1ab;
+  --text-soft: #87867f;
+  --text-faint: #5e5d58;
+  --text-project: #cac8c2;
+
+  /* ── Lines & borders (derived from --c-warm) ───────────────── */
+  --line: rgba(var(--c-warm), 0.08);
+  --line-strong: rgba(var(--c-warm), 0.14);
+
+  /* ── Accent (solid) ─────────────────────────────────────────── */
+  --accent: #f0ede6;
   --accent-strong: #ffffff;
+
+  /* ── Status (solid) ─────────────────────────────────────────── */
   --danger: #f18e7f;
   --success: #98c8a2;
-  --shadow: 0 16px 32px rgba(0, 0, 0, 0.26);
-  --shell-width: 900px;
-  --radius-xl: 18px;
-  --radius-lg: 14px;
+
+  /* ── Elevation ──────────────────────────────────────────────── */
+  --shadow: 0 16px 32px rgba(var(--c-black), 0.26);
+
+  /* ── Radius scale ───────────────────────────────────────────── */
+  --radius-xl: 22px;
+  --radius-lg: 16px;
   --radius-md: 12px;
-  --radius-sm: 10px;
-  --control-radius: 10px;
+  --radius-sm: 8px;
+  --radius-pill: 999px;
+  --control-radius: 12px;
+
+  /* ── Spacing scale ──────────────────────────────────────────── */
+  --shell-width: 900px;
   --control-pad-x: 8px;
   --control-gap: 4px;
   --space-1: 4px;
@@ -35,16 +72,24 @@
   --space-4: 12px;
   --space-5: 16px;
   --space-6: 24px;
+
+  /* ── Typography scale ───────────────────────────────────────── */
   --text-11: 11px;
   --text-12: 12px;
   --text-13: 13px;
   --text-14: 14px;
   --text-15: 15px;
+  --text-16: 16px;
+  --text-18: 18px;
+
+  /* ── Icon sizes ─────────────────────────────────────────────── */
   --icon-disclosure: 14px;
   --icon-support: 18px;
   --icon-compact-action: 22px;
   --icon-toolbar-action: 24px;
   --icon-hero-action: 28px;
+
+  /* ── Font stacks ────────────────────────────────────────────── */
   --font-sans: "Segoe UI Variable Display", "Aptos", "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", "Cascadia Code", "Consolas", monospace;
   --font-serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", "Times New Roman", serif;
@@ -66,7 +111,8 @@ body {
   color: var(--text);
   font-family: var(--font-sans);
   font-size: var(--text-14);
-  line-height: 1.45;
+  line-height: 1.5;
+  letter-spacing: -0.006em;
 }
 
 body {
@@ -116,7 +162,7 @@ pre {
 ::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
   border-radius: 999px;
-  background: rgba(255, 247, 238, 0.1);
+  background: rgba(var(--c-warm), 0.1);
   background-clip: padding-box;
 }
 
@@ -136,8 +182,8 @@ pre {
   overflow-x: hidden;
   overflow-y: auto;
   background:
-    radial-gradient(circle at top left, rgba(152, 200, 162, 0.12), transparent 32%),
-    linear-gradient(180deg, #111214 0%, #15171a 100%);
+    radial-gradient(circle at top left, rgba(var(--c-accent), 0.12), transparent 32%),
+    linear-gradient(180deg, #111110 0%, #151413 100%);
   padding: clamp(20px, 4vw, 40px);
 }
 
@@ -147,17 +193,17 @@ pre {
   place-items: center;
   padding: clamp(20px, 4vw, 40px);
   background:
-    radial-gradient(circle at top left, rgba(152, 200, 162, 0.12), transparent 34%),
-    linear-gradient(180deg, #101214 0%, #15181c 100%);
+    radial-gradient(circle at top left, rgba(var(--c-accent), 0.12), transparent 34%),
+    linear-gradient(180deg, #101010 0%, #151413 100%);
 }
 
 .cloud-auth-card {
   width: min(980px, 100%);
-  border: 1px solid rgba(255, 247, 238, 0.08);
-  border-radius: 24px;
-  background: rgba(22, 23, 26, 0.88);
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.24);
-  padding: clamp(22px, 4vw, 30px);
+  border: 1px solid rgba(var(--c-warm), 0.04);
+  border-radius: var(--radius-xl);
+  background: rgba(24, 23, 21, 0.72);
+  box-shadow: var(--shadow-lg);
+  padding: clamp(26px, 5vw, 38px);
 }
 
 .cloud-auth-card-narrow {
@@ -175,6 +221,7 @@ pre {
   font-family: var(--font-serif);
   font-size: clamp(30px, 5vw, 48px);
   line-height: 0.96;
+  letter-spacing: -0.02em;
 }
 
 .cloud-auth-copy p,
@@ -182,7 +229,7 @@ pre {
 .cloud-auth-meta {
   margin: 0;
   color: var(--text-muted);
-  line-height: 1.6;
+  line-height: 1.65;
 }
 
 .cloud-auth-grid {
@@ -194,10 +241,10 @@ pre {
 
 .cloud-auth-qr-panel,
 .cloud-auth-form-panel {
-  border: 1px solid rgba(255, 247, 238, 0.08);
-  border-radius: 20px;
-  background: rgba(12, 13, 16, 0.34);
-  padding: 20px;
+  border: 1px solid rgba(var(--c-warm), 0.03);
+  border-radius: var(--radius-xl);
+  background: rgba(12, 12, 11, 0.28);
+  padding: 22px;
 }
 
 .cloud-auth-qr-panel {
@@ -210,7 +257,7 @@ pre {
 .cloud-auth-qr {
   width: min(224px, 100%);
   height: auto;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   background: #fff;
   padding: 10px;
 }
@@ -253,11 +300,11 @@ pre {
 }
 
 .cloud-auth-input {
-  min-height: 46px;
-  border: 1px solid rgba(255, 247, 238, 0.12);
-  border-radius: 14px;
-  background: rgba(255, 247, 238, 0.04);
-  padding: 0 14px;
+  min-height: 48px;
+  border: 1px solid rgba(var(--c-warm), 0.06);
+  border-radius: var(--radius-lg);
+  background: rgba(var(--c-warm), 0.03);
+  padding: 0 16px;
   color: var(--text-strong);
   font-size: 18px;
   font-family: var(--font-mono);
@@ -266,8 +313,8 @@ pre {
 
 .cloud-auth-input:focus {
   outline: none;
-  border-color: rgba(152, 200, 162, 0.38);
-  box-shadow: 0 0 0 3px rgba(152, 200, 162, 0.14);
+  border-color: rgba(var(--c-accent), 0.38);
+  box-shadow: 0 0 0 3px rgba(var(--c-accent), 0.14);
 }
 
 .cloud-auth-submit,
@@ -275,25 +322,26 @@ pre {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 40px;
-  border: 1px solid rgba(152, 200, 162, 0.28);
+  min-height: 42px;
+  border: none;
   border-radius: 999px;
-  background: rgba(152, 200, 162, 0.12);
-  padding: 0 16px;
+  background: rgba(var(--c-accent), 0.14);
+  padding: 0 20px;
   color: var(--text-strong);
   font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
+  transition: background 160ms ease;
 }
 
 .cloud-auth-submit:hover,
 .cloud-session-action:hover {
-  background: rgba(152, 200, 162, 0.18);
-  border-color: rgba(152, 200, 162, 0.42);
+  background: rgba(var(--c-accent), 0.22);
 }
 
 .cloud-auth-error {
   margin: 0;
-  color: #ffcfb7;
+  color: #f0c8a8;
   font-size: 13px;
   line-height: 1.55;
 }
@@ -331,10 +379,10 @@ pre {
 .cloud-panel,
 .cloud-node-card,
 .cloud-empty-state {
-  border: 1px solid rgba(255, 247, 238, 0.08);
-  border-radius: 20px;
-  background: rgba(22, 23, 26, 0.84);
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.24);
+  border: 1px solid rgba(var(--c-warm), 0.04);
+  border-radius: var(--radius-xl);
+  background: rgba(24, 23, 21, 0.72);
+  box-shadow: var(--shadow-lg);
 }
 
 .cloud-hero-copy,
@@ -348,13 +396,14 @@ pre {
   display: inline-flex;
   align-items: center;
   min-height: 24px;
-  border: 1px solid rgba(152, 200, 162, 0.2);
+  border: none;
   border-radius: 999px;
-  background: rgba(152, 200, 162, 0.08);
-  padding: 0 10px;
-  color: #b9d9c0;
-  font-size: 12px;
-  letter-spacing: 0.04em;
+  background: rgba(var(--c-accent), 0.06);
+  padding: 0 12px;
+  color: rgba(var(--c-accent), 0.7);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -369,6 +418,7 @@ pre {
 .cloud-hero-copy h1 {
   font-size: clamp(32px, 5vw, 54px);
   line-height: 0.94;
+  letter-spacing: -0.02em;
 }
 
 .cloud-hero-copy p,
@@ -376,30 +426,30 @@ pre {
 .cloud-empty-state p {
   margin: 12px 0 0;
   color: var(--text-muted);
-  font-size: 15px;
-  line-height: 1.6;
+  font-size: var(--text-15);
+  line-height: 1.65;
 }
 
 .cloud-code-fence {
   margin-top: 14px;
-  border: 1px solid rgba(255, 247, 238, 0.08);
-  border-radius: 16px;
+  border: 1px solid rgba(var(--c-warm), 0.08);
+  border-radius: var(--radius-lg);
   overflow: hidden;
   background:
-    linear-gradient(180deg, rgba(12, 13, 16, 0.98) 0%, rgba(17, 18, 22, 0.98) 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 247, 238, 0.04);
+    linear-gradient(180deg, rgba(12, 12, 11, 0.98) 0%, rgba(17, 17, 15, 0.98) 100%);
+  box-shadow: inset 0 1px 0 rgba(var(--c-warm), 0.04);
 }
 
 .cloud-code-fence-label {
   display: block;
-  border-bottom: 1px solid rgba(255, 247, 238, 0.06);
+  border-bottom: 1px solid rgba(var(--c-warm), 0.06);
   padding: 8px 12px;
   color: var(--text-soft);
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  background: rgba(255, 247, 238, 0.03);
+  background: rgba(var(--c-warm), 0.03);
 }
 
 .cloud-code-fence-body {
@@ -505,9 +555,9 @@ pre {
   align-items: center;
   justify-content: center;
   min-height: 32px;
-  border: 1px solid rgba(255, 247, 238, 0.1);
+  border: 1px solid rgba(var(--c-warm), 0.1);
   border-radius: 999px;
-  background: rgba(255, 247, 238, 0.04);
+  background: rgba(var(--c-warm), 0.04);
   padding: 0 12px;
   color: var(--text-strong);
   font-size: 12px;
@@ -516,8 +566,8 @@ pre {
 }
 
 .cloud-panel-link:hover {
-  border-color: rgba(152, 200, 162, 0.3);
-  background: rgba(152, 200, 162, 0.12);
+  border-color: rgba(var(--c-accent), 0.3);
+  background: rgba(var(--c-accent), 0.12);
 }
 
 .cloud-panel-head code {
@@ -560,19 +610,19 @@ pre {
   display: inline-flex;
   align-items: center;
   min-height: 24px;
-  border: 1px solid rgba(152, 200, 162, 0.18);
+  border: 1px solid rgba(var(--c-success), 0.18);
   border-radius: 999px;
-  background: rgba(152, 200, 162, 0.08);
+  background: rgba(var(--c-success), 0.08);
   padding: 0 10px;
-  color: #b9d9c0;
+  color: #98c8a2;
   font-size: 12px;
   text-transform: uppercase;
 }
 
 .cloud-node-status.is-offline {
-  border-color: rgba(255, 196, 161, 0.18);
-  background: rgba(255, 196, 161, 0.08);
-  color: #ffcfb7;
+  border-color: rgba(var(--c-warning), 0.18);
+  background: rgba(var(--c-warning), 0.08);
+  color: #f0c8a8;
 }
 
 .cloud-node-actions {
@@ -585,9 +635,9 @@ pre {
   align-items: center;
   justify-content: center;
   min-height: 38px;
-  border: 1px solid rgba(255, 247, 238, 0.1);
+  border: 1px solid rgba(var(--c-warm), 0.1);
   border-radius: 999px;
-  background: rgba(255, 247, 238, 0.04);
+  background: rgba(var(--c-warm), 0.04);
   padding: 0 16px;
   color: var(--text-strong);
   font-size: 13px;
@@ -596,8 +646,8 @@ pre {
 
 .cloud-node-open:hover,
 .cloud-node-open:hover {
-  border-color: rgba(152, 200, 162, 0.3);
-  background: rgba(152, 200, 162, 0.12);
+  border-color: rgba(var(--c-accent), 0.3);
+  background: rgba(var(--c-accent), 0.12);
 }
 
 .cloud-remote-icon-button {
@@ -609,15 +659,15 @@ pre {
   height: 36px;
   min-height: 36px;
   padding: 0;
-  border-color: rgba(255, 247, 238, 0.1);
-  background: rgba(255, 247, 238, 0.04);
+  border-color: rgba(var(--c-warm), 0.1);
+  background: rgba(var(--c-warm), 0.04);
   color: var(--text-strong);
   text-decoration: none;
 }
 
 .cloud-remote-icon-button:hover {
-  border-color: rgba(152, 200, 162, 0.3);
-  background: rgba(152, 200, 162, 0.12);
+  border-color: rgba(var(--c-accent), 0.3);
+  background: rgba(var(--c-accent), 0.12);
 }
 
 .cloud-remote-inline-icon {
@@ -658,8 +708,8 @@ pre {
   overflow-y: auto;
   padding: 10px;
   background:
-    radial-gradient(circle at top left, rgba(152, 200, 162, 0.12), transparent 24%),
-    linear-gradient(180deg, #101113 0%, #141619 100%);
+    radial-gradient(circle at top left, rgba(var(--c-accent), 0.12), transparent 24%),
+    linear-gradient(180deg, #100f0e 0%, #141312 100%);
 }
 
 .cloud-wall-header {
@@ -669,11 +719,11 @@ pre {
   gap: 10px;
   width: 100%;
   margin: 0 auto 10px;
-  border: 1px solid rgba(255, 247, 238, 0.08);
-  border-radius: 16px;
-  background: rgba(18, 20, 24, 0.94);
+  border: 1px solid rgba(var(--c-warm), 0.08);
+  border-radius: var(--radius-lg);
+  background: rgba(18, 18, 16, 0.94);
   padding: 8px 10px;
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--shadow-sm);
 }
 
 .cloud-wall-header-copy {
@@ -738,9 +788,9 @@ pre {
   overflow: hidden;
   isolation: isolate;
   border: 1px solid transparent;
-  border-radius: 18px;
-  background: rgba(22, 23, 26, 0.92);
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.22);
+  border-radius: var(--radius-xl);
+  background: rgba(22, 22, 20, 0.92);
+  box-shadow: var(--shadow-lg);
 }
 
 .cloud-wall-pane::after {
@@ -748,7 +798,7 @@ pre {
   position: absolute;
   inset: 0;
   z-index: 10;
-  border: 1px solid rgba(255, 247, 238, 0.08);
+  border: 1px solid rgba(var(--c-warm), 0.08);
   border-radius: inherit;
   pointer-events: none;
 }
@@ -763,18 +813,17 @@ pre {
 }
 
 .cloud-wall-pane.is-offline::after {
-  border-color: rgba(255, 196, 161, 0.2);
+  border-color: rgba(var(--c-warning), 0.2);
 }
 
 .cloud-wall-pane-head {
   flex: none;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
   gap: 8px;
   padding: 6px 8px;
-  border-bottom: 1px solid rgba(255, 247, 238, 0.06);
-  background: rgba(18, 20, 24, 0.9);
+  border-bottom: 1px solid rgba(var(--c-warm), 0.06);
+  background: rgba(18, 18, 16, 0.9);
   overflow: hidden;
 }
 
@@ -815,22 +864,22 @@ pre {
   align-items: center;
   gap: 6px;
   min-width: 0;
-  flex: 0 1 auto;
-  justify-self: end;
+  flex: 0 0 auto;
+  margin-left: auto;
 }
 
 .cloud-wall-pane-select {
   min-width: 0;
   width: auto;
-  max-width: clamp(92px, 34%, 168px);
+  max-width: clamp(120px, 50%, 260px);
   flex: 0 1 auto;
 }
 
 .cloud-wall-pane-select .dock-select-trigger {
   min-height: 30px;
-  border: 1px solid rgba(255, 247, 238, 0.08);
-  border-radius: 10px;
-  background: rgba(255, 247, 238, 0.03);
+  border: 1px solid rgba(var(--c-warm), 0.08);
+  border-radius: var(--radius-sm);
+  background: rgba(var(--c-warm), 0.03);
   padding-left: 8px;
   padding-right: 8px;
   color: var(--text);
@@ -847,7 +896,7 @@ pre {
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
-  background: #0f1012;
+  background: #0f0f0e;
 }
 
 .cloud-wall-pane-body > * {
@@ -870,8 +919,8 @@ pre {
   padding: 24px;
   text-align: center;
   background:
-    radial-gradient(circle at top, rgba(152, 200, 162, 0.09), transparent 28%),
-    linear-gradient(180deg, rgba(17, 18, 20, 0.96) 0%, rgba(20, 22, 25, 0.98) 100%);
+    radial-gradient(circle at top, rgba(var(--c-accent), 0.09), transparent 28%),
+    linear-gradient(180deg, rgba(17, 17, 15, 0.96) 0%, rgba(20, 20, 18, 0.98) 100%);
 }
 
 .cloud-wall-empty-pane strong {
@@ -888,7 +937,7 @@ pre {
 }
 
 .cloud-wall-empty-pane.is-warning strong {
-  color: #ffcfb7;
+  color: #f0c8a8;
 }
 
 .cloud-remote-shell {
@@ -897,8 +946,8 @@ pre {
   display: flex;
   flex-direction: column;
   background:
-    radial-gradient(circle at top right, rgba(152, 200, 162, 0.1), transparent 24%),
-    linear-gradient(180deg, #101113 0%, #141619 100%);
+    radial-gradient(circle at top right, rgba(var(--c-accent), 0.1), transparent 24%),
+    linear-gradient(180deg, #100f0e 0%, #141312 100%);
   overflow: hidden;
 }
 
@@ -914,9 +963,9 @@ pre {
   gap: 14px;
   flex: 0 0 auto;
   padding: 8px 12px;
-  border-bottom: 1px solid rgba(255, 247, 238, 0.08);
-  background: rgba(18, 20, 24, 0.94);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  border-bottom: 1px solid rgba(var(--c-warm), 0.08);
+  background: rgba(18, 18, 16, 0.94);
+  box-shadow: var(--shadow-sm);
 }
 
 .cloud-remote-copy {
@@ -980,7 +1029,7 @@ pre {
   gap: 16px;
   height: 36px;
   padding: 0 14px;
-  border-bottom: 1px solid rgba(255, 247, 238, 0.04);
+  border-bottom: 1px solid rgba(var(--c-warm), 0.04);
   background: var(--menu-bg);
   color: var(--text-muted);
 }
@@ -1033,7 +1082,7 @@ pre {
   position: fixed;
   inset: 0;
   z-index: 30;
-  background: rgba(0, 0, 0, 0.54);
+  background: rgba(var(--c-black), 0.54);
   opacity: 0;
   pointer-events: none;
   transition: opacity 180ms ease;
@@ -1050,7 +1099,7 @@ pre {
   height: 100vh;
   min-height: 0;
   overflow: hidden;
-  background: #0f1012;
+  background: #0f0f0e;
 }
 
 .dock-left-stack {
@@ -1088,7 +1137,7 @@ pre {
 
 .dock-sidebar-resize-handle:hover::before,
 .dock-shell.is-resizing .dock-sidebar-resize-handle::before {
-  background: rgba(255, 247, 238, 0.18);
+  background: rgba(var(--c-warm), 0.18);
 }
 
 .dock-nav-rail,
@@ -1118,7 +1167,7 @@ pre {
   font-family: var(--font-serif);
   font-size: 20px;
   line-height: 1;
-  letter-spacing: 0.02em;
+  letter-spacing: -0.01em;
 }
 
 .dock-nav-items {
@@ -1133,7 +1182,7 @@ pre {
 .dock-ghost-action,
 .dock-chip-remove {
   border: 1px solid transparent;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: transparent;
   transition:
     background 160ms ease,
@@ -1160,7 +1209,7 @@ pre {
 .dock-ghost-action:hover,
 .dock-chip-remove:hover,
 .dock-thread-row:hover {
-  background: rgba(255, 247, 238, 0.04);
+  background: rgba(var(--c-warm), 0.04);
   border-color: var(--line);
   color: var(--text);
 }
@@ -1171,14 +1220,14 @@ pre {
 }
 
 .dock-nav-item:focus-visible {
-  background: rgba(255, 247, 238, 0.04);
+  background: rgba(var(--c-warm), 0.04);
   border-color: var(--line);
   color: var(--text);
   outline: none;
 }
 
 .dock-nav-item:active {
-  background: rgba(255, 247, 238, 0.06);
+  background: rgba(var(--c-warm), 0.06);
   border-color: var(--line-strong);
   color: var(--text);
   transform: translateY(1px);
@@ -1270,7 +1319,7 @@ pre {
   min-height: 34px;
   border: 1px solid var(--line);
   border-radius: var(--control-radius);
-  background: rgba(255, 247, 238, 0.03);
+  background: rgba(var(--c-warm), 0.03);
   padding: 0 var(--control-pad-x);
 }
 
@@ -1279,8 +1328,8 @@ pre {
 .dock-composer-cwd,
 .dock-question input {
   border: 1px solid var(--line);
-  border-radius: 12px;
-  background: rgba(255, 247, 238, 0.03);
+  border-radius: var(--radius-md);
+  background: rgba(var(--c-warm), 0.03);
   color: var(--text);
   outline: none;
 }
@@ -1311,8 +1360,8 @@ pre {
 .dock-composer-cwd:focus,
 .dock-question input:focus,
 .dock-search-field:focus-within {
-  border-color: rgba(255, 247, 238, 0.18);
-  box-shadow: 0 0 0 3px rgba(255, 247, 238, 0.06);
+  border-color: rgba(var(--c-warm), 0.18);
+  box-shadow: 0 0 0 3px rgba(var(--c-warm), 0.06);
 }
 
 .dock-select {
@@ -1327,7 +1376,7 @@ pre {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: var(--control-radius);
-  background: rgba(255, 247, 238, 0.03);
+  background: rgba(var(--c-warm), 0.03);
   color: var(--text);
   padding: 0 var(--control-pad-x);
   text-align: left;
@@ -1340,12 +1389,12 @@ pre {
 
 .dock-select-trigger:hover {
   border-color: var(--line-strong);
-  background: rgba(255, 247, 238, 0.045);
+  background: rgba(var(--c-warm), 0.045);
 }
 
 .dock-select-trigger:focus-visible {
-  border-color: rgba(255, 247, 238, 0.18);
-  box-shadow: 0 0 0 3px rgba(255, 247, 238, 0.06);
+  border-color: rgba(var(--c-warm), 0.18);
+  box-shadow: 0 0 0 3px rgba(var(--c-warm), 0.06);
   outline: none;
 }
 
@@ -1397,9 +1446,9 @@ pre {
   overflow-x: hidden;
   overflow-y: auto;
   border: 1px solid var(--line-strong);
-  border-radius: 10px;
-  background: #221f24;
-  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.34);
+  border-radius: var(--radius-md);
+  background: #22211e;
+  box-shadow: var(--shadow-lg);
   padding: 4px;
 }
 
@@ -1410,7 +1459,7 @@ pre {
   gap: 8px;
   width: 100%;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text);
   padding: 7px 8px;
@@ -1426,7 +1475,7 @@ pre {
 
 .dock-select-option:hover,
 .dock-select-option.is-selected {
-  background: rgba(255, 247, 238, 0.08);
+  background: rgba(var(--c-warm), 0.08);
 }
 
 .dock-select-option.is-disabled {
@@ -1475,7 +1524,7 @@ pre {
   min-height: 26px;
   min-width: 0;
   border-color: transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: transparent;
   box-shadow: none;
   padding: 0 6px;
@@ -1490,14 +1539,14 @@ pre {
 
 .dock-composer-select .dock-select-trigger:hover {
   border-color: var(--line);
-  background: rgba(255, 247, 238, 0.045);
+  background: rgba(var(--c-warm), 0.045);
   color: var(--text);
 }
 
 .dock-composer-select .dock-select-trigger:focus-visible,
 .dock-composer-select.is-open .dock-select-trigger {
   border-color: var(--line);
-  background: rgba(255, 247, 238, 0.05);
+  background: rgba(var(--c-warm), 0.05);
   box-shadow: none;
   color: var(--text);
 }
@@ -1571,7 +1620,7 @@ pre {
   row-gap: 3px;
   width: 100%;
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: transparent;
   padding: 7px 9px;
   min-width: 0;
@@ -1593,13 +1642,13 @@ pre {
 }
 
 .dock-thread-row-shell.is-selected {
-  background: rgba(255, 247, 238, 0.06);
+  background: rgba(var(--c-warm), 0.06);
   border-color: var(--line);
 }
 
 .dock-thread-row-shell.is-archived {
-  background: rgba(255, 247, 238, 0.025);
-  border-color: rgba(255, 247, 238, 0.06);
+  background: rgba(var(--c-warm), 0.025);
+  border-color: rgba(var(--c-warm), 0.06);
 }
 
 .dock-thread-row:disabled {
@@ -1722,11 +1771,11 @@ pre {
   justify-content: center;
   min-height: 24px;
   padding: 0 10px;
-  border: 1px solid rgba(255, 247, 238, 0.12);
+  border: 1px solid rgba(var(--c-warm), 0.12);
   border-radius: 999px;
-  background: rgba(38, 32, 33, 0.96);
+  background: rgba(35, 34, 30, 0.96);
   box-shadow:
-    0 10px 24px rgba(0, 0, 0, 0.3),
+    0 10px 24px rgba(var(--c-black), 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
   color: var(--text);
   font-size: var(--text-11);
@@ -1758,7 +1807,7 @@ pre {
 }
 
 .dock-thread-row-action.is-confirming {
-  background: color-mix(in srgb, var(--danger) 12%, rgba(82, 58, 61, 0.95));
+  background: color-mix(in srgb, var(--danger) 12%, rgba(76, 62, 50, 0.95));
   box-shadow: none;
   color: color-mix(in srgb, var(--danger) 74%, black 26%);
 }
@@ -1871,7 +1920,7 @@ pre {
 .dock-icon-button.is-armed,
 .dock-icon-button.is-busy {
   border-color: var(--line);
-  background: rgba(255, 247, 238, 0.055);
+  background: rgba(var(--c-warm), 0.055);
   color: var(--text);
 }
 
@@ -1886,7 +1935,7 @@ pre {
   gap: 4px;
   min-height: 24px;
   border: 1px solid transparent;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: transparent;
   padding: 0 6px;
   color: var(--text-muted);
@@ -1900,7 +1949,7 @@ pre {
 
 .dock-status-pill:hover {
   border-color: var(--line);
-  background: rgba(255, 247, 238, 0.045);
+  background: rgba(var(--c-warm), 0.045);
   color: var(--text);
 }
 
@@ -1924,7 +1973,7 @@ pre {
   max-width: 100%;
   min-height: 24px;
   border-color: transparent;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: transparent;
   box-shadow: none;
   padding: 0 6px 0 8px;
@@ -1938,14 +1987,14 @@ pre {
 
 .dock-stage-language-select .dock-select-trigger:hover {
   border-color: var(--line);
-  background: rgba(255, 247, 238, 0.045);
+  background: rgba(var(--c-warm), 0.045);
   color: var(--text);
 }
 
 .dock-stage-language-select .dock-select-trigger:focus-visible,
 .dock-stage-language-select.is-open .dock-select-trigger {
   border-color: var(--line);
-  background: rgba(255, 247, 238, 0.05);
+  background: rgba(var(--c-warm), 0.05);
   box-shadow: none;
   color: var(--text);
 }
@@ -1953,7 +2002,7 @@ pre {
 .dock-status-select-shell .dock-select-trigger {
   min-height: 24px;
   border-color: transparent;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: transparent;
   box-shadow: none;
   padding: 0 6px;
@@ -1963,28 +2012,28 @@ pre {
 
 .dock-status-select-shell .dock-select-trigger:hover {
   border-color: var(--line);
-  background: rgba(255, 247, 238, 0.045);
+  background: rgba(var(--c-warm), 0.045);
   color: var(--text);
 }
 
 .dock-status-select-shell .dock-select-trigger:focus-visible,
 .dock-status-select-shell.is-open .dock-select-trigger {
   border-color: var(--line);
-  background: rgba(255, 247, 238, 0.05);
+  background: rgba(var(--c-warm), 0.05);
   box-shadow: none;
   color: var(--text);
 }
 
 .dock-status-select-shell.is-danger .dock-select-trigger {
-  color: #e2a35d;
+  color: #d9a05c;
 }
 
 .dock-status-select-shell.is-danger .dock-select-trigger:hover,
 .dock-status-select-shell.is-danger .dock-select-trigger:focus-visible,
 .dock-status-select-shell.is-danger.is-open .dock-select-trigger {
-  border-color: rgba(226, 163, 93, 0.28);
-  background: rgba(226, 163, 93, 0.08);
-  color: #f0b97d;
+  border-color: rgba(var(--c-warning), 0.28);
+  background: rgba(var(--c-warning), 0.08);
+  color: #ebb47a;
 }
 
 .dock-rename-strip {
@@ -2039,10 +2088,10 @@ pre {
   align-items: center;
   min-height: 28px;
   min-width: 28px;
-  border: 1px solid rgba(255, 247, 238, 0.12);
+  border: 1px solid rgba(var(--c-warm), 0.12);
   border-radius: 999px;
-  background: rgba(20, 20, 22, 0.96);
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
+  background: rgba(20, 20, 18, 0.96);
+  box-shadow: 0 8px 18px rgba(var(--c-black), 0.22);
   padding: 0;
   color: var(--text);
   transition:
@@ -2053,8 +2102,8 @@ pre {
 
 .dock-scroll-bottom-button:hover {
   transform: translateY(-1px);
-  border-color: rgba(255, 247, 238, 0.18);
-  background: rgba(28, 28, 31, 0.98);
+  border-color: rgba(var(--c-warm), 0.18);
+  background: rgba(28, 28, 26, 0.98);
 }
 
 .dock-scroll-bottom-icon {
@@ -2081,7 +2130,7 @@ pre {
   font-family: var(--font-serif);
   font-size: clamp(34px, 5vw, 48px);
   line-height: 0.95;
-  letter-spacing: 0.03em;
+  letter-spacing: -0.02em;
 }
 
 .dock-hero strong {
@@ -2108,9 +2157,9 @@ pre {
   align-items: center;
   gap: 6px;
   min-height: 34px;
-  border: 1px solid rgba(255, 247, 238, 0.1);
+  border: 1px solid rgba(var(--c-warm), 0.1);
   border-radius: 999px;
-  background: rgba(255, 247, 238, 0.04);
+  background: rgba(var(--c-warm), 0.04);
   padding: 0 12px;
   font-size: var(--text-13);
 }
@@ -2191,8 +2240,8 @@ pre {
 .dock-artifact,
 .dock-request-card {
   border: 1px solid var(--line);
-  border-radius: 12px;
-  background: rgba(255, 247, 238, 0.02);
+  border-radius: var(--radius-md);
+  background: rgba(var(--c-warm), 0.02);
 }
 
 .dock-entry {
@@ -2218,14 +2267,14 @@ pre {
   width: 96px;
   height: 64px;
   overflow: hidden;
-  border: 1px solid rgba(255, 247, 238, 0.1);
-  border-radius: 12px;
-  background: rgba(255, 247, 238, 0.025);
+  border: 1px solid rgba(var(--c-warm), 0.1);
+  border-radius: var(--radius-md);
+  background: rgba(var(--c-warm), 0.025);
   padding: 0;
 }
 
 .dock-user-attachment-tile:hover {
-  border-color: rgba(255, 247, 238, 0.18);
+  border-color: rgba(var(--c-warm), 0.18);
   transform: translateY(-1px);
 }
 
@@ -2250,14 +2299,14 @@ pre {
 .dock-assistant-image-button {
   display: block;
   overflow: hidden;
-  border: 1px solid rgba(255, 247, 238, 0.1);
-  border-radius: 14px;
-  background: rgba(255, 247, 238, 0.025);
+  border: 1px solid rgba(var(--c-warm), 0.1);
+  border-radius: var(--radius-lg);
+  background: rgba(var(--c-warm), 0.025);
   padding: 0;
 }
 
 .dock-assistant-image-button:hover {
-  border-color: rgba(255, 247, 238, 0.18);
+  border-color: rgba(var(--c-warm), 0.18);
   transform: translateY(-1px);
 }
 
@@ -2279,9 +2328,9 @@ pre {
 .dock-user-bubble {
   width: fit-content;
   max-width: min(100%, 560px);
-  border: 1px solid rgba(255, 247, 238, 0.09);
-  border-radius: 12px;
-  background: rgba(255, 247, 238, 0.028);
+  border: 1px solid rgba(var(--c-warm), 0.09);
+  border-radius: var(--radius-lg);
+  background: rgba(var(--c-warm), 0.028);
   padding: 8px 10px;
 }
 
@@ -2307,9 +2356,9 @@ pre {
   background:
     linear-gradient(
       90deg,
-      rgba(255, 247, 238, 0),
-      rgba(255, 247, 238, 0.12) 18%,
-      rgba(255, 247, 238, 0.08)
+      rgba(var(--c-warm), 0),
+      rgba(var(--c-warm), 0.12) 18%,
+      rgba(var(--c-warm), 0.08)
     );
 }
 
@@ -2317,7 +2366,7 @@ pre {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: rgba(255, 247, 238, 0.56);
+  color: rgba(var(--c-warm), 0.56);
   font-size: var(--text-12);
   line-height: 1;
   white-space: nowrap;
@@ -2343,13 +2392,13 @@ pre {
   border: 0;
   background: transparent;
   padding: 2px 0;
-  color: rgba(255, 247, 238, 0.58);
+  color: rgba(var(--c-warm), 0.58);
   cursor: pointer;
 }
 
 .dock-processed-summary:focus-visible {
   outline: none;
-  color: rgba(255, 247, 238, 0.76);
+  color: rgba(var(--c-warm), 0.76);
 }
 
 .dock-processed-line {
@@ -2357,9 +2406,9 @@ pre {
   background:
     linear-gradient(
       90deg,
-      rgba(255, 247, 238, 0),
-      rgba(255, 247, 238, 0.12) 18%,
-      rgba(255, 247, 238, 0.08)
+      rgba(var(--c-warm), 0),
+      rgba(var(--c-warm), 0.12) 18%,
+      rgba(var(--c-warm), 0.08)
     );
 }
 
@@ -2380,7 +2429,7 @@ pre {
   place-items: center;
   width: 18px;
   height: 18px;
-  color: rgba(255, 247, 238, 0.54);
+  color: rgba(var(--c-warm), 0.54);
 }
 
 .dock-processed-toggle-icon {
@@ -2411,7 +2460,7 @@ pre {
 .dock-markdown {
   color: var(--text);
   font-size: var(--text-14);
-  line-height: 1.58;
+  line-height: 1.65;
 }
 
 .dock-markdown > :first-child {
@@ -2442,14 +2491,14 @@ pre {
 }
 
 .dock-markdown a {
-  color: #8cbfff;
+  color: #9cbfee;
   text-decoration: underline;
-  text-decoration-color: rgba(140, 191, 255, 0.5);
+  text-decoration-color: rgba(var(--c-info), 0.5);
   text-underline-offset: 2px;
 }
 
 .dock-markdown a:hover {
-  color: #b6d4ff;
+  color: #bfd4f0;
 }
 
 .dock-markdown strong {
@@ -2457,19 +2506,19 @@ pre {
 }
 
 .dock-markdown code {
-  border: 1px solid rgba(255, 247, 238, 0.08);
-  border-radius: 8px;
-  background: rgba(255, 247, 238, 0.05);
+  border: 1px solid rgba(var(--c-warm), 0.08);
+  border-radius: var(--radius-sm);
+  background: rgba(var(--c-warm), 0.05);
   padding: 0.12em 0.38em;
-  color: #f2e6d7;
+  color: #efe9df;
   font-size: 0.92em;
 }
 
 .dock-markdown pre {
   overflow-x: auto;
-  border: 1px solid rgba(255, 247, 238, 0.08);
-  border-radius: 12px;
-  background: rgba(0, 0, 0, 0.24);
+  border: 1px solid rgba(var(--c-warm), 0.08);
+  border-radius: var(--radius-md);
+  background: rgba(var(--c-black), 0.24);
   padding: 10px 12px;
 }
 
@@ -2481,7 +2530,7 @@ pre {
 }
 
 .dock-markdown blockquote {
-  border-left: 2px solid rgba(255, 247, 238, 0.18);
+  border-left: 2px solid rgba(var(--c-warm), 0.18);
   margin-left: 0;
   padding-left: 10px;
   color: var(--text-muted);
@@ -2489,7 +2538,7 @@ pre {
 
 .dock-markdown hr {
   border: 0;
-  border-top: 1px solid rgba(255, 247, 238, 0.08);
+  border-top: 1px solid rgba(var(--c-warm), 0.08);
 }
 
 .dock-markdown table {
@@ -2500,7 +2549,7 @@ pre {
 
 .dock-markdown th,
 .dock-markdown td {
-  border: 1px solid rgba(255, 247, 238, 0.08);
+  border: 1px solid rgba(var(--c-warm), 0.08);
   padding: 6px 8px;
   text-align: left;
   vertical-align: top;
@@ -2509,7 +2558,7 @@ pre {
 .dock-markdown th {
   color: var(--text-muted);
   font-weight: 600;
-  background: rgba(255, 247, 238, 0.04);
+  background: rgba(var(--c-warm), 0.04);
 }
 
 .dock-user-bubble .dock-entry-text {
@@ -2520,9 +2569,9 @@ pre {
 
 .dock-plan-card {
   width: min(100%, 720px);
-  border: 1px solid rgba(255, 247, 238, 0.09);
-  border-radius: 12px;
-  background: rgba(255, 247, 238, 0.02);
+  border: 1px solid rgba(var(--c-warm), 0.09);
+  border-radius: var(--radius-md);
+  background: rgba(var(--c-warm), 0.02);
   overflow: hidden;
   padding: 0;
 }
@@ -2533,8 +2582,8 @@ pre {
   justify-content: space-between;
   gap: 8px;
   padding: 10px 12px 8px;
-  border-bottom: 1px solid rgba(255, 247, 238, 0.05);
-  background: rgba(255, 247, 238, 0.024);
+  border-bottom: 1px solid rgba(var(--c-warm), 0.05);
+  background: rgba(var(--c-warm), 0.024);
 }
 
 .dock-plan-card-summary {
@@ -2633,7 +2682,7 @@ pre {
   position: absolute;
   top: 0;
   left: 14px;
-  color: rgba(255, 247, 238, 0.58);
+  color: rgba(var(--c-warm), 0.58);
   font-size: var(--text-13);
   line-height: 1.55;
   min-width: 0;
@@ -2646,26 +2695,26 @@ pre {
   width: 7px;
   height: 7px;
   margin-top: 0;
-  border: 1px solid rgba(255, 247, 238, 0.26);
+  border: 1px solid rgba(var(--c-warm), 0.26);
   border-radius: 999px;
   background: transparent;
   flex: none;
 }
 
 .dock-plan-row.is-completed .dock-plan-row-status {
-  border-color: rgba(255, 247, 238, 0.42);
-  background: rgba(255, 247, 238, 0.42);
+  border-color: rgba(var(--c-warm), 0.42);
+  background: rgba(var(--c-warm), 0.42);
   box-shadow: none;
 }
 
 .dock-plan-row.is-inProgress .dock-plan-row-status {
-  border-color: rgba(255, 247, 238, 0.38);
-  background: rgba(255, 247, 238, 0.1);
-  box-shadow: inset 0 0 0 1px rgba(255, 247, 238, 0.04);
+  border-color: rgba(var(--c-warm), 0.38);
+  background: rgba(var(--c-warm), 0.1);
+  box-shadow: inset 0 0 0 1px rgba(var(--c-warm), 0.04);
 }
 
 .dock-plan-row.is-pending .dock-plan-row-status {
-  border-color: rgba(255, 247, 238, 0.24);
+  border-color: rgba(var(--c-warm), 0.24);
   background: transparent;
 }
 
@@ -2689,11 +2738,11 @@ pre {
 }
 
 .dock-plan-row-copy code {
-  border: 1px solid rgba(255, 247, 238, 0.08);
-  border-radius: 8px;
-  background: rgba(255, 247, 238, 0.05);
+  border: 1px solid rgba(var(--c-warm), 0.08);
+  border-radius: var(--radius-sm);
+  background: rgba(var(--c-warm), 0.05);
   padding: 0.12em 0.38em;
-  color: #f2e6d7;
+  color: #efe9df;
   font-size: 0.92em;
 }
 
@@ -2748,7 +2797,7 @@ pre {
   width: 8px;
   height: 8px;
   border-radius: 999px;
-  background: rgba(255, 247, 238, 0.45);
+  background: rgba(var(--c-warm), 0.45);
   animation: dock-pulse 1.2s ease-in-out infinite;
 }
 
@@ -2774,9 +2823,9 @@ pre {
   min-height: 24px;
   max-width: min(100%, 360px);
   overflow: hidden;
-  border: 1px solid rgba(255, 247, 238, 0.08);
+  border: 1px solid rgba(var(--c-warm), 0.08);
   border-radius: 999px;
-  background: rgba(255, 247, 238, 0.03);
+  background: rgba(var(--c-warm), 0.03);
   padding: 0 8px;
   color: var(--text-muted);
   font-size: var(--text-12);
@@ -2790,7 +2839,7 @@ pre {
   z-index: 1400;
   display: grid;
   place-items: center;
-  background: rgba(7, 7, 9, 0.8);
+  background: rgba(7, 7, 6, 0.8);
   backdrop-filter: blur(10px);
   padding: 28px;
 }
@@ -2807,10 +2856,10 @@ pre {
   display: block;
   max-width: min(92vw, 1080px);
   max-height: 82vh;
-  border: 1px solid rgba(255, 247, 238, 0.12);
-  border-radius: 22px;
-  background: rgba(12, 12, 14, 0.92);
-  box-shadow: 0 28px 68px rgba(0, 0, 0, 0.48);
+  border: 1px solid rgba(var(--c-warm), 0.12);
+  border-radius: var(--radius-xl);
+  background: rgba(12, 12, 11, 0.92);
+  box-shadow: var(--shadow-lg);
 }
 
 .dock-lightbox-close {
@@ -2818,9 +2867,9 @@ pre {
   top: 14px;
   right: 14px;
   min-height: 32px;
-  border: 1px solid rgba(255, 247, 238, 0.12);
+  border: 1px solid rgba(var(--c-warm), 0.12);
   border-radius: 999px;
-  background: rgba(17, 17, 20, 0.78);
+  background: rgba(17, 17, 15, 0.78);
   padding: 0 12px;
   color: var(--text);
 }
@@ -2847,9 +2896,9 @@ pre {
 
 .dock-command-card {
   width: min(100%, 860px);
-  border: 1px solid rgba(255, 247, 238, 0.07);
-  border-radius: 12px;
-  background: rgba(255, 247, 238, 0.02);
+  border: 1px solid rgba(var(--c-warm), 0.07);
+  border-radius: var(--radius-md);
+  background: rgba(var(--c-warm), 0.02);
 }
 
 .dock-command-summary {
@@ -2912,7 +2961,7 @@ pre {
 }
 
 .dock-command-detail {
-  border-top: 1px solid rgba(255, 247, 238, 0.06);
+  border-top: 1px solid rgba(var(--c-warm), 0.06);
   padding: 10px 12px 12px;
 }
 
@@ -2927,11 +2976,11 @@ pre {
 .dock-command-output {
   margin: 8px 0 0;
   overflow: auto;
-  border: 1px solid rgba(255, 247, 238, 0.06);
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(var(--c-warm), 0.06);
+  border-radius: var(--radius-sm);
+  background: rgba(var(--c-black), 0.22);
   padding: 8px 10px;
-  color: #dfdbd5;
+  color: #dfdcd6;
   font-size: var(--text-12);
   line-height: 1.6;
 }
@@ -2946,14 +2995,14 @@ pre {
 .dock-filechange-card {
   width: 100%;
   min-width: 0;
-  border: 1px solid rgba(255, 247, 238, 0.07);
-  border-radius: 12px;
-  background: rgba(255, 247, 238, 0.02);
+  border: 1px solid rgba(var(--c-warm), 0.07);
+  border-radius: var(--radius-md);
+  background: rgba(var(--c-warm), 0.02);
   box-sizing: border-box;
 }
 
 .dock-filechange-card.is-static {
-  border-color: rgba(255, 247, 238, 0.08);
+  border-color: rgba(var(--c-warm), 0.08);
 }
 
 .dock-filechange-summary {
@@ -3026,7 +3075,7 @@ pre {
 
 .dock-filechange-detail {
   min-width: 0;
-  border-top: 1px solid rgba(255, 247, 238, 0.06);
+  border-top: 1px solid rgba(var(--c-warm), 0.06);
   padding: 10px 12px 12px;
 }
 
@@ -3037,11 +3086,11 @@ pre {
   max-width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
-  border: 1px solid rgba(255, 247, 238, 0.06);
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(var(--c-warm), 0.06);
+  border-radius: var(--radius-sm);
+  background: rgba(var(--c-black), 0.22);
   padding: 8px 10px;
-  color: #dfdbd5;
+  color: #dfdcd6;
   font-family: var(--font-mono);
   font-size: var(--text-12);
   line-height: 1.6;
@@ -3058,11 +3107,11 @@ pre {
 }
 
 .dock-filechange-line.is-added {
-  color: #57d18c;
+  color: #5cc88a;
 }
 
 .dock-filechange-line.is-removed {
-  color: #ff8f88;
+  color: #f09088;
 }
 
 .dock-diff-count {
@@ -3070,11 +3119,11 @@ pre {
 }
 
 .dock-diff-count.is-added {
-  color: #57d18c;
+  color: #5cc88a;
 }
 
 .dock-diff-count.is-removed {
-  color: #ff7c74;
+  color: #f07c74;
 }
 
 .dock-bottom-dock {
@@ -3109,9 +3158,9 @@ pre {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  border: 1px solid rgba(243, 240, 234, 0.12);
-  border-radius: 12px;
-  background: rgba(243, 240, 234, 0.03);
+  border: 1px solid rgba(var(--c-warm), 0.12);
+  border-radius: var(--radius-md);
+  background: rgba(var(--c-warm), 0.03);
   padding: 8px 10px;
 }
 
@@ -3148,11 +3197,11 @@ pre {
 .dock-request-card pre {
   display: block;
   overflow: auto;
-  border: 1px solid rgba(255, 247, 238, 0.05);
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(var(--c-warm), 0.05);
+  border-radius: var(--radius-sm);
+  background: rgba(var(--c-black), 0.2);
   padding: 8px 10px;
-  color: #d6d2cb;
+  color: #d6d4cd;
   font-size: 12px;
 }
 
@@ -3174,9 +3223,9 @@ pre {
 }
 
 .dock-request-command-shell {
-  border: 1px solid rgba(255, 247, 238, 0.06);
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(var(--c-warm), 0.06);
+  border-radius: var(--radius-sm);
+  background: rgba(var(--c-black), 0.22);
   padding: 8px 10px;
 }
 
@@ -3185,7 +3234,7 @@ pre {
   padding: 0;
   border: 0;
   background: transparent;
-  color: #e5dfd7;
+  color: #e5e2db;
   line-height: 1.6;
 }
 
@@ -3202,16 +3251,16 @@ pre {
 
 .dock-request-action {
   min-height: 32px;
-  border: 1px solid rgba(255, 247, 238, 0.1);
-  border-radius: 10px;
-  background: rgba(255, 247, 238, 0.03);
+  border: 1px solid rgba(var(--c-warm), 0.1);
+  border-radius: var(--radius-sm);
+  background: rgba(var(--c-warm), 0.03);
   padding: 0 10px;
   color: var(--text);
 }
 
 .dock-request-action.is-primary {
-  border-color: rgba(255, 247, 238, 0.18);
-  background: rgba(255, 247, 238, 0.08);
+  border-color: rgba(var(--c-warm), 0.18);
+  background: rgba(var(--c-warm), 0.08);
 }
 
 .dock-request-action.is-muted {
@@ -3219,8 +3268,8 @@ pre {
 }
 
 .dock-request-action:hover {
-  border-color: rgba(255, 247, 238, 0.18);
-  background: rgba(255, 247, 238, 0.06);
+  border-color: rgba(var(--c-warm), 0.18);
+  background: rgba(var(--c-warm), 0.06);
 }
 
 .dock-request-action:disabled,
@@ -3253,15 +3302,15 @@ pre {
   z-index: 1;
   width: 100%;
   margin-top: -10px;
-  border: 1px solid rgba(255, 247, 238, 0.08);
-  border-radius: 18px;
-  background: #252527;
+  border: 1px solid rgba(var(--c-warm), 0.08);
+  border-radius: var(--radius-xl);
+  background: #252422;
   box-shadow: none;
   padding: 12px 14px 10px;
 }
 
 .dock-composer-panel:focus-within {
-  border-color: rgba(255, 247, 238, 0.14);
+  border-color: rgba(var(--c-warm), 0.14);
 }
 
 .dock-composer-plan-panel {
@@ -3276,8 +3325,8 @@ pre {
 .dock-composer-plan-panel .dock-plan-card {
   width: calc(100% - 8px);
   margin: 0 auto;
-  border-color: rgba(255, 247, 238, 0.07);
-  background: rgba(255, 247, 238, 0.024);
+  border-color: rgba(var(--c-warm), 0.07);
+  background: rgba(var(--c-warm), 0.024);
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
 }
@@ -3315,7 +3364,7 @@ pre {
   gap: 8px;
   min-width: 0;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: var(--panel-bg-soft);
   padding: 6px 8px;
 }
@@ -3323,7 +3372,7 @@ pre {
 .dock-upload-chip img {
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   object-fit: cover;
 }
 
@@ -3383,7 +3432,7 @@ pre {
   width: 28px;
   height: 28px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-soft);
   transition:
@@ -3395,7 +3444,7 @@ pre {
 .dock-composer-add-button:hover,
 .dock-composer-add-button:focus-within {
   border-color: var(--line);
-  background: rgba(255, 247, 238, 0.045);
+  background: rgba(var(--c-warm), 0.045);
   color: var(--text);
 }
 
@@ -3441,7 +3490,7 @@ pre {
 
 .dock-round-action {
   height: 28px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 
 .dock-send-button {
@@ -3454,7 +3503,7 @@ pre {
 }
 
 .dock-send-button.is-stop {
-  background: rgba(255, 247, 238, 0.16);
+  background: rgba(var(--c-warm), 0.16);
   color: var(--text);
 }
 
@@ -3478,7 +3527,7 @@ pre {
 }
 
 .dock-send-button.is-stop:hover {
-  background: rgba(255, 247, 238, 0.22);
+  background: rgba(var(--c-warm), 0.22);
 }
 
 .dock-send-button:disabled {
@@ -3497,11 +3546,11 @@ pre {
 }
 
 .dock-error {
-  border: 1px solid rgba(241, 142, 127, 0.28);
-  border-radius: 12px;
-  background: rgba(241, 142, 127, 0.08);
+  border: 1px solid rgba(var(--c-danger), 0.28);
+  border-radius: var(--radius-md);
+  background: rgba(var(--c-danger), 0.08);
   padding: 8px 10px;
-  color: #ffc0b5;
+  color: #f0bfb3;
 }
 
 .dock-question-stack {
@@ -3932,6 +3981,6 @@ pre {
   .dock-request-card,
   .dock-upload-chip,
   .dock-composer-panel {
-    border-radius: 12px;
+    border-radius: var(--radius-md);
   }
 }
