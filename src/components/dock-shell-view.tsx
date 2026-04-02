@@ -449,6 +449,7 @@ export function DockShellView(props: DockShellViewProps) {
     null
   );
   const resizeStateRef = useRef<{ startX: number; startWidth: number } | null>(null);
+  const heroCwdInputRef = useRef<HTMLInputElement | null>(null);
   const stageScrollRef = useRef<HTMLElement | null>(null);
   const stageScrollBodyRef = useRef<HTMLDivElement | null>(null);
   const shouldAutoFollowRef = useRef(true);
@@ -637,6 +638,15 @@ export function DockShellView(props: DockShellViewProps) {
       setHeroCwdOpen(false);
     }
   }, [props.selectedThread, props.loadingThread]);
+
+  useEffect(() => {
+    if (!heroCwdOpen) {
+      return;
+    }
+
+    heroCwdInputRef.current?.focus();
+    heroCwdInputRef.current?.select();
+  }, [heroCwdOpen]);
 
   useEffect(() => {
     if (!archiveTooltip) {
@@ -1225,7 +1235,7 @@ export function DockShellView(props: DockShellViewProps) {
               ) : null}
 
               {!props.selectedThread && !props.loadingThread ? (
-                <div className="dock-hero">
+                <div className={clsx("dock-hero", heroCwdOpen && "is-cwd-open")}>
                   <div className="dock-hero-wordmark">Codexy</div>
                   <strong>{t("stage.startBuilding")}</strong>
                   <div className="dock-hero-project">{props.workspaceLabel}</div>
@@ -1244,7 +1254,13 @@ export function DockShellView(props: DockShellViewProps) {
                       {t("actions.choosePath")}
                     </button>
                   </div>
-                  {heroCwdOpen ? (
+                  <div
+                    aria-hidden={!heroCwdOpen}
+                    className={clsx(
+                      "dock-hero-cwd-shell",
+                      heroCwdOpen && "is-open"
+                    )}
+                  >
                     <div className="dock-hero-cwd">
                       <label
                         className="dock-hero-cwd-label"
@@ -1253,12 +1269,15 @@ export function DockShellView(props: DockShellViewProps) {
                         {t("request.workingDirectory")}
                       </label>
                       <input
-                        autoFocus
+                        aria-hidden={!heroCwdOpen}
                         className="dock-sidebar-input dock-hero-input"
+                        disabled={!heroCwdOpen}
                         id="dock-hero-cwd-input"
                         onChange={(event) => setHeroCwdDraft(event.target.value)}
                         onKeyDown={handleHeroCwdKeyDown}
                         placeholder={t("request.workingDirectory")}
+                        ref={heroCwdInputRef}
+                        tabIndex={heroCwdOpen ? 0 : -1}
                         value={heroCwdDraft}
                       />
                       <div className="dock-hero-cwd-actions">
@@ -1266,6 +1285,7 @@ export function DockShellView(props: DockShellViewProps) {
                           className="dock-request-action is-primary"
                           disabled={!heroCwdDraft.trim()}
                           onClick={handleHeroCwdSubmit}
+                          tabIndex={heroCwdOpen ? 0 : -1}
                           type="button"
                         >
                           {t("actions.usePath")}
@@ -1273,13 +1293,14 @@ export function DockShellView(props: DockShellViewProps) {
                         <button
                           className="dock-ghost-action is-muted"
                           onClick={() => setHeroCwdOpen(false)}
+                          tabIndex={heroCwdOpen ? 0 : -1}
                           type="button"
                         >
                           {t("actions.cancel")}
                         </button>
                       </div>
                     </div>
-                  ) : null}
+                  </div>
                 </div>
               ) : null}
 
