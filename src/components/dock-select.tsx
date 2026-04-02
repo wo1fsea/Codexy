@@ -3,6 +3,7 @@
 import clsx from "clsx";
 import {
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -67,27 +68,36 @@ export function DockSelect({
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (!open) {
+  useLayoutEffect(() => {
+    if (!mounted || !open) {
       return;
     }
 
     function updateMenuPosition() {
       const rect = triggerRef.current?.getBoundingClientRect();
-      if (!rect) {
+      const menu = menuRef.current;
+      if (!rect || !menu) {
         return;
       }
 
-      const menuMaxW = Math.min(320, window.innerWidth - 24);
-      const menuW = Math.max(rect.width, menuMaxW);
+      const viewportPadding = 12;
+      const menuMaxW = Math.min(320, window.innerWidth - viewportPadding * 2);
+      const measuredWidth = menu.offsetWidth || menu.scrollWidth || rect.width;
+      const menuW = Math.min(Math.max(measuredWidth, rect.width), menuMaxW);
       let left = rect.left;
-      if (left + menuW > window.innerWidth - 12) {
-        left = Math.max(12, window.innerWidth - 12 - menuW);
+      if (left + menuW > window.innerWidth - viewportPadding) {
+        left = rect.right - menuW;
       }
+      left = Math.max(
+        viewportPadding,
+        Math.min(left, window.innerWidth - viewportPadding - menuW)
+      );
 
       setMenuStyle({
         left,
         minWidth: rect.width,
+        maxWidth: menuMaxW,
+        visibility: "visible",
         ...(placement === "top"
           ? { bottom: window.innerHeight - rect.top + 8 }
           : { top: rect.bottom + 8 })
@@ -126,7 +136,7 @@ export function DockSelect({
       window.removeEventListener("pointerdown", handlePointerDown);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [open, placement]);
+  }, [mounted, open, placement]);
 
   return (
     <div
@@ -155,13 +165,13 @@ export function DockSelect({
         <AppIcon className="dock-select-caret" name="chevron" />
       </button>
 
-      {mounted && open && menuStyle
+      {mounted && open
         ? createPortal(
             <div
               className={clsx("dock-select-menu", menuClassName)}
               ref={menuRef}
               role="listbox"
-              style={menuStyle}
+              style={menuStyle ?? { left: 0, top: 0, visibility: "hidden" }}
             >
               {options.map((option) => {
                 const isSelected = option.value === value;

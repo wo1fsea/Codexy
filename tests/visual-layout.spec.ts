@@ -178,3 +178,40 @@ test("language switcher persists the browser-local selection", async ({ page }) 
     "スレッドまたはプロジェクトを検索"
   );
 });
+
+test("language switcher menu stays aligned on narrow viewports", async ({ page }) => {
+  await installDockApiMock(page);
+
+  await page.setViewportSize({ width: 500, height: 900 });
+  await gotoDock(page);
+
+  const languageSwitch = page.locator(
+    ".dock-stage-language-select .dock-select-trigger"
+  );
+  await expect(languageSwitch).toBeVisible();
+  await languageSwitch.click();
+
+  const metrics = await page.evaluate(() => {
+    const trigger = document.querySelector(
+      ".dock-stage-language-select .dock-select-trigger"
+    );
+    const menu = document.querySelector(".dock-select-menu");
+    if (!(trigger instanceof HTMLElement) || !(menu instanceof HTMLElement)) {
+      return null;
+    }
+
+    const triggerBox = trigger.getBoundingClientRect();
+    const menuBox = menu.getBoundingClientRect();
+    return {
+      triggerRight: Math.round(triggerBox.right),
+      menuRight: Math.round(menuBox.right),
+      menuLeft: Math.round(menuBox.left),
+      viewportWidth: window.innerWidth
+    };
+  });
+
+  expect(metrics).not.toBeNull();
+  expect(metrics!.menuLeft).toBeGreaterThanOrEqual(12);
+  expect(metrics!.menuRight).toBeLessThanOrEqual(metrics!.viewportWidth - 12);
+  expect(Math.abs(metrics!.menuRight - metrics!.triggerRight)).toBeLessThanOrEqual(2);
+});
