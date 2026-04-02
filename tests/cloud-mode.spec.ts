@@ -234,6 +234,72 @@ test("cloud mode requires TOTP setup before showing the dashboard", async ({ pag
   }
 });
 
+test("cloud auth setup page scrolls on mobile viewports", async ({ page }) => {
+  const cloudHome = makeTempDir("codexy-cloud-mobile-auth-home-");
+  const cloudPort = await getFreePort();
+  const runtimeSuffix = Date.now().toString();
+
+  try {
+    await page.setViewportSize({
+      width: 390,
+      height: 640
+    });
+
+    const startResult = runNodeCli(
+      ["cloud", "start", "--port", String(cloudPort)],
+      cloudHome,
+      180_000,
+      {
+        NEXT_DIST_DIR: `.next-runtime-cloud-playwright-${runtimeSuffix}`
+      }
+    );
+    expect(startResult.status, startResult.stdout + startResult.stderr).toBe(0);
+
+    const cloudUrl = `http://127.0.0.1:${cloudPort}`;
+    await page.goto(`${cloudUrl}/auth/setup`, {
+      waitUntil: "domcontentloaded"
+    });
+
+    await expect(page.getByRole("heading", { name: "Bind Google Authenticator" })).toBeVisible();
+
+    const authShell = page.locator(".cloud-auth-shell");
+    const initialMetrics = await authShell.evaluate((element) => {
+      const footer = element.querySelector(".cloud-auth-footer") as HTMLElement | null;
+
+      return {
+        clientHeight: element.clientHeight,
+        footerBottom: footer?.getBoundingClientRect().bottom ?? 0,
+        overflowY: window.getComputedStyle(element).overflowY,
+        scrollHeight: element.scrollHeight,
+        viewportHeight: window.innerHeight
+      };
+    });
+
+    expect(initialMetrics.overflowY).toBe("auto");
+    expect(initialMetrics.scrollHeight).toBeGreaterThan(initialMetrics.clientHeight);
+    expect(initialMetrics.footerBottom).toBeGreaterThan(initialMetrics.viewportHeight);
+
+    const scrollState = await authShell.evaluate((element) => {
+      element.scrollTo({
+        top: element.scrollHeight,
+        behavior: "auto"
+      });
+
+      return {
+        maxScrollTop: element.scrollHeight - element.clientHeight,
+        scrollTop: element.scrollTop
+      };
+    });
+
+    expect(scrollState.maxScrollTop).toBeGreaterThan(0);
+    expect(scrollState.scrollTop).toBeGreaterThan(0);
+    await expect(page.getByRole("link", { name: "Back" })).toBeInViewport();
+  } finally {
+    runNodeCli(["cloud", "stop"], cloudHome, 20_000);
+    rmSync(cloudHome, { recursive: true, force: true });
+  }
+});
+
 test("cloud dashboard refreshes when a new node links in", async ({ page }) => {
   const cloudHome = makeTempDir("codexy-cloud-refresh-home-");
   const nodeHome = makeTempDir("codexy-cloud-refresh-node-");

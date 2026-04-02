@@ -188,10 +188,15 @@ pre {
 }
 
 .cloud-auth-shell {
-  min-height: 100vh;
+  height: 100dvh;
+  min-height: 100dvh;
   display: grid;
-  place-items: center;
+  justify-items: center;
+  align-content: center;
   padding: clamp(20px, 4vw, 40px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
   background:
     radial-gradient(circle at top left, rgba(var(--c-accent), 0.12), transparent 34%),
     linear-gradient(180deg, #101010 0%, #151413 100%);
