@@ -54,7 +54,7 @@ type UploadItem = {
   previewUrl?: string;
 };
 
-type ArchiveFilter = "live" | "archived" | "all";
+type ArchiveFilter = "live" | "archived";
 
 type ConnectionNoticeState =
   | {
@@ -120,10 +120,6 @@ function isSidebarArchivedThread(
 }
 
 function matchesArchiveFilter(thread: DockThread, archiveFilter: ArchiveFilter) {
-  if (archiveFilter === "all") {
-    return true;
-  }
-
   return archiveFilter === "archived"
     ? getArchiveState(thread)
     : !getArchiveState(thread);
@@ -1919,7 +1915,7 @@ export function DockApp({
     const params = new URLSearchParams();
     params.set(
       "archived",
-      archiveFilter === "all" ? "all" : archiveFilter === "archived" ? "true" : "false"
+      archiveFilter === "archived" ? "true" : "false"
     );
 
     const data = await fetchJson<{ data: DockThread[] }>(

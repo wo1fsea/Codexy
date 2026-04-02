@@ -111,7 +111,7 @@ test("custom dropdown renders its popup menu", async ({ page }) => {
   await expect(menu).toBeVisible();
   await expect(page.getByRole("option", { name: "Live" })).toBeVisible();
   await expect(page.getByRole("option", { name: "Archived" })).toBeVisible();
-  await expect(page.getByRole("option", { name: "All" })).toBeVisible();
+  await expect(page.getByRole("option", { name: "All" })).toHaveCount(0);
 });
 
 test("new thread nav button stays frameless at rest and gains chrome on hover", async ({

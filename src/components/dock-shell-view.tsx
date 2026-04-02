@@ -26,7 +26,7 @@ import { useI18n } from "@/lib/i18n/provider";
 import type { TranslateFn } from "@/lib/i18n/messages";
 import type { StatusPayload } from "@/lib/status";
 
-type ArchiveFilter = "live" | "archived" | "all";
+type ArchiveFilter = "live" | "archived";
 
 type UploadItem = {
   id: string;
@@ -471,8 +471,7 @@ export function DockShellView(props: DockShellViewProps) {
     Boolean(props.error);
   const archiveFilterOptions: DockSelectOption[] = [
     { value: "live", label: t("filters.live") },
-    { value: "archived", label: t("filters.archived") },
-    { value: "all", label: t("filters.all") }
+    { value: "archived", label: t("filters.archived") }
   ];
   const permissionPresetOptions: DockSelectOption[] = [
     { value: "default", label: t("permissions.default") },

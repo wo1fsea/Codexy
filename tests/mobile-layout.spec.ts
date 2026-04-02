@@ -88,3 +88,60 @@ test("mobile bottom dock stays inside the viewport", async ({ page }) => {
   expect(metrics!.composerBottom).toBeLessThanOrEqual(metrics!.viewportHeight);
   expect(metrics!.statusBottom).toBeLessThanOrEqual(metrics!.viewportHeight);
 });
+
+test("mobile idle hero does not scroll into blank space", async ({ page }) => {
+  await installDockApiMock(page);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await gotoDock(page);
+
+  const metrics = await page.evaluate(() => {
+    const stageScroll = document.querySelector(".dock-stage-scroll");
+    const stageScrollBody = document.querySelector(".dock-stage-scroll-body");
+    const hero = document.querySelector(".dock-hero");
+
+    if (
+      !(stageScroll instanceof HTMLElement) ||
+      !(stageScrollBody instanceof HTMLElement) ||
+      !(hero instanceof HTMLElement)
+    ) {
+      return null;
+    }
+
+    return {
+      clientHeight: stageScroll.clientHeight,
+      scrollHeight: stageScroll.scrollHeight,
+      heroHeight: Math.round(hero.getBoundingClientRect().height),
+      bodyHeight: Math.round(stageScrollBody.getBoundingClientRect().height)
+    };
+  });
+
+  expect(metrics).not.toBeNull();
+  expect(metrics!.scrollHeight - metrics!.clientHeight).toBeLessThanOrEqual(1);
+  expect(metrics!.bodyHeight).toBeLessThanOrEqual(metrics!.clientHeight + 1);
+  expect(metrics!.heroHeight).toBeLessThanOrEqual(metrics!.clientHeight + 1);
+});
+
+test("mobile document root does not exceed the viewport height", async ({ page }) => {
+  await installDockApiMock(page);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await gotoDock(page);
+
+  const metrics = await page.evaluate(() => {
+    const scrollingElement = document.scrollingElement;
+    if (!(scrollingElement instanceof HTMLElement)) {
+      return null;
+    }
+
+    return {
+      viewportHeight: window.innerHeight,
+      clientHeight: scrollingElement.clientHeight,
+      scrollHeight: scrollingElement.scrollHeight
+    };
+  });
+
+  expect(metrics).not.toBeNull();
+  expect(metrics!.clientHeight).toBeLessThanOrEqual(metrics!.viewportHeight + 1);
+  expect(metrics!.scrollHeight).toBeLessThanOrEqual(metrics!.viewportHeight + 1);
+});
