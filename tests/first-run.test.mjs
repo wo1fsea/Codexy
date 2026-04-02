@@ -46,6 +46,39 @@ function makeTempDir(prefix) {
   return mkdtempSync(path.join(os.tmpdir(), prefix));
 }
 
+function getNonLoopbackIpv4() {
+  const interfaces = Object.values(os.networkInterfaces());
+
+  for (const networkEntries of interfaces) {
+    const entries = networkEntries ?? [];
+
+    for (const entry of entries) {
+      const family = typeof entry.family === "string" ? entry.family : String(entry.family);
+      if (family !== "IPv4" || entry.internal || !entry.address) {
+        continue;
+      }
+
+      return entry.address;
+    }
+  }
+
+  return null;
+}
+
+async function fetchWithTimeout(url, timeoutMs = 3_000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, {
+      cache: "no-store",
+      signal: controller.signal
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 const BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 
 function decodeBase32(input) {
@@ -317,7 +350,7 @@ test("install.sh creates a launcher that dispatches to the current checkout", { 
   }
 });
 
-test("codexy lifecycle commands can start, report, and stop the local service", async () => {
+test("codexy lifecycle commands can start, report, and stop the local service", async (t) => {
   const codexyHome = makeTempDir("codexy-test-home-");
   const port = await getFreePort();
 
@@ -342,6 +375,21 @@ test("codexy lifecycle commands can start, report, and stop the local service", 
     assert.equal(statusResult.status, 0, statusResult.stdout + statusResult.stderr);
     assert.match(statusResult.stdout, /Codexy is running/);
     assert.match(statusResult.stdout, new RegExp(`URL: http://127\\.0\\.0\\.1:${port}`));
+
+    const loopbackStatusResponse = await fetchWithTimeout(
+      `http://127.0.0.1:${port}/api/status`
+    );
+    assert.equal(loopbackStatusResponse.status, 200);
+
+    const nonLoopbackHost = getNonLoopbackIpv4();
+    if (nonLoopbackHost) {
+      await assert.rejects(
+        () => fetchWithTimeout(`http://${nonLoopbackHost}:${port}/api/status`),
+        /fetch failed|ECONNREFUSED|connect|abort/i
+      );
+    } else {
+      t.diagnostic("No active non-loopback IPv4 host was available; skipped direct-access probe.");
+    }
 
     const stopResult = runNodeCli(["stop"], {
       env: {

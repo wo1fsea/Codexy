@@ -940,7 +940,7 @@ export function DockShellView(props: DockShellViewProps) {
                 <label className="dock-search-field">
                   <AppIcon className="dock-inline-icon" name="search" />
                   <input
-                    className="dock-sidebar-input dock-search-input"
+                    className="dock-search-input"
                     onChange={(event) => props.onSearchChange(event.target.value)}
                     placeholder={t("sidebar.searchPlaceholder")}
                     value={props.search}

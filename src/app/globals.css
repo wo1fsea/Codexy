@@ -1314,7 +1314,7 @@ pre {
   grid-template-rows: auto minmax(0, 1fr);
   gap: 8px;
   min-height: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .dock-search-field {
@@ -1364,10 +1364,14 @@ pre {
 
 .dock-sidebar-input:focus,
 .dock-composer-cwd:focus,
-.dock-question input:focus,
-.dock-search-field:focus-within {
+.dock-question input:focus {
   border-color: rgba(var(--c-warm), 0.18);
   box-shadow: 0 0 0 3px rgba(var(--c-warm), 0.06);
+}
+
+.dock-search-field:focus-within {
+  border-color: rgba(var(--c-warm), 0.18);
+  box-shadow: inset 0 0 0 1px rgba(var(--c-warm), 0.12);
 }
 
 .dock-select {

@@ -31,6 +31,7 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
 const runtimeKey = createHash("sha1").update(repoRoot).digest("hex").slice(0, 12);
 const codexyHome = process.env.CODEXY_HOME_DIR?.trim() || path.join(os.homedir(), ".codexy");
+const LOOPBACK_HOST = "127.0.0.1";
 
 const SERVICE_MODES = {
   node: {
@@ -246,7 +247,7 @@ function httpGetStatus(port) {
   return new Promise((resolve) => {
     const req = http.get(
       {
-        host: "127.0.0.1",
+        host: LOOPBACK_HOST,
         port,
         path: "/api/status",
         timeout: 1000
@@ -331,7 +332,7 @@ function isPortAvailable(port) {
       });
     });
 
-    server.listen(port, "127.0.0.1");
+    server.listen(port, LOOPBACK_HOST);
   });
 }
 
@@ -506,7 +507,7 @@ async function runDoctor() {
     printCheck(
       health?.ok ? "ok" : "warn",
       "service",
-      `running on http://127.0.0.1:${metadata.port} (${health?.ok ? "healthy" : "not yet healthy"})`
+      `running on http://${LOOPBACK_HOST}:${metadata.port} (${health?.ok ? "healthy" : "not yet healthy"})`
     );
   } else {
     printCheck("warn", "service", "not running");
@@ -516,7 +517,7 @@ async function runDoctor() {
 }
 
 function serviceUrl(port) {
-  return `http://127.0.0.1:${port}`;
+  return `http://${LOOPBACK_HOST}:${port}`;
 }
 
 async function stopPid(pid) {
@@ -683,7 +684,7 @@ async function runStart(argv, modeName) {
   const logFd = openSync(logPath, "w");
   const child = spawn(
     process.execPath,
-    [getNextBin(), "start", "--hostname", "0.0.0.0", "--port", String(options.port)],
+    [getNextBin(), "start", "--hostname", LOOPBACK_HOST, "--port", String(options.port)],
     {
       cwd: repoRoot,
       detached: true,
