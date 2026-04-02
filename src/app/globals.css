@@ -1208,7 +1208,7 @@ pre {
 .dock-round-action:hover,
 .dock-ghost-action:hover,
 .dock-chip-remove:hover,
-.dock-thread-row:hover {
+.dock-thread-row-shell:hover {
   background: rgba(var(--c-warm), 0.04);
   border-color: var(--line);
   color: var(--text);
