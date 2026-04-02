@@ -1348,6 +1348,7 @@ pre {
   padding: 6px 0;
   color: var(--text-muted);
   font-size: var(--text-13);
+  outline: none;
 }
 
 .dock-sidebar-select-row {
