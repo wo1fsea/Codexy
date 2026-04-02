@@ -5,6 +5,12 @@ import path from "node:path";
 
 import type { DockThread, DockThreadItem, DockTurn, DockUserInput } from "@/lib/codex/types";
 
+const WIN32_EXTENDED_PREFIX = /^\\\\\\?\\/;
+
+function normalizeCwd(raw: string): string {
+  return raw.replace(WIN32_EXTENDED_PREFIX, "");
+}
+
 const SESSION_FILE_CACHE = new Map<string, string | null>();
 const SESSION_SUMMARY_CACHE_TTL_MS = 5_000;
 const SESSION_ID_PATTERN =
@@ -319,7 +325,7 @@ function createSessionCommandItem(
     type: "commandExecution",
     id: `session-command:${callId}`,
     command,
-    cwd: typeof payload.cwd === "string" ? payload.cwd : "",
+    cwd: typeof payload.cwd === "string" ? normalizeCwd(payload.cwd) : "",
     processId:
       typeof payload.process_id === "string"
         ? payload.process_id
@@ -718,7 +724,7 @@ function extractThreadMetadataFromSessionContent(
     if (record.type === "session_meta" && !sawRootSessionMeta) {
       sawRootSessionMeta = true;
       threadId = getString(payload.id) ?? threadId;
-      cwd = getString(payload.cwd) ?? cwd;
+      cwd = normalizeCwd(getString(payload.cwd) ?? cwd);
       cliVersion = getString(payload.cli_version) ?? cliVersion;
       modelProvider = getString(payload.model_provider) ?? modelProvider;
       createdAt = getTimestampMs(payload.timestamp, createdAt);

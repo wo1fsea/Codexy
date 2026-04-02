@@ -335,6 +335,42 @@ function isPortAvailable(port) {
   });
 }
 
+async function tryReclaimPort(port) {
+  if (process.platform === "win32") {
+    const result = spawnSync(
+      "powershell",
+      [
+        "-NoProfile",
+        "-Command",
+        `Get-NetTCPConnection -LocalPort ${port} -ErrorAction SilentlyContinue | ForEach-Object { $_.OwningProcess } | Sort-Object -Unique`
+      ],
+      { encoding: "utf8", windowsHide: true }
+    );
+
+    const pids = (result.stdout || "")
+      .split(/\r?\n/)
+      .map((line) => Number.parseInt(line.trim(), 10))
+      .filter((pid) => Number.isInteger(pid) && pid > 0);
+
+    for (const pid of pids) {
+      await stopPid(pid);
+    }
+  } else {
+    const result = spawnSync("lsof", ["-ti", `:${port}`], {
+      encoding: "utf8"
+    });
+
+    const pids = (result.stdout || "")
+      .split(/\r?\n/)
+      .map((line) => Number.parseInt(line.trim(), 10))
+      .filter((pid) => Number.isInteger(pid) && pid > 0);
+
+    for (const pid of pids) {
+      await stopPid(pid);
+    }
+  }
+}
+
 async function waitForReady(port) {
   for (let attempt = 0; attempt < 30; attempt += 1) {
     const status = await httpGetStatus(port);
@@ -488,27 +524,27 @@ async function stopPid(pid) {
     return;
   }
 
-  try {
-    process.kill(pid);
-  } catch {}
-
-  const deadline = Date.now() + 5000;
-  while (Date.now() < deadline) {
-    if (!isProcessRunning(pid)) {
-      return;
-    }
-
-    await new Promise((resolve) => {
-      setTimeout(resolve, 200);
-    });
-  }
-
   if (process.platform === "win32") {
     spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], {
       stdio: "ignore",
       windowsHide: true
     });
   } else {
+    try {
+      process.kill(pid);
+    } catch {}
+
+    const deadline = Date.now() + 5000;
+    while (Date.now() < deadline) {
+      if (!isProcessRunning(pid)) {
+        return;
+      }
+
+      await new Promise((resolve) => {
+        setTimeout(resolve, 200);
+      });
+    }
+
     try {
       process.kill(pid, "SIGKILL");
     } catch {}
@@ -626,7 +662,11 @@ async function runStart(argv, modeName) {
   }
 
   if (!(await isPortAvailable(options.port))) {
-    fail(`Port ${options.port} is already in use. Choose another port or stop the existing listener.`);
+    process.stdout.write(`Port ${options.port} is in use. Attempting to reclaim...\n`);
+    await tryReclaimPort(options.port);
+    if (!(await isPortAvailable(options.port))) {
+      fail(`Port ${options.port} is still in use after cleanup. Choose another port or stop the existing listener.`);
+    }
   }
 
   if (mode.needsCodexBinary && !checkBinary(process.env.CODEXY_CODEX_BIN || "codex")) {
