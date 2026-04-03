@@ -147,6 +147,47 @@ async function waitForCloudProxyStatus(
   throw new Error(`Timed out waiting for cloud proxy status at ${url}.`);
 }
 
+async function readCloudProxyEventHead(
+  url: string,
+  cookieHeader: string,
+  timeoutMs = 30_000
+) {
+  const response = await fetch(url, {
+    cache: "no-store",
+    headers: {
+      cookie: cookieHeader
+    },
+    signal: AbortSignal.timeout(timeoutMs)
+  });
+
+  if (!response.ok) {
+    throw new Error(`Cloud proxy events failed with status ${response.status}.`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error("Cloud proxy events response was not stream-backed.");
+  }
+
+  const decoder = new TextDecoder();
+  let buffered = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+
+    buffered += decoder.decode(value, { stream: true });
+    if (buffered.includes("\n\n")) {
+      break;
+    }
+  }
+
+  await reader.cancel();
+  return buffered;
+}
+
 async function fetchLinkedNodes(cloudUrl: string, cookieHeader: string) {
   const response = await fetch(`${cloudUrl}/api/cloud/nodes`, {
     cache: "no-store",
@@ -352,6 +393,60 @@ test("cloud dashboard refreshes when a new node links in", async ({ page }) => {
   }
 });
 
+test("cloud dashboard copy button copies the link command", async ({ page }) => {
+  const cloudHome = makeTempDir("codexy-cloud-copy-home-");
+  const cloudPort = await getFreePort();
+  const runtimeSuffix = Date.now().toString();
+
+  try {
+    await page.addInitScript(() => {
+      Object.defineProperty(window, "__copiedCommand", {
+        configurable: true,
+        enumerable: false,
+        value: null,
+        writable: true
+      });
+
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: {
+          writeText: async (value: string) => {
+            (window as typeof window & { __copiedCommand: string | null }).__copiedCommand =
+              value;
+          }
+        }
+      });
+    });
+
+    const cloudStart = runNodeCli(
+      ["cloud", "start", "--port", String(cloudPort)],
+      cloudHome,
+      180_000,
+      {
+        NEXT_DIST_DIR: `.next-runtime-cloud-playwright-${runtimeSuffix}`
+      }
+    );
+    expect(cloudStart.status, cloudStart.stdout + cloudStart.stderr).toBe(0);
+
+    const cloudUrl = `http://127.0.0.1:${cloudPort}`;
+    await bindCloudAuthenticator(page, cloudUrl, cloudHome);
+
+    const copyButton = page.getByRole("button", { name: "Copy command" });
+    await expect(copyButton).toBeVisible();
+    await copyButton.click();
+    await expect(page.getByRole("button", { name: "Copied command" })).toBeVisible();
+
+    const copiedCommand = await page.evaluate(
+      () =>
+        (window as typeof window & { __copiedCommand: string | null }).__copiedCommand
+    );
+    expect(copiedCommand).toBe(`codexy link ${cloudUrl} --code 123456`);
+  } finally {
+    runNodeCli(["cloud", "stop"], cloudHome, 20_000);
+    rmSync(cloudHome, { recursive: true, force: true });
+  }
+});
+
 test("cloud mode can open a linked node workspace through the proxy", async ({ page }) => {
   const cloudHome = makeTempDir("codexy-cloud-workspace-home-");
   const nodeHome = makeTempDir("codexy-cloud-workspace-node-");
@@ -409,6 +504,66 @@ test("cloud mode can open a linked node workspace through the proxy", async ({ p
     await expect(page.getByText("Log out of this cloud session?")).toBeVisible();
     await page.getByRole("button", { name: "Cancel" }).click();
     await expect(page.getByText("Log out of this cloud session?")).toHaveCount(0);
+  } finally {
+    runNodeCli(["stop"], nodeHome, 20_000);
+    runNodeCli(["cloud", "stop"], cloudHome, 20_000);
+    rmSync(nodeHome, { recursive: true, force: true });
+    rmSync(cloudHome, { recursive: true, force: true });
+  }
+});
+
+test("cloud proxy events stream sends the initial connection event", async ({ page }) => {
+  const cloudHome = makeTempDir("codexy-cloud-events-home-");
+  const nodeHome = makeTempDir("codexy-cloud-events-node-");
+  const cloudPort = await getFreePort();
+  const nodePort = await getFreePort();
+  const cloudUrl = `http://127.0.0.1:${cloudPort}`;
+  const runtimeSuffix = Date.now().toString();
+
+  try {
+    const cloudStart = runNodeCli(
+      ["cloud", "start", "--port", String(cloudPort)],
+      cloudHome,
+      180_000,
+      {
+        NEXT_DIST_DIR: `.next-runtime-cloud-playwright-${runtimeSuffix}`
+      }
+    );
+    expect(cloudStart.status, cloudStart.stdout + cloudStart.stderr).toBe(0);
+
+    await bindCloudAuthenticator(page, cloudUrl, cloudHome);
+    const sessionCookie = await getSessionCookieHeader(page, cloudUrl);
+    const linkResult = runNodeCli(
+      ["link", cloudUrl, "--code", generateTotpCode(readCloudAuthSecret(cloudHome))],
+      nodeHome
+    );
+    expect(linkResult.status, linkResult.stdout + linkResult.stderr).toBe(0);
+
+    const nodeStart = runNodeCli(
+      ["start", "--port", String(nodePort)],
+      nodeHome,
+      180_000,
+      {
+        NEXT_DIST_DIR: `.next-runtime-node-playwright-${runtimeSuffix}`
+      }
+    );
+    expect(nodeStart.status, nodeStart.stdout + nodeStart.stderr).toBe(0);
+
+    const nodeIdMatch = linkResult.stdout.match(/\(([0-9a-f-]{36})\)/i);
+    expect(nodeIdMatch).not.toBeNull();
+    const nodeId = nodeIdMatch?.[1] ?? "";
+
+    await waitForCloudProxyStatus(
+      `${cloudUrl}/api/cloud/nodes/${encodeURIComponent(nodeId)}/proxy/status`,
+      sessionCookie
+    );
+
+    const eventHead = await readCloudProxyEventHead(
+      `${cloudUrl}/api/cloud/nodes/${encodeURIComponent(nodeId)}/proxy/events`,
+      sessionCookie
+    );
+    expect(eventHead).toContain('"type":"connection"');
+    expect(eventHead).toContain('"status":"connected"');
   } finally {
     runNodeCli(["stop"], nodeHome, 20_000);
     runNodeCli(["cloud", "stop"], cloudHome, 20_000);

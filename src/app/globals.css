@@ -475,14 +475,64 @@ pre {
 
 .cloud-code-fence-body {
   margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding: 14px 16px;
   overflow-x: auto;
   color: var(--text-strong);
   font-family: var(--font-mono);
   font-size: 14px;
   line-height: 1.55;
+  white-space: normal;
+}
+
+.cloud-code-fence-body code {
+  flex: 1 1 auto;
+  min-width: 0;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.cloud-code-copy {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(var(--c-warm), 0.08);
+  border-radius: var(--radius-sm);
+  background: rgba(var(--c-warm), 0.03);
+  color: var(--text-soft);
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.cloud-code-copy:hover,
+.cloud-code-copy:focus-visible {
+  border-color: rgba(var(--c-warm), 0.16);
+  background: rgba(var(--c-warm), 0.06);
+  color: var(--text);
+  outline: none;
+}
+
+.cloud-code-copy:active {
+  transform: translateY(1px);
+}
+
+.cloud-code-copy.is-copied {
+  border-color: rgba(var(--c-accent), 0.24);
+  background: rgba(var(--c-accent), 0.1);
+  color: rgba(var(--c-accent), 0.9);
+}
+
+.cloud-code-copy-icon {
+  width: var(--icon-compact-action);
+  height: var(--icon-compact-action);
 }
 
 .cloud-hero-copy code,

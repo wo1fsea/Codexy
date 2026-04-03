@@ -69,30 +69,37 @@ function fromBase64(value: string | null | undefined) {
 }
 
 function createStreamState(cleanup: () => void): StreamState {
-  const state: StreamState = {
+  const state: {
+    controller: ReadableStreamDefaultController<Uint8Array> | null;
+    queue: Uint8Array[];
+    closed: boolean;
+  } = {
     controller: null,
     queue: [],
-    closed: false,
-    stream: new ReadableStream<Uint8Array>({
-      start(controller) {
-        state.controller = controller;
-        while (state.queue.length) {
-          controller.enqueue(state.queue.shift()!);
-        }
+    closed: false
+  };
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      state.controller = controller;
+      while (state.queue.length) {
+        controller.enqueue(state.queue.shift()!);
+      }
 
-        if (state.closed) {
-          controller.close();
-          cleanup();
-        }
-      },
-      cancel() {
-        state.closed = true;
+      if (state.closed) {
+        controller.close();
         cleanup();
       }
-    })
-  };
+    },
+    cancel() {
+      state.closed = true;
+      cleanup();
+    }
+  });
 
-  return state;
+  return {
+    ...state,
+    stream
+  };
 }
 
 class CloudTunnelBroker {

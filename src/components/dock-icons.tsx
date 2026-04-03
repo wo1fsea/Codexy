@@ -3,6 +3,8 @@ type IconName =
   | "back"
   | "chevron"
   | "compact"
+  | "copy"
+  | "check"
   | "new-thread"
   | "automation"
   | "skills"
@@ -105,6 +107,19 @@ export function AppIcon({
         <svg {...props}>
           <path d="M7 7.5h7.5v7H7z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" />
           <path d="M9.5 5.5H17v7.5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" />
+        </svg>
+      );
+    case "copy":
+      return (
+        <svg {...props}>
+          <rect x="8" y="8" width="9" height="9" rx="1.8" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" />
+          <path d="M6.5 14V7.8A1.8 1.8 0 0 1 8.3 6h6.2" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" />
+        </svg>
+      );
+    case "check":
+      return (
+        <svg {...props}>
+          <path d="m6.8 12.3 3.2 3.2 7.2-7.2" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
         </svg>
       );
     case "automation":

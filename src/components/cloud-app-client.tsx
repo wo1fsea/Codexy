@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { startTransition, useEffect, useState } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 
+import { AppIcon } from "@/components/dock-icons";
 import { CloudLogoutAction } from "@/components/cloud-logout-action";
 import type { CloudNodeRecord, CloudRegistrySnapshot } from "@/lib/cloud-registry";
 
@@ -30,9 +31,19 @@ export function CloudAppClient({
 }) {
   const [nodes, setNodes] = useState(initialNodes);
   const [cloudOrigin, setCloudOrigin] = useState("<cloud-url>");
+  const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
+  const copyResetTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     setCloudOrigin(window.location.origin);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (copyResetTimerRef.current !== null) {
+        window.clearTimeout(copyResetTimerRef.current);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -85,6 +96,32 @@ export function CloudAppClient({
 
   const linkExample = `codexy link ${cloudOrigin} --code 123456`;
 
+  async function handleCopyLinkExample() {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(linkExample);
+      } else {
+        const input = document.createElement("textarea");
+        input.value = linkExample;
+        input.setAttribute("readonly", "true");
+        input.style.position = "absolute";
+        input.style.left = "-9999px";
+        document.body.append(input);
+        input.select();
+        document.execCommand("copy");
+        input.remove();
+      }
+
+      setCopyState("copied");
+      if (copyResetTimerRef.current !== null) {
+        window.clearTimeout(copyResetTimerRef.current);
+      }
+      copyResetTimerRef.current = window.setTimeout(() => {
+        setCopyState("idle");
+      }, 1600);
+    } catch {}
+  }
+
   return (
     <main className="cloud-app-shell">
       <section className="cloud-hero">
@@ -96,6 +133,20 @@ export function CloudAppClient({
             <span className="cloud-code-fence-label">bash</span>
             <pre className="cloud-code-fence-body">
               <code>{linkExample}</code>
+              <button
+                aria-label={copyState === "copied" ? "Copied command" : "Copy command"}
+                className={`cloud-code-copy${copyState === "copied" ? " is-copied" : ""}`}
+                onClick={() => {
+                  void handleCopyLinkExample();
+                }}
+                title={copyState === "copied" ? "Copied" : "Copy"}
+                type="button"
+              >
+                <AppIcon
+                  className="cloud-code-copy-icon"
+                  name={copyState === "copied" ? "check" : "copy"}
+                />
+              </button>
             </pre>
           </div>
         </div>
