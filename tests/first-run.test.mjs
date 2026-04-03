@@ -421,7 +421,7 @@ test("codexy lifecycle commands can start, report, and stop the local service", 
   }
 });
 
-test("codexy cloud lifecycle commands can start, report, and stop the local cloud service", async () => {
+test("codexy cloud lifecycle commands can start, report, and stop the local cloud service", async (t) => {
   const codexyHome = makeTempDir("codexy-cloud-runtime-home-");
   const port = await getFreePort();
 
@@ -453,6 +453,18 @@ test("codexy cloud lifecycle commands can start, report, and stop the local clou
     const html = await htmlResponse.text();
     assert.equal(htmlResponse.status, 200);
     assert.match(html, /Bind Google Authenticator/);
+
+    const nonLoopbackHost = getNonLoopbackIpv4();
+    if (nonLoopbackHost) {
+      const directAccessResponse = await fetchWithTimeout(
+        `http://${nonLoopbackHost}:${port}`
+      );
+      const directAccessHtml = await directAccessResponse.text();
+      assert.equal(directAccessResponse.status, 200);
+      assert.match(directAccessHtml, /Bind Google Authenticator/);
+    } else {
+      t.diagnostic("No active non-loopback IPv4 host was available; skipped direct cloud probe.");
+    }
 
     const stopResult = runNodeCli(["cloud", "stop"], {
       env: {

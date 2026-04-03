@@ -42,7 +42,8 @@ const SERVICE_MODES = {
     defaultPort:
       Number.parseInt(process.env.PORT ?? process.env.CODEXY_WEB_PORT ?? "3000", 10) || 3000,
     distDir: ".next-runtime-node",
-    needsCodexBinary: true
+    needsCodexBinary: true,
+    listenHost: LOOPBACK_HOST
   },
   cloud: {
     key: "cloud",
@@ -52,7 +53,8 @@ const SERVICE_MODES = {
     defaultPort:
       Number.parseInt(process.env.PORT ?? process.env.CODEXY_CLOUD_PORT ?? "3400", 10) || 3400,
     distDir: ".next-runtime-cloud",
-    needsCodexBinary: false
+    needsCodexBinary: false,
+    listenHost: "0.0.0.0"
   }
 };
 
@@ -318,7 +320,7 @@ async function promptForTotpCode() {
   }
 }
 
-function isPortAvailable(port) {
+function isPortAvailable(port, host) {
   return new Promise((resolve) => {
     const server = net.createServer();
 
@@ -332,7 +334,7 @@ function isPortAvailable(port) {
       });
     });
 
-    server.listen(port, LOOPBACK_HOST);
+    server.listen(port, host);
   });
 }
 
@@ -662,10 +664,10 @@ async function runStart(argv, modeName) {
     );
   }
 
-  if (!(await isPortAvailable(options.port))) {
+  if (!(await isPortAvailable(options.port, mode.listenHost))) {
     process.stdout.write(`Port ${options.port} is in use. Attempting to reclaim...\n`);
     await tryReclaimPort(options.port);
-    if (!(await isPortAvailable(options.port))) {
+    if (!(await isPortAvailable(options.port, mode.listenHost))) {
       fail(`Port ${options.port} is still in use after cleanup. Choose another port or stop the existing listener.`);
     }
   }
@@ -684,7 +686,7 @@ async function runStart(argv, modeName) {
   const logFd = openSync(logPath, "w");
   const child = spawn(
     process.execPath,
-    [getNextBin(), "start", "--hostname", LOOPBACK_HOST, "--port", String(options.port)],
+    [getNextBin(), "start", "--hostname", mode.listenHost, "--port", String(options.port)],
     {
       cwd: repoRoot,
       detached: true,
