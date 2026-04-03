@@ -37,12 +37,16 @@ type HeadWaiter = {
   resolve: (value: CloudTunnelPendingHead) => void;
   reject: (error: Error) => void;
   timeout: ReturnType<typeof setTimeout>;
+  request: CloudTunnelRequest;
+  createdAtMs: number;
 };
 
 type ResponseWaiter = {
   resolve: (value: CloudTunnelBufferedResponse) => void;
   reject: (error: Error) => void;
   timeout: ReturnType<typeof setTimeout>;
+  request: CloudTunnelRequest;
+  createdAtMs: number;
 };
 
 type PollWaiter = {
@@ -55,6 +59,8 @@ type StreamState = {
   controller: ReadableStreamDefaultController<Uint8Array> | null;
   queue: Uint8Array[];
   closed: boolean;
+  request: CloudTunnelRequest;
+  createdAtMs: number;
 };
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
@@ -68,7 +74,21 @@ function fromBase64(value: string | null | undefined) {
   return Buffer.from(value, "base64");
 }
 
-function createStreamState(cleanup: () => void): StreamState {
+function logCloudTunnel(event: string, details: Record<string, unknown>) {
+  console.info(
+    `[cloud-tunnel] ${JSON.stringify({
+      ts: new Date().toISOString(),
+      event,
+      ...details
+    })}`
+  );
+}
+
+function createStreamState(
+  request: CloudTunnelRequest,
+  createdAtMs: number,
+  cleanup: () => void
+): StreamState {
   const state: {
     controller: ReadableStreamDefaultController<Uint8Array> | null;
     queue: Uint8Array[];
@@ -98,7 +118,9 @@ function createStreamState(cleanup: () => void): StreamState {
 
   return {
     ...state,
-    stream
+    stream,
+    request,
+    createdAtMs
   };
 }
 
@@ -121,17 +143,33 @@ class CloudTunnelBroker {
       stream: false,
       streamId: null
     };
+    const createdAtMs = Date.now();
 
     return await new Promise<CloudTunnelBufferedResponse>((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.responseWaiters.delete(requestId);
+        logCloudTunnel("buffered-timeout", {
+          requestId,
+          nodeId: request.nodeId,
+          method: request.method,
+          path: `${request.path}${request.search || ""}`,
+          waitedMs: Date.now() - createdAtMs
+        });
         reject(new Error("Timed out waiting for the linked node to respond."));
       }, DEFAULT_REQUEST_TIMEOUT_MS);
 
       this.responseWaiters.set(requestId, {
         resolve,
         reject,
-        timeout
+        timeout,
+        request,
+        createdAtMs
+      });
+      logCloudTunnel("buffered-enqueue", {
+        requestId,
+        nodeId: request.nodeId,
+        method: request.method,
+        path: `${request.path}${request.search || ""}`
       });
       this.enqueueRequest(request);
     });
@@ -146,7 +184,8 @@ class CloudTunnelBroker {
       stream: true,
       streamId
     };
-    const streamState = createStreamState(() => {
+    const createdAtMs = Date.now();
+    const streamState = createStreamState(request, createdAtMs, () => {
       this.streams.delete(streamId);
     });
 
@@ -156,13 +195,30 @@ class CloudTunnelBroker {
       const timeout = setTimeout(() => {
         this.headWaiters.delete(requestId);
         this.streams.delete(streamId);
+        logCloudTunnel("stream-timeout", {
+          requestId,
+          streamId,
+          nodeId: request.nodeId,
+          method: request.method,
+          path: `${request.path}${request.search || ""}`,
+          waitedMs: Date.now() - createdAtMs
+        });
         reject(new Error("Timed out waiting for the linked node stream to start."));
       }, DEFAULT_REQUEST_TIMEOUT_MS);
 
       this.headWaiters.set(requestId, {
         resolve,
         reject,
-        timeout
+        timeout,
+        request,
+        createdAtMs
+      });
+      logCloudTunnel("stream-enqueue", {
+        requestId,
+        streamId,
+        nodeId: request.nodeId,
+        method: request.method,
+        path: `${request.path}${request.search || ""}`
       });
       this.enqueueRequest(request);
     });
@@ -183,7 +239,18 @@ class CloudTunnelBroker {
   async waitForNodeRequest(nodeId: string) {
     const queued = this.queuedRequests.get(nodeId);
     if (queued?.length) {
-      return queued.shift() ?? null;
+      const request = queued.shift() ?? null;
+      if (request) {
+        logCloudTunnel("dispatch-queued", {
+          requestId: request.requestId,
+          streamId: request.streamId,
+          nodeId: request.nodeId,
+          method: request.method,
+          path: `${request.path}${request.search || ""}`,
+          remainingQueueLength: queued.length
+        });
+      }
+      return request;
     }
 
     return await new Promise<CloudTunnelRequest | null>((resolve) => {
@@ -222,6 +289,14 @@ class CloudTunnelBroker {
     if (headWaiter) {
       clearTimeout(headWaiter.timeout);
       this.headWaiters.delete(input.requestId);
+      logCloudTunnel("buffered-response", {
+        requestId: input.requestId,
+        nodeId: headWaiter.request.nodeId,
+        method: headWaiter.request.method,
+        path: `${headWaiter.request.path}${headWaiter.request.search || ""}`,
+        status: input.status,
+        waitMs: Date.now() - headWaiter.createdAtMs
+      });
       headWaiter.resolve(buffered);
       return;
     }
@@ -233,6 +308,14 @@ class CloudTunnelBroker {
 
     clearTimeout(responseWaiter.timeout);
     this.responseWaiters.delete(input.requestId);
+    logCloudTunnel("buffered-response", {
+      requestId: input.requestId,
+      nodeId: responseWaiter.request.nodeId,
+      method: responseWaiter.request.method,
+      path: `${responseWaiter.request.path}${responseWaiter.request.search || ""}`,
+      status: input.status,
+      waitMs: Date.now() - responseWaiter.createdAtMs
+    });
     responseWaiter.resolve(buffered);
   }
 
@@ -249,6 +332,15 @@ class CloudTunnelBroker {
 
     clearTimeout(headWaiter.timeout);
     this.headWaiters.delete(input.requestId);
+    logCloudTunnel("stream-head", {
+      requestId: input.requestId,
+      streamId: input.streamId,
+      nodeId: headWaiter.request.nodeId,
+      method: headWaiter.request.method,
+      path: `${headWaiter.request.path}${headWaiter.request.search || ""}`,
+      status: input.status,
+      waitMs: Date.now() - headWaiter.createdAtMs
+    });
     headWaiter.resolve({
       kind: "stream",
       status: input.status,
@@ -282,6 +374,16 @@ class CloudTunnelBroker {
     }
 
     state.closed = true;
+    logCloudTunnel("stream-close", {
+      requestId: state.request.requestId,
+      streamId: input.streamId,
+      nodeId: state.request.nodeId,
+      method: state.request.method,
+      path: `${state.request.path}${state.request.search || ""}`,
+      reason: input.error ? "error" : "done",
+      error: input.error || undefined,
+      lifetimeMs: Date.now() - state.createdAtMs
+    });
 
     if (state.controller) {
       if (input.error) {
@@ -304,6 +406,13 @@ class CloudTunnelBroker {
       } else {
         this.pollWaiters.delete(request.nodeId);
       }
+      logCloudTunnel("dispatch-live", {
+        requestId: request.requestId,
+        streamId: request.streamId,
+        nodeId: request.nodeId,
+        method: request.method,
+        path: `${request.path}${request.search || ""}`
+      });
       waiter.resolve(request);
       return;
     }
@@ -311,6 +420,14 @@ class CloudTunnelBroker {
     const queued = this.queuedRequests.get(request.nodeId) ?? [];
     queued.push(request);
     this.queuedRequests.set(request.nodeId, queued);
+    logCloudTunnel("queue-request", {
+      requestId: request.requestId,
+      streamId: request.streamId,
+      nodeId: request.nodeId,
+      method: request.method,
+      path: `${request.path}${request.search || ""}`,
+      queueLength: queued.length
+    });
   }
 }
 

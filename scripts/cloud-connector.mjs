@@ -19,6 +19,16 @@ const nodeMetadataPath = path.join(codexyHome, "state", runtimeKey, "node", "ser
 let stopped = false;
 const activeStreamRequests = new Set();
 
+function logConnector(event, details = {}) {
+  process.stdout.write(
+    `[cloud-connector] ${JSON.stringify({
+      ts: new Date().toISOString(),
+      event,
+      ...details
+    })}\n`
+  );
+}
+
 function readNodeMetadata() {
   if (!existsSync(nodeMetadataPath)) {
     throw new Error(`Node service metadata is missing at ${nodeMetadataPath}.`);
@@ -87,7 +97,7 @@ async function postErrorResponse(cloudUrl, cloud, requestId, message, status = 5
   });
 }
 
-async function postStreamResponse(cloudUrl, cloud, request, response) {
+async function postStreamResponse(cloudUrl, cloud, request, response, startedAtMs) {
   await postJson(`${cloudUrl}/api/cloud/connectors/responses`, {
     nodeId: cloud.nodeId,
     connectorToken: cloud.connectorToken,
@@ -100,6 +110,14 @@ async function postStreamResponse(cloudUrl, cloud, request, response) {
     stream: true,
     streamId: request.streamId
   });
+  logConnector("stream-head-forwarded", {
+    requestId: request.requestId,
+    streamId: request.streamId,
+    method: request.method,
+    path: `${request.path}${request.search || ""}`,
+    status: response.status,
+    elapsedMs: Date.now() - startedAtMs
+  });
 
   if (!response.body) {
     await postJson(`${cloudUrl}/api/cloud/connectors/streams`, {
@@ -108,10 +126,21 @@ async function postStreamResponse(cloudUrl, cloud, request, response) {
       streamId: request.streamId,
       done: true
     });
+    logConnector("stream-complete", {
+      requestId: request.requestId,
+      streamId: request.streamId,
+      method: request.method,
+      path: `${request.path}${request.search || ""}`,
+      chunks: 0,
+      bytes: 0,
+      elapsedMs: Date.now() - startedAtMs
+    });
     return;
   }
 
   const reader = response.body.getReader();
+  let chunkCount = 0;
+  let byteCount = 0;
 
   while (!stopped) {
     const { done, value } = await reader.read();
@@ -122,8 +151,20 @@ async function postStreamResponse(cloudUrl, cloud, request, response) {
         streamId: request.streamId,
         done: true
       });
+      logConnector("stream-complete", {
+        requestId: request.requestId,
+        streamId: request.streamId,
+        method: request.method,
+        path: `${request.path}${request.search || ""}`,
+        chunks: chunkCount,
+        bytes: byteCount,
+        elapsedMs: Date.now() - startedAtMs
+      });
       return;
     }
+
+    chunkCount += 1;
+    byteCount += value.byteLength;
 
     await postJson(`${cloudUrl}/api/cloud/connectors/streams`, {
       nodeId: cloud.nodeId,
@@ -143,6 +184,15 @@ async function executeCloudRequest(request) {
   const nodeUrl = getLocalNodeUrl();
   const targetUrl = new URL(`${request.path}${request.search || ""}`, nodeUrl);
   const method = String(request.method || "GET").toUpperCase();
+  const startedAtMs = Date.now();
+
+  logConnector("request-start", {
+    requestId: request.requestId,
+    streamId: request.streamId,
+    method,
+    path: `${request.path}${request.search || ""}`,
+    nodeUrl: targetUrl.toString()
+  });
 
   try {
     const response = await fetch(targetUrl, {
@@ -156,12 +206,29 @@ async function executeCloudRequest(request) {
 
     const contentType = response.headers.get("content-type") || "";
     if (request.stream && request.streamId && contentType.includes("text/event-stream")) {
-      await postStreamResponse(cloud.url, cloud, request, response);
+      await postStreamResponse(cloud.url, cloud, request, response, startedAtMs);
       return;
     }
 
     await postBufferedResponse(cloud.url, cloud, request.requestId, response);
+    logConnector("request-complete", {
+      requestId: request.requestId,
+      streamId: request.streamId,
+      method,
+      path: `${request.path}${request.search || ""}`,
+      status: response.status,
+      contentType,
+      elapsedMs: Date.now() - startedAtMs
+    });
   } catch (error) {
+    logConnector("request-error", {
+      requestId: request.requestId,
+      streamId: request.streamId,
+      method,
+      path: `${request.path}${request.search || ""}`,
+      elapsedMs: Date.now() - startedAtMs,
+      error: error instanceof Error ? error.message : "Node request failed."
+    });
     await postErrorResponse(
       cloud.url,
       cloud,
@@ -207,6 +274,15 @@ async function pollCloud() {
   }
 
   const payload = await response.json();
+  if (payload.request) {
+    logConnector("poll-delivered", {
+      requestId: payload.request.requestId,
+      streamId: payload.request.streamId,
+      method: payload.request.method,
+      path: `${payload.request.path}${payload.request.search || ""}`,
+      stream: Boolean(payload.request.stream)
+    });
+  }
   return payload.request ?? null;
 }
 
