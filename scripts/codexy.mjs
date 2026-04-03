@@ -16,7 +16,7 @@ function helpText() {
 Usage:
   codexy help
   codexy doctor
-  codexy start [--port 3000]
+  codexy start [--port 3000] [--dangerous-public-bind]
   codexy stop
   codexy status
   codexy logs

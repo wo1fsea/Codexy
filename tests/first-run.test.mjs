@@ -421,6 +421,62 @@ test("codexy lifecycle commands can start, report, and stop the local service", 
   }
 });
 
+test("codexy start can opt into a dangerous public bind for node mode", async (t) => {
+  const codexyHome = makeTempDir("codexy-dangerous-bind-home-");
+  const port = await getFreePort();
+
+  try {
+    const startResult = runNodeCli(
+      ["start", "--port", String(port), "--dangerous-public-bind"],
+      {
+        env: {
+          CODEXY_HOME_DIR: codexyHome
+        },
+        timeout: 180_000
+      }
+    );
+
+    assert.equal(startResult.status, 0, startResult.stdout + startResult.stderr);
+    assert.match(startResult.stdout, new RegExp(`http://127\\.0\\.0\\.1:${port}`));
+    assert.match(startResult.stdout, new RegExp(`Bind: http://0\\.0\\.0\\.0:${port}`));
+    assert.match(startResult.stdout, /dangerous public bind is enabled/i);
+
+    const statusResult = runNodeCli(["status"], {
+      env: {
+        CODEXY_HOME_DIR: codexyHome
+      },
+      timeout: 20_000
+    });
+
+    assert.equal(statusResult.status, 0, statusResult.stdout + statusResult.stderr);
+    assert.match(statusResult.stdout, new RegExp(`URL: http://127\\.0\\.0\\.1:${port}`));
+    assert.match(statusResult.stdout, new RegExp(`Bind: http://0\\.0\\.0\\.0:${port}`));
+
+    const loopbackStatusResponse = await fetchWithTimeout(
+      `http://127.0.0.1:${port}/api/status`
+    );
+    assert.equal(loopbackStatusResponse.status, 200);
+
+    const nonLoopbackHost = getNonLoopbackIpv4();
+    if (nonLoopbackHost) {
+      const directResponse = await fetchWithTimeout(
+        `http://${nonLoopbackHost}:${port}/api/status`
+      );
+      assert.equal(directResponse.status, 200);
+    } else {
+      t.diagnostic("No active non-loopback IPv4 host was available; skipped dangerous bind probe.");
+    }
+  } finally {
+    runNodeCli(["stop"], {
+      env: {
+        CODEXY_HOME_DIR: codexyHome
+      },
+      timeout: 20_000
+    });
+    rmSync(codexyHome, { recursive: true, force: true });
+  }
+});
+
 test("codexy cloud lifecycle commands can start, report, and stop the local cloud service", async (t) => {
   const codexyHome = makeTempDir("codexy-cloud-runtime-home-");
   const port = await getFreePort();

@@ -74,7 +74,8 @@ function getModeConfig(modeName) {
 
 function parseArgs(argv, mode) {
   const result = {
-    port: mode.defaultPort
+    port: mode.defaultPort,
+    listenHost: mode.listenHost
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -92,6 +93,15 @@ function parseArgs(argv, mode) {
 
       result.port = parsed;
       index += 1;
+      continue;
+    }
+
+    if (current === "--dangerous-public-bind") {
+      if (mode.key !== "node") {
+        fail("--dangerous-public-bind is only supported for `codexy start`.");
+      }
+
+      result.listenHost = "0.0.0.0";
       continue;
     }
 
@@ -522,6 +532,10 @@ function serviceUrl(port) {
   return `http://${LOOPBACK_HOST}:${port}`;
 }
 
+function listenUrl(port, host) {
+  return `http://${host}:${port}`;
+}
+
 async function stopPid(pid) {
   if (!isProcessRunning(pid)) {
     return;
@@ -652,6 +666,9 @@ async function runStart(argv, modeName) {
     }
 
     process.stdout.write(`${mode.label} is already running at ${serviceUrl(current.port)}.\n`);
+    if (current.listenHost && current.listenHost !== LOOPBACK_HOST) {
+      process.stdout.write(`Bind: ${listenUrl(current.port, current.listenHost)}\n`);
+    }
     process.stdout.write(`Log file: ${current.logPath}\n`);
     process.exit(0);
   }
@@ -664,10 +681,10 @@ async function runStart(argv, modeName) {
     );
   }
 
-  if (!(await isPortAvailable(options.port, mode.listenHost))) {
+  if (!(await isPortAvailable(options.port, options.listenHost))) {
     process.stdout.write(`Port ${options.port} is in use. Attempting to reclaim...\n`);
     await tryReclaimPort(options.port);
-    if (!(await isPortAvailable(options.port, mode.listenHost))) {
+    if (!(await isPortAvailable(options.port, options.listenHost))) {
       fail(`Port ${options.port} is still in use after cleanup. Choose another port or stop the existing listener.`);
     }
   }
@@ -686,7 +703,7 @@ async function runStart(argv, modeName) {
   const logFd = openSync(logPath, "w");
   const child = spawn(
     process.execPath,
-    [getNextBin(), "start", "--hostname", mode.listenHost, "--port", String(options.port)],
+    [getNextBin(), "start", "--hostname", options.listenHost, "--port", String(options.port)],
     {
       cwd: repoRoot,
       detached: true,
@@ -701,6 +718,7 @@ async function runStart(argv, modeName) {
   writeMetadata(mode, {
     pid: child.pid,
     port: options.port,
+    listenHost: options.listenHost,
     logPath,
     repoRoot,
     runtimeMode: mode.runtimeMode,
@@ -715,6 +733,12 @@ async function runStart(argv, modeName) {
   }
 
   process.stdout.write(`${mode.label} is running at ${serviceUrl(options.port)}.\n`);
+  if (options.listenHost !== LOOPBACK_HOST) {
+    process.stdout.write(`Bind: ${listenUrl(options.port, options.listenHost)}\n`);
+    process.stdout.write(
+      "WARN dangerous public bind is enabled. Anyone who can reach this port can open the node UI.\n"
+    );
+  }
   process.stdout.write(`Log file: ${logPath}\n`);
 
   if (mode.key === "node") {
@@ -761,6 +785,9 @@ async function runStatus(modeName) {
   process.stdout.write(`${mode.label} is running.\n`);
   process.stdout.write(`PID: ${metadata.pid}\n`);
   process.stdout.write(`URL: ${serviceUrl(metadata.port)}\n`);
+  if (metadata.listenHost && metadata.listenHost !== LOOPBACK_HOST) {
+    process.stdout.write(`Bind: ${listenUrl(metadata.port, metadata.listenHost)}\n`);
+  }
   process.stdout.write(`Health: ${health?.ok ? "ready" : "starting"}\n`);
   process.stdout.write(`Log file: ${metadata.logPath}\n`);
 
