@@ -1,26 +1,46 @@
 # Codexy
 
-Codexy is a web control console for a Codex host. The open-source app now supports two runtime modes from the same `codexy` entrypoint:
+Codexy is a web control console for Codex workspaces. The open-source app supports two runtime modes from the same `codexy` entrypoint, so the same install can run as a local node or as a self-hosted cloud.
 
-- node mode: the current local/Tailscale-first Codexy runtime for a host machine
-- cloud mode: a self-hosted single-user cloud entrypoint for registering linked nodes and opening their workspaces through an outbound connector
+## Runtime Modes
 
-The runtime in this repository is built on Next.js. Node mode listens on `0.0.0.0:3000` by default, and cloud mode listens on `0.0.0.0:3400` by default.
+### Codexy Node Mode
+
+Use `codexy start` on a workstation or server that should run Codex locally.
+
+- local-first workspace runtime for one host machine
+- default browser address: `http://127.0.0.1:3000`
+- loopback-only by default, so direct browser access stays local unless you add Tailscale or another reverse path
+- can link outbound to a self-hosted Codexy cloud with `codexy link <cloud-url> --code 123456`
+
+### Codexy Cloud Mode
+
+Use `codexy cloud start` on a machine that should act as the self-hosted cloud entrypoint.
+
+- single-user self-hosted control plane for linked Codexy nodes
+- default browser address: `http://0.0.0.0:3400`
+- protected by a Google Authenticator-compatible TOTP login
+- provides the linked node directory, remote node workspaces, and the desktop-only workspace wall
 
 ## Interface Preview
 
 <table>
   <tr>
     <td valign="top" width="68%">
-      <strong>Desktop</strong><br />
+      <strong>Desktop workspace</strong><br />
       <img src="./docs/images/codexy-desktop.png" alt="Codexy desktop preview" width="100%" />
     </td>
     <td valign="top" width="32%">
-      <strong>Mobile</strong><br />
+      <strong>Mobile app</strong><br />
       <img src="./docs/images/codexy-mobile.png" alt="Codexy mobile preview" width="100%" />
     </td>
   </tr>
 </table>
+
+<p>
+  <strong>Cloud wall</strong><br />
+  <img src="./docs/images/codexy-cloud-wall.png" alt="Codexy cloud wall preview" width="100%" />
+</p>
 
 ## Requirements
 
