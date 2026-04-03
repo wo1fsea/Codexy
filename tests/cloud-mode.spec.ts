@@ -188,6 +188,50 @@ async function readCloudProxyEventHead(
   return buffered;
 }
 
+async function openCloudProxyEventStream(
+  url: string,
+  cookieHeader: string,
+  timeoutMs = 30_000
+) {
+  const response = await fetch(url, {
+    cache: "no-store",
+    headers: {
+      cookie: cookieHeader
+    },
+    signal: AbortSignal.timeout(timeoutMs)
+  });
+
+  if (!response.ok) {
+    throw new Error(`Cloud proxy events failed with status ${response.status}.`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error("Cloud proxy events response was not stream-backed.");
+  }
+
+  const decoder = new TextDecoder();
+  let buffered = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+
+    buffered += decoder.decode(value, { stream: true });
+    if (buffered.includes("\n\n")) {
+      break;
+    }
+  }
+
+  return {
+    response,
+    reader,
+    buffered
+  };
+}
+
 async function fetchLinkedNodes(cloudUrl: string, cookieHeader: string) {
   const response = await fetch(`${cloudUrl}/api/cloud/nodes`, {
     cache: "no-store",
@@ -564,6 +608,87 @@ test("cloud proxy events stream sends the initial connection event", async ({ pa
     );
     expect(eventHead).toContain('"type":"connection"');
     expect(eventHead).toContain('"status":"connected"');
+  } finally {
+    runNodeCli(["stop"], nodeHome, 20_000);
+    runNodeCli(["cloud", "stop"], cloudHome, 20_000);
+    rmSync(nodeHome, { recursive: true, force: true });
+    rmSync(cloudHome, { recursive: true, force: true });
+  }
+});
+
+test("cloud proxy keeps buffered requests responsive while events stay open", async ({
+  page
+}) => {
+  const cloudHome = makeTempDir("codexy-cloud-events-live-home-");
+  const nodeHome = makeTempDir("codexy-cloud-events-live-node-");
+  const cloudPort = await getFreePort();
+  const nodePort = await getFreePort();
+  const cloudUrl = `http://127.0.0.1:${cloudPort}`;
+  const runtimeSuffix = Date.now().toString();
+
+  try {
+    const cloudStart = runNodeCli(
+      ["cloud", "start", "--port", String(cloudPort)],
+      cloudHome,
+      180_000,
+      {
+        NEXT_DIST_DIR: `.next-runtime-cloud-playwright-${runtimeSuffix}`
+      }
+    );
+    expect(cloudStart.status, cloudStart.stdout + cloudStart.stderr).toBe(0);
+
+    await bindCloudAuthenticator(page, cloudUrl, cloudHome);
+    const sessionCookie = await getSessionCookieHeader(page, cloudUrl);
+    const linkResult = runNodeCli(
+      ["link", cloudUrl, "--code", generateTotpCode(readCloudAuthSecret(cloudHome))],
+      nodeHome
+    );
+    expect(linkResult.status, linkResult.stdout + linkResult.stderr).toBe(0);
+
+    const nodeStart = runNodeCli(
+      ["start", "--port", String(nodePort)],
+      nodeHome,
+      180_000,
+      {
+        NEXT_DIST_DIR: `.next-runtime-node-playwright-${runtimeSuffix}`
+      }
+    );
+    expect(nodeStart.status, nodeStart.stdout + nodeStart.stderr).toBe(0);
+
+    const nodeIdMatch = linkResult.stdout.match(/\(([0-9a-f-]{36})\)/i);
+    expect(nodeIdMatch).not.toBeNull();
+    const nodeId = nodeIdMatch?.[1] ?? "";
+    const encodedNodeId = encodeURIComponent(nodeId);
+
+    await waitForCloudProxyStatus(
+      `${cloudUrl}/api/cloud/nodes/${encodedNodeId}/proxy/status`,
+      sessionCookie
+    );
+
+    const stream = await openCloudProxyEventStream(
+      `${cloudUrl}/api/cloud/nodes/${encodedNodeId}/proxy/events`,
+      sessionCookie
+    );
+    expect(stream.buffered).toContain('"type":"connection"');
+
+    const statusResponse = await fetch(
+      `${cloudUrl}/api/cloud/nodes/${encodedNodeId}/proxy/status`,
+      {
+        cache: "no-store",
+        headers: {
+          cookie: sessionCookie
+        },
+        signal: AbortSignal.timeout(15_000)
+      }
+    );
+    expect(statusResponse.ok).toBe(true);
+
+    const statusPayload = (await statusResponse.json()) as {
+      runtimeMode?: string;
+    };
+    expect(statusPayload.runtimeMode).toBe("node");
+
+    await stream.reader.cancel();
   } finally {
     runNodeCli(["stop"], nodeHome, 20_000);
     runNodeCli(["cloud", "stop"], cloudHome, 20_000);

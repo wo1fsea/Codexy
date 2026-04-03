@@ -17,6 +17,7 @@ const codexyHome = process.env.CODEXY_HOME_DIR?.trim() || path.join(os.homedir()
 const nodeMetadataPath = path.join(codexyHome, "state", runtimeKey, "node", "service.json");
 
 let stopped = false;
+const activeStreamRequests = new Set();
 
 function readNodeMetadata() {
   if (!existsSync(nodeMetadataPath)) {
@@ -170,6 +171,18 @@ async function executeCloudRequest(request) {
   }
 }
 
+function runStreamRequestInBackground(request) {
+  const task = executeCloudRequest(request)
+    .catch((error) => {
+      fail(error instanceof Error ? error.message : "Cloud connector stream failed.");
+    })
+    .finally(() => {
+      activeStreamRequests.delete(task);
+    });
+
+  activeStreamRequests.add(task);
+}
+
 async function pollCloud() {
   const cloud = getCloudLinkState();
 
@@ -207,6 +220,11 @@ while (!stopped) {
   try {
     const request = await pollCloud();
     if (!request) {
+      continue;
+    }
+
+    if (request.stream) {
+      runStreamRequestInBackground(request);
       continue;
     }
 
