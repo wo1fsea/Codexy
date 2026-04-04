@@ -36,6 +36,19 @@ import type {
   DockUserInput
 } from "@/lib/codex/types";
 import {
+  getApprovePayload,
+  getCommandApprovalCwd,
+  getCommandApprovalText,
+  getDeclinePayload,
+  getSingleApprovePayload,
+  isCommandApprovalMethod,
+  isFileApprovalMethod,
+  isMcpElicitationRequest,
+  isPermissionApprovalRequest,
+  type McpElicitationRequestEntry,
+  type PermissionApprovalRequestEntry
+} from "@/lib/codex/server-requests";
+import {
   applyNotificationToThread,
   mergeThreadPreservingRichTurns as mergeThreadFromNotification,
   shouldRefreshThreadsForNotification,
@@ -81,14 +94,6 @@ type DockAppProps = {
 
 type RequestAnswerValue = string | number | boolean | string[] | null;
 type RequestAnswersState = Record<string, Record<string, RequestAnswerValue>>;
-type PermissionApprovalRequestEntry = Extract<
-  DockServerRequest,
-  { method: "item/permissions/requestApproval" }
->;
-type McpElicitationRequestEntry = Extract<
-  DockServerRequest,
-  { method: "mcpServer/elicitation/request" }
->;
 type McpFormElicitationParams = Extract<
   McpElicitationRequestEntry["params"],
   { mode: "form" }
@@ -1878,39 +1883,12 @@ function ThreadItemView({
   return <ArtifactItemView item={item} />;
 }
 
-function getApprovePayload(method: DockServerRequest["method"]) {
-  if (method === "execCommandApproval" || method === "applyPatchApproval") {
-    return { decision: "approved_for_session" };
-  }
-
-  return { decision: "acceptForSession" };
-}
-
-function getSingleApprovePayload(method: DockServerRequest["method"]) {
-  if (method === "execCommandApproval" || method === "applyPatchApproval") {
-    return { decision: "approved" };
-  }
-
-  return { decision: "accept" };
-}
-
-function getDeclinePayload(method: DockServerRequest["method"]) {
-  if (method === "execCommandApproval" || method === "applyPatchApproval") {
-    return { decision: "denied" };
-  }
-
-  return { decision: "decline" };
-}
-
 function getRequestTitle(method: DockServerRequest["method"], t: TranslateFn) {
-  if (
-    method === "item/commandExecution/requestApproval" ||
-    method === "execCommandApproval"
-  ) {
+  if (isCommandApprovalMethod(method)) {
     return t("request.commandApproval");
   }
 
-  if (method === "item/fileChange/requestApproval" || method === "applyPatchApproval") {
+  if (isFileApprovalMethod(method)) {
     return t("request.fileApproval");
   }
 
@@ -1927,49 +1905,6 @@ function getRequestTitle(method: DockServerRequest["method"], t: TranslateFn) {
   }
 
   return humanizeIdentifier(method);
-}
-
-function getCommandApprovalText(request: DockServerRequest, t: TranslateFn) {
-  if (request.method === "item/commandExecution/requestApproval") {
-    return (
-      request.params.command ||
-      request.params.reason ||
-      t("request.commandNeedsApproval")
-    );
-  }
-
-  if (request.method === "execCommandApproval") {
-    return request.params.command.join(" ");
-  }
-
-  return "";
-}
-
-function getCommandApprovalCwd(
-  request: DockServerRequest,
-  fallbackCwd: string
-) {
-  if (request.method === "item/commandExecution/requestApproval") {
-    return request.params.cwd || fallbackCwd;
-  }
-
-  if (request.method === "execCommandApproval") {
-    return request.params.cwd || fallbackCwd;
-  }
-
-  return fallbackCwd;
-}
-
-function isPermissionApprovalRequest(
-  request: DockServerRequest
-): request is PermissionApprovalRequestEntry {
-  return request.method === "item/permissions/requestApproval";
-}
-
-function isMcpElicitationRequest(
-  request: DockServerRequest
-): request is McpElicitationRequestEntry {
-  return request.method === "mcpServer/elicitation/request";
 }
 
 function getGrantedPermissionsFromRequest(
@@ -3428,7 +3363,7 @@ export function DockApp({
           <>
             <div className="dock-request-command-shell">
               <pre className="dock-request-command">
-                {getCommandApprovalText(request, t)}
+                {getCommandApprovalText(request) ?? t("request.commandNeedsApproval")}
               </pre>
             </div>
             <div className="dock-request-meta-row">

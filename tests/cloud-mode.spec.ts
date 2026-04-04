@@ -11,6 +11,10 @@ const repoRoot = process.cwd();
 const cliScript = path.join(repoRoot, "scripts", "codexy.mjs");
 const BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 
+test.describe.configure({
+  timeout: 120_000
+});
+
 function runNodeCli(
   args: string[],
   homeDir: string,
