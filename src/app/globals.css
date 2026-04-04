@@ -196,13 +196,23 @@ pre {
 }
 
 .cloud-app-shell {
+  height: 100vh;
   min-height: 100vh;
   overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
   background:
     radial-gradient(circle at top left, rgba(var(--c-accent), 0.12), transparent 32%),
     linear-gradient(180deg, #111110 0%, #151413 100%);
   padding: clamp(20px, 4vw, 40px);
+}
+
+@supports (height: 100dvh) {
+  .cloud-app-shell {
+    height: 100dvh;
+    min-height: 100dvh;
+  }
 }
 
 .cloud-auth-shell {
