@@ -3,9 +3,21 @@ import type { RuntimeAdapter } from "@/lib/runtime/contracts";
 
 class CodexRuntimeAdapter implements RuntimeAdapter {
   readonly id = "codex" as const;
+  readonly capabilities = {
+    steer: true,
+    fork: true,
+    review: true,
+    rollback: true,
+    compact: true,
+    shellCommand: true
+  } as const;
 
   private get bridge() {
     return getCodexBridge();
+  }
+
+  getCapabilities() {
+    return this.capabilities;
   }
 
   ensureConnected() {

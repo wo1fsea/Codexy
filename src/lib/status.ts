@@ -1,4 +1,5 @@
 import type { CloudLinkStatus } from "@/lib/cloud-link";
+import type { RuntimeCapabilities } from "@/lib/runtime/types";
 import type { TailscaleSummary } from "@/lib/tailscale";
 
 export type StatusPayload = {
@@ -6,6 +7,7 @@ export type StatusPayload = {
     connected: boolean;
     pendingRequests: number;
   };
+  capabilities: RuntimeCapabilities;
   tailscale: TailscaleSummary;
   cloud: CloudLinkStatus;
   defaults: {

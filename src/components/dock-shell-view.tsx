@@ -487,10 +487,15 @@ export function DockShellView(props: DockShellViewProps) {
   const shouldAutoFollowRef = useRef(true);
   const pendingScrollBehaviorRef = useRef<ScrollBehavior | null>(null);
   const hasDraft = props.prompt.trim().length > 0 || props.attachments.length > 0;
+  const runtimeCapabilities = props.status?.capabilities;
   const composerReady =
     props.composerCwd.trim().length > 0 && props.composerModel.trim().length > 0;
   const canSubmit = !props.submitting && hasDraft && composerReady;
-  const canSteer = Boolean(props.currentActiveTurn) && !props.submitting && hasDraft;
+  const canSteer =
+    runtimeCapabilities?.steer !== false &&
+    Boolean(props.currentActiveTurn) &&
+    !props.submitting &&
+    hasDraft;
   const primaryActionIsStop = Boolean(props.currentActiveTurn);
   const primaryActionLabel = primaryActionIsStop
     ? t("actions.stop")
@@ -1276,7 +1281,7 @@ export function DockShellView(props: DockShellViewProps) {
             </div>
 
             <div className="dock-stage-toolbar">
-              {props.selectedThread ? (
+              {props.selectedThread && runtimeCapabilities?.compact !== false ? (
                 <button
                   aria-label={t("actions.compact")}
                   className="dock-icon-button"
@@ -1288,7 +1293,7 @@ export function DockShellView(props: DockShellViewProps) {
                   <AppIcon className="dock-inline-icon" name="compact" />
                 </button>
               ) : null}
-              {props.selectedThread ? (
+              {props.selectedThread && runtimeCapabilities?.fork !== false ? (
                 <button
                   aria-label={t("actions.fork")}
                   className="dock-icon-button"
@@ -1300,7 +1305,7 @@ export function DockShellView(props: DockShellViewProps) {
                   <AppIcon className="dock-inline-icon" name="copy" />
                 </button>
               ) : null}
-              {props.selectedThread ? (
+              {props.selectedThread && runtimeCapabilities?.review !== false ? (
                 <button
                   aria-label={t("actions.review")}
                   className="dock-icon-button"
@@ -1312,7 +1317,7 @@ export function DockShellView(props: DockShellViewProps) {
                   <AppIcon className="dock-inline-icon" name="check" />
                 </button>
               ) : null}
-              {props.selectedThread ? (
+              {props.selectedThread && runtimeCapabilities?.rollback !== false ? (
                 <button
                   aria-label={t("actions.rollback")}
                   className="dock-icon-button"
@@ -1324,7 +1329,7 @@ export function DockShellView(props: DockShellViewProps) {
                   <AppIcon className="dock-inline-icon" name="back" />
                 </button>
               ) : null}
-              {props.selectedThread ? (
+              {props.selectedThread && runtimeCapabilities?.shellCommand !== false ? (
                 <button
                   aria-label={t("actions.shellCommand")}
                   className={clsx(

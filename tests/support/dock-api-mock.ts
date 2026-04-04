@@ -9,6 +9,14 @@ export const DEFAULT_CWD = "C:\\Users\\wo1fsea\\Documents\\codex_mw";
 
 export const DEFAULT_STATUS = {
   bridge: { connected: true, pendingRequests: 0 },
+  capabilities: {
+    steer: true,
+    fork: true,
+    review: true,
+    rollback: true,
+    compact: true,
+    shellCommand: true
+  },
   tailscale: {
     connected: true,
     backendState: "Running",

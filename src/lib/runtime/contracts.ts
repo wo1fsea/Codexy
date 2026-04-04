@@ -5,6 +5,7 @@ import type {
   RuntimeReviewTarget,
   RuntimeApprovalPolicy,
   RuntimeBridgeEvent,
+  RuntimeCapabilities,
   RuntimeId,
   RuntimeModel,
   RuntimeThreadCompactStartResponse,
@@ -29,6 +30,7 @@ export type ResolveRuntimeRequestFallback = {
 export type RuntimeAdapter = {
   id: RuntimeId;
   ensureConnected(): Promise<void>;
+  getCapabilities(): RuntimeCapabilities;
   getState(): RuntimeState;
   getEndpointUrl(): string | null;
   getPendingServerRequests(threadId?: string): RuntimeServerRequest[];

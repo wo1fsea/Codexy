@@ -21,6 +21,15 @@ import type {
 
 export type RuntimeId = "codex";
 
+export type RuntimeCapabilities = {
+  steer: boolean;
+  fork: boolean;
+  review: boolean;
+  rollback: boolean;
+  compact: boolean;
+  shellCommand: boolean;
+};
+
 export type RuntimeThread = DockThread;
 export type RuntimeModel = DockModel;
 export type RuntimeBridgeEvent = DockBridgeEvent;

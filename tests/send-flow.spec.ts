@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import {
   DEFAULT_CWD,
+  DEFAULT_STATUS,
   gotoDock,
   installDockApiMock
 } from "./support/dock-api-mock";
@@ -1076,6 +1077,74 @@ test("shell command strip submits a thread command and closes", async ({
     command: "git status --short"
   });
   await expect(commandInput).toHaveCount(0);
+});
+
+test("runtime capabilities hide unsupported thread controls", async ({
+  page
+}) => {
+  await installDockApiMock(page, {
+    status: {
+      ...DEFAULT_STATUS,
+      capabilities: {
+        steer: false,
+        fork: false,
+        review: false,
+        rollback: false,
+        compact: false,
+        shellCommand: false
+      }
+    },
+    threads: [
+      {
+        id: "thread-capabilities-1",
+        preview: "Limited runtime",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000000,
+        updatedAt: 1774000200,
+        status: { type: "active", activeFlags: [] },
+        path: null,
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "session",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: "Limited runtime",
+        turns: [
+          {
+            id: "turn-capabilities-1",
+            status: "inProgress",
+            error: null,
+            items: [
+              {
+                type: "userMessage",
+                id: "user-capabilities-1",
+                content: [
+                  {
+                    type: "text",
+                    text: "keep going",
+                    text_elements: []
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  });
+
+  await gotoDock(page);
+  await page.locator(".dock-thread-row").first().click();
+  await page.locator("textarea.dock-composer-input").fill("should stay hidden");
+
+  await expect(page.locator('[data-toolbar-action="compact"]')).toHaveCount(0);
+  await expect(page.locator('[data-toolbar-action="fork"]')).toHaveCount(0);
+  await expect(page.locator('[data-toolbar-action="review"]')).toHaveCount(0);
+  await expect(page.locator('[data-toolbar-action="rollback"]')).toHaveCount(0);
+  await expect(page.locator('[data-toolbar-action="shell-command"]')).toHaveCount(0);
+  await expect(page.locator('[data-composer-action="steer"]')).toHaveCount(0);
 });
 
 test("archiving the current thread jumps back to new thread and removes it from the live list", async ({

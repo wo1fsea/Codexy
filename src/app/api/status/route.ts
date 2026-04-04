@@ -28,6 +28,7 @@ export async function GET() {
   return NextResponse.json({
     runtimeMode: "node",
     bridge: runtime.getState(),
+    capabilities: runtime.getCapabilities(),
     tailscale,
     cloud,
     defaults: {
