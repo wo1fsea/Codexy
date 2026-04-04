@@ -37,10 +37,12 @@ export default async function CloudNodeWorkspacePage({
           >
             <AppIcon className="cloud-remote-inline-icon" name="back" />
           </Link>
-          <span className="cloud-eyebrow">Remote node workspace</span>
-          <span className="cloud-remote-node-name" title={node.nodeId}>
-            {node.displayName}
-          </span>
+          <div className="cloud-remote-workspace-line">
+            <span className="cloud-eyebrow">Remote node workspace</span>
+            <span className="cloud-remote-node-name" title={node.nodeId}>
+              {node.displayName}
+            </span>
+          </div>
         </div>
         <div className="cloud-remote-status">
           <span

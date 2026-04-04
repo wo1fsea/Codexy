@@ -1055,11 +1055,29 @@ pre {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex: 1;
-  flex-wrap: wrap;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.cloud-remote-workspace-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.cloud-remote-workspace-line .cloud-eyebrow {
+  flex: none;
+  white-space: nowrap;
 }
 
 .cloud-remote-node-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--text-strong);
   font-family: var(--font-sans);
   font-size: 13px;
@@ -1081,7 +1099,8 @@ pre {
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
-  flex-wrap: wrap;
+  flex: none;
+  flex-wrap: nowrap;
 }
 
 .cloud-remote-stage {
@@ -2154,6 +2173,11 @@ pre {
   position: relative;
   flex: 1 1 auto;
   min-height: 0;
+}
+
+.dock-stage-body {
+  display: flex;
+  flex-direction: column;
 }
 
 .dock-stage-thread-shell {
@@ -4201,12 +4225,38 @@ pre {
   }
 
   .cloud-remote-header {
-    flex-direction: column;
-    align-items: stretch;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+  }
+
+  .cloud-remote-copy {
+    gap: 8px;
+  }
+
+  .cloud-remote-workspace-line {
+    gap: 6px;
+  }
+
+  .cloud-remote-workspace-line .cloud-eyebrow {
+    max-width: clamp(112px, 44vw, 172px);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 0 10px;
+    font-size: 10px;
+  }
+
+  .cloud-remote-node-name {
+    font-size: 12px;
+    letter-spacing: 0.04em;
   }
 
   .cloud-remote-status {
-    justify-content: flex-start;
+    justify-content: flex-end;
+    gap: 6px;
   }
 }
 

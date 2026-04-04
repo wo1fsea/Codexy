@@ -622,6 +622,129 @@ test("cloud mode can open a linked node workspace through the proxy", async ({ p
   }
 });
 
+test("cloud remote workspace keeps a single-line mobile header and fills the remaining viewport", async ({
+  page
+}) => {
+  const cloudHome = makeTempDir("codexy-cloud-mobile-remote-home-");
+  const nodeHome = makeTempDir("codexy-cloud-mobile-remote-node-");
+  const cloudPort = await getFreePort();
+  const nodePort = await getFreePort();
+  const cloudUrl = `http://127.0.0.1:${cloudPort}`;
+  const runtimeSuffix = Date.now().toString();
+
+  try {
+    await page.setViewportSize({
+      width: 390,
+      height: 844
+    });
+
+    const cloudStart = runNodeCli(
+      ["cloud", "start", "--port", String(cloudPort)],
+      cloudHome,
+      180_000,
+      {
+        NEXT_DIST_DIR: `.next-runtime-cloud-playwright-${runtimeSuffix}`
+      }
+    );
+    expect(cloudStart.status, cloudStart.stdout + cloudStart.stderr).toBe(0);
+
+    await bindCloudAuthenticator(page, cloudUrl, cloudHome);
+    const sessionCookie = await getSessionCookieHeader(page, cloudUrl);
+    const linkResult = runNodeCli(
+      ["link", cloudUrl, "--code", generateTotpCode(readCloudAuthSecret(cloudHome))],
+      nodeHome
+    );
+    expect(linkResult.status, linkResult.stdout + linkResult.stderr).toBe(0);
+
+    const nodeStart = runNodeCli(
+      ["start", "--port", String(nodePort)],
+      nodeHome,
+      180_000,
+      {
+        NEXT_DIST_DIR: `.next-runtime-node-playwright-${runtimeSuffix}`
+      }
+    );
+    expect(nodeStart.status, nodeStart.stdout + nodeStart.stderr).toBe(0);
+
+    const nodeIdMatch = linkResult.stdout.match(/\(([0-9a-f-]{36})\)/i);
+    expect(nodeIdMatch).not.toBeNull();
+    const nodeId = nodeIdMatch?.[1] ?? "";
+
+    await waitForCloudProxyStatus(
+      `${cloudUrl}/api/cloud/nodes/${encodeURIComponent(nodeId)}/proxy/status`,
+      sessionCookie
+    );
+
+    await page.goto(`${cloudUrl}/nodes/${encodeURIComponent(nodeId)}`, {
+      waitUntil: "domcontentloaded"
+    });
+
+    await expect(page.getByText("Remote node workspace")).toBeVisible();
+
+    const workspaceLine = page.locator(".cloud-remote-workspace-line");
+    const header = page.locator(".cloud-remote-header");
+    const copy = page.locator(".cloud-remote-copy");
+    const status = page.locator(".cloud-remote-status");
+
+    const lineMetrics = await workspaceLine.evaluate((element) => ({
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth
+    }));
+    expect(lineMetrics.scrollHeight).toBeLessThanOrEqual(lineMetrics.clientHeight + 1);
+    expect(lineMetrics.scrollWidth).toBeLessThanOrEqual(lineMetrics.clientWidth + 1);
+
+    const headerBox = await header.boundingBox();
+    const copyBox = await copy.boundingBox();
+    const statusBox = await status.boundingBox();
+    expect(headerBox).not.toBeNull();
+    expect(copyBox).not.toBeNull();
+    expect(statusBox).not.toBeNull();
+    expect(headerBox?.height ?? 0).toBeLessThanOrEqual(56);
+    expect(Math.abs((copyBox?.y ?? 0) - (statusBox?.y ?? 0))).toBeLessThan(3);
+
+    const shellMetrics = await page.evaluate(() => {
+      const shell = document.querySelector(".cloud-remote-shell") as HTMLElement | null;
+      const headerElement = document.querySelector(".cloud-remote-header") as HTMLElement | null;
+      const stageElement = document.querySelector(".cloud-remote-stage") as HTMLElement | null;
+      const dockAppElement = document.querySelector(
+        ".cloud-remote-stage .dock-app"
+      ) as HTMLElement | null;
+
+      if (!shell || !headerElement || !stageElement || !dockAppElement) {
+        return null;
+      }
+
+      return {
+        viewportHeight: window.innerHeight,
+        shellHeight: shell.clientHeight,
+        headerHeight: headerElement.clientHeight,
+        stageHeight: stageElement.clientHeight,
+        stageBottom: stageElement.getBoundingClientRect().bottom,
+        dockAppHeight: dockAppElement.clientHeight
+      };
+    });
+
+    expect(shellMetrics).not.toBeNull();
+    expect(shellMetrics!.shellHeight).toBeLessThanOrEqual(shellMetrics!.viewportHeight + 1);
+    expect(shellMetrics!.stageBottom).toBeLessThanOrEqual(shellMetrics!.viewportHeight + 1);
+    expect(Math.abs(shellMetrics!.stageHeight - shellMetrics!.dockAppHeight)).toBeLessThanOrEqual(
+      1
+    );
+    expect(
+      Math.abs(
+        shellMetrics!.shellHeight - (shellMetrics!.headerHeight + shellMetrics!.stageHeight)
+      )
+    ).toBeLessThanOrEqual(1);
+  } finally {
+    runNodeCli(["stop"], nodeHome, 20_000);
+    runNodeCli(["cloud", "stop"], cloudHome, 20_000);
+    rmSync(nodeHome, { recursive: true, force: true });
+    rmSync(cloudHome, { recursive: true, force: true });
+  }
+});
+
 test("cloud proxy events stream sends the initial connection event", async ({ page }) => {
   const cloudHome = makeTempDir("codexy-cloud-events-home-");
   const nodeHome = makeTempDir("codexy-cloud-events-node-");
