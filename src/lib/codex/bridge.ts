@@ -8,6 +8,11 @@ import { WebSocket, type RawData } from "ws";
 
 import { dockEnv } from "@/lib/codex/env";
 import {
+  createCodexServerRequest,
+  extractThreadIdFromPayload,
+  type CodexRpcMethod
+} from "@/lib/codex/protocol-registry";
+import {
   isJsonRpcNotification,
   isJsonRpcResponse,
   isJsonRpcServerRequest,
@@ -42,24 +47,6 @@ type PendingRpc = {
   resolve: (value: any) => void;
   reject: (error: Error) => void;
 };
-
-type RpcMethod =
-  | "thread/list"
-  | "thread/read"
-  | "thread/start"
-  | "thread/resume"
-  | "thread/name/set"
-  | "thread/archive"
-  | "thread/unarchive"
-  | "thread/fork"
-  | "thread/compact/start"
-  | "thread/rollback"
-  | "thread/shellCommand"
-  | "turn/start"
-  | "turn/steer"
-  | "turn/interrupt"
-  | "review/start"
-  | "model/list";
 
 const SOCKET_CONNECT_TIMEOUT_MS = 5_000;
 const INITIALIZE_TIMEOUT_MS = 5_000;
@@ -360,112 +347,6 @@ function createSandboxPolicy(mode: DockSandboxMode) {
   return { type: "workspaceWrite" as const };
 }
 
-function extractThreadIdFromPayload(value: unknown): string | undefined {
-  if (!value || typeof value !== "object") {
-    return undefined;
-  }
-
-  if ("threadId" in value && typeof value.threadId === "string") {
-    return value.threadId;
-  }
-
-  if ("conversationId" in value && typeof value.conversationId === "string") {
-    return value.conversationId;
-  }
-
-  if (
-    "thread" in value &&
-    value.thread &&
-    typeof value.thread === "object" &&
-    "id" in value.thread &&
-    typeof value.thread.id === "string"
-  ) {
-    return value.thread.id;
-  }
-
-  return undefined;
-}
-
-function createServerRequest(
-  rpcId: JsonRpcId,
-  method: string,
-  params: unknown
-): DockServerRequest | null {
-  const threadId = extractThreadIdFromPayload(params);
-  const requestId = String(rpcId);
-
-  if (method === "item/commandExecution/requestApproval") {
-    return {
-      requestId,
-      rpcId,
-      method,
-      threadId,
-      params: params as any
-    };
-  }
-
-  if (method === "item/fileChange/requestApproval") {
-    return {
-      requestId,
-      rpcId,
-      method,
-      threadId,
-      params: params as any
-    };
-  }
-
-  if (method === "item/tool/requestUserInput") {
-    return {
-      requestId,
-      rpcId,
-      method,
-      threadId,
-      params: params as any
-    };
-  }
-
-  if (method === "item/permissions/requestApproval") {
-    return {
-      requestId,
-      rpcId,
-      method,
-      threadId,
-      params: params as any
-    };
-  }
-
-  if (method === "mcpServer/elicitation/request") {
-    return {
-      requestId,
-      rpcId,
-      method,
-      threadId,
-      params: params as any
-    };
-  }
-
-  if (method === "execCommandApproval") {
-    return {
-      requestId,
-      rpcId,
-      method,
-      threadId,
-      params: params as any
-    };
-  }
-
-  if (method === "applyPatchApproval") {
-    return {
-      requestId,
-      rpcId,
-      method,
-      threadId,
-      params: params as any
-    };
-  }
-
-  return null;
-}
 
 class CodexBridge extends EventEmitter {
   private socket: WebSocket | null = null;
@@ -1139,7 +1020,7 @@ class CodexBridge extends EventEmitter {
   }
 
   private sendRpc<TResult = unknown>(
-    method: RpcMethod | "initialize",
+    method: CodexRpcMethod | "initialize",
     params: unknown,
     timeoutMs = RPC_TIMEOUT_MS
   ): Promise<TResult> {
@@ -1208,7 +1089,7 @@ class CodexBridge extends EventEmitter {
   }
 
   private async request<TResult = unknown>(
-    method: RpcMethod,
+    method: CodexRpcMethod,
     params: unknown
   ): Promise<TResult> {
     await this.ensureConnected();
@@ -1234,7 +1115,7 @@ class CodexBridge extends EventEmitter {
     }
 
     if (isJsonRpcServerRequest(message)) {
-      const serverRequest = createServerRequest(
+      const serverRequest = createCodexServerRequest(
         message.id,
         message.method,
         message.params
