@@ -39,6 +39,12 @@ If a change updates a rule in one layer, update the matching source-of-truth doc
 - Owns host-local upload persistence, path resolution, and public URL mapping.
 - Must not absorb Codex thread logic or UI formatting.
 
+### `src/lib/host-terminal.ts`
+
+- Owns browser-requested host terminal session lifecycle and host command execution for the embedded stage terminal.
+- Must stay separate from Codex bridge thread/session logic.
+- Must expose browser-safe session methods through `src/app/api/**` instead of leaking process handles or child-process details into UI code.
+
 ### `src/lib/tailscale.ts`
 
 - Owns host reachability inspection and Tailscale status summaries.
@@ -82,6 +88,13 @@ Update docs in the same patch when you change:
 - Codex bridge integration assumptions
 - workflow or verification requirements
 - UI contract, spacing, or interaction invariants
+
+## Verification Rules
+
+- Treat automated verification and real browser verification as complementary, not interchangeable.
+- When a change adds or modifies user-facing behavior, validate it in a real browser session against the local app in addition to the matching automated checks.
+- Browser verification should exercise the changed path end to end and leave an artifact under `output/playwright/`.
+- The task record under `output/tasks/<task-id>/` should note what browser flow was exercised and where the artifact was written.
 
 ## Change Checklist
 

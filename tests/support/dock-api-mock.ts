@@ -177,6 +177,7 @@ export async function installDockApiMock(page: Page, options: MockOptions = {}) 
   let threadCounter = threadOrder.length;
   let turnCounter = 0;
   let uploadCounter = 0;
+  let terminalSessionCounter = 0;
 
   await page.route("**/api/**", async (route) => {
     const request = route.request();
@@ -202,6 +203,65 @@ export async function installDockApiMock(page: Page, options: MockOptions = {}) 
         },
         body: events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join("")
       });
+      return;
+    }
+
+    if (path === "/api/terminal/sessions" && method === "POST") {
+      const body = (request.postDataJSON() ?? {}) as {
+        cwd?: string | null;
+      };
+      terminalSessionCounter += 1;
+      await fulfillJson(route, {
+        sessionId: `mock-terminal-${terminalSessionCounter}`,
+        cwd: body.cwd ?? status.defaults.cwd,
+        shellLabel: "MockShell",
+        status: "idle"
+      });
+      return;
+    }
+
+    const terminalEventsMatch = path.match(/^\/api\/terminal\/sessions\/([^/]+)\/events$/);
+    if (terminalEventsMatch && method === "GET") {
+      await route.fulfill({
+        status: 200,
+        headers: {
+          "Content-Type": "text/event-stream"
+        },
+        body: [
+          {
+            seq: 1,
+            type: "started",
+            cwd: status.defaults.cwd,
+            shellLabel: "MockShell",
+            status: "running"
+          },
+          {
+            seq: 2,
+            type: "output",
+            content: `Connected to MockShell on this Codexy node.\r\n${status.defaults.cwd}> `
+          }
+        ]
+          .map((event) => `data: ${JSON.stringify(event)}\n\n`)
+          .join("")
+      });
+      return;
+    }
+
+    const terminalInputMatch = path.match(/^\/api\/terminal\/sessions\/([^/]+)\/input$/);
+    if (terminalInputMatch && method === "POST") {
+      await fulfillJson(route, { ok: true });
+      return;
+    }
+
+    const terminalInterruptMatch = path.match(/^\/api\/terminal\/sessions\/([^/]+)\/interrupt$/);
+    if (terminalInterruptMatch && method === "POST") {
+      await fulfillJson(route, { ok: true });
+      return;
+    }
+
+    const terminalSessionMatch = path.match(/^\/api\/terminal\/sessions\/([^/]+)$/);
+    if (terminalSessionMatch && method === "DELETE") {
+      await fulfillJson(route, { ok: true });
       return;
     }
 

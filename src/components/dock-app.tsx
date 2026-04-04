@@ -1801,6 +1801,7 @@ export function DockApp({
   const [loadingThread, setLoadingThread] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [renamingThread, setRenamingThread] = useState(false);
+  const [stageMode, setStageMode] = useState<"thread" | "terminal">("thread");
   const [archiveConfirmThreadId, setArchiveConfirmThreadId] = useState<
     string | null
   >(null);
@@ -1827,6 +1828,12 @@ export function DockApp({
   useEffect(() => {
     setArchiveConfirmThreadId(null);
     setArchivingThreadId(null);
+  }, [selectedThreadId]);
+
+  useEffect(() => {
+    if (!selectedThreadId) {
+      setStageMode("thread");
+    }
   }, [selectedThreadId]);
 
   useLayoutEffect(() => {
@@ -2820,6 +2827,7 @@ export function DockApp({
   function handleNewThread(nextCwd?: string) {
     setSelectedThreadId(null);
     setSelectedThread(null);
+    setStageMode("thread");
     setSidebarOpen(false);
     setPrompt("");
     setTakeoverPromptOpen(false);
@@ -3119,121 +3127,129 @@ export function DockApp({
         data-dock-responsive-strategy={responsiveStrategy}
         ref={rootRef}
       >
-      <DockShellView
-        archiveConfirmThreadId={archiveConfirmThreadId}
-        archiveFilter={archiveFilter}
-        archivingThreadId={archivingThreadId}
-        attachments={attachments}
-        composerCwd={composerCwd}
-        composerModel={effectiveComposerModel}
-        composerPermissionPreset={composerPermissionPreset}
-        composerReasoningEffort={effectiveComposerReasoningEffort}
-        connectionNotice={connectionNoticeText}
-        currentActiveTurn={currentActiveTurn}
-        currentRequests={currentRequests}
-        error={error}
-        groupedThreads={groupedThreads}
-        loadingThread={loadingThread}
-        models={models}
-        onArchiveFilterChange={(value) => {
-          setArchiveConfirmThreadId(null);
-          setArchiveFilter(value);
-        }}
-        onArchiveCancel={() => setArchiveConfirmThreadId(null)}
-        onArchiveConfirm={(threadId) => void toggleArchiveThread(threadId)}
-        onComposerCwdChange={setComposerCwd}
-        onComposerModelChange={setComposerModel}
-        onComposerPermissionPresetChange={setComposerPermissionPreset}
-        onComposerReasoningEffortChange={setComposerReasoningEffort}
-        onInterruptCurrentTurn={() => {
-          if (!currentActiveTurn || !selectedThreadId) return;
-          void fetchJson(`/threads/${selectedThreadId}/interrupt`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              turnId: currentActiveTurn.id
+        <DockShellView
+          apiBasePath={resolvedApiBasePath}
+          archiveConfirmThreadId={archiveConfirmThreadId}
+          archiveFilter={archiveFilter}
+          archivingThreadId={archivingThreadId}
+          attachments={attachments}
+          composerCwd={composerCwd}
+          composerModel={effectiveComposerModel}
+          composerPermissionPreset={composerPermissionPreset}
+          composerReasoningEffort={effectiveComposerReasoningEffort}
+          connectionNotice={connectionNoticeText}
+          currentActiveTurn={currentActiveTurn}
+          currentRequests={currentRequests}
+          error={error}
+          groupedThreads={groupedThreads}
+          loadingThread={loadingThread}
+          models={models}
+          onArchiveFilterChange={(value) => {
+            setArchiveConfirmThreadId(null);
+            setArchiveFilter(value);
+          }}
+          onArchiveCancel={() => setArchiveConfirmThreadId(null)}
+          onArchiveConfirm={(threadId) => void toggleArchiveThread(threadId)}
+          onComposerCwdChange={setComposerCwd}
+          onComposerModelChange={setComposerModel}
+          onComposerPermissionPresetChange={setComposerPermissionPreset}
+          onComposerReasoningEffortChange={setComposerReasoningEffort}
+          onInterruptCurrentTurn={() => {
+            if (!currentActiveTurn || !selectedThreadId) return;
+            void fetchJson(`/threads/${selectedThreadId}/interrupt`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({
+                turnId: currentActiveTurn.id
+              })
+            }).catch((cause) =>
+              setError(
+                cause instanceof Error
+                  ? localizeRuntimeMessage(cause.message, t)
+                  : t("error.interruptFailed")
+              )
+            );
+          }}
+          onNewThread={handleNewThread}
+          onOpenSidebar={() => setSidebarOpen(true)}
+          onProjectFilterChange={setProjectFilter}
+          onPromptChange={setPrompt}
+          onRefreshThreads={() => void refreshThreads()}
+          onRemoveAttachment={(attachmentId) =>
+            setAttachments((current) => {
+              const attachment = current.find((entry) => entry.id === attachmentId);
+              const next = current.filter((entry) => entry.id !== attachmentId);
+              if (attachment?.previewUrl) {
+                URL.revokeObjectURL(attachment.previewUrl);
+              }
+              return next;
             })
-          }).catch((cause) =>
-            setError(
-              cause instanceof Error
-                ? localizeRuntimeMessage(cause.message, t)
-                : t("error.interruptFailed")
-            )
-          );
-        }}
-        onNewThread={handleNewThread}
-      onOpenSidebar={() => setSidebarOpen(true)}
-      onProjectFilterChange={setProjectFilter}
-      onPromptChange={setPrompt}
-      onRefreshThreads={() => void refreshThreads()}
-      onRemoveAttachment={(attachmentId) =>
-        setAttachments((current) => {
-          const attachment = current.find((entry) => entry.id === attachmentId);
-          const next = current.filter((entry) => entry.id !== attachmentId);
-          if (attachment?.previewUrl) {
-            URL.revokeObjectURL(attachment.previewUrl);
           }
-          return next;
-        })
-      }
-      onRenameCancel={() => {
-        setRenamingThread(false);
-        setThreadNameDraft(selectedThread ? getThreadLabel(selectedThread, t) : "");
-      }}
-      onRenameSave={() => void renameSelectedThread()}
-      onResolveRequest={renderRequestCard}
-      onSearchChange={setSearch}
-      onSelectThread={(thread) => {
-        if (isSidebarArchivedThread(thread, archiveFilter)) {
-          return;
-        }
-        setArchiveConfirmThreadId(null);
-        setRenamingThread(false);
-        setSelectedThreadId(thread.id);
-        setSidebarOpen(false);
-      }}
-      onSidebarClose={() => setSidebarOpen(false)}
-      onSubmitPrompt={() => void submitPrompt()}
-      onTakeoverCancel={() => setTakeoverPromptOpen(false)}
-      onTakeoverConfirm={() => void submitPrompt({ takeoverConfirmed: true })}
-      onThreadNameDraftChange={setThreadNameDraft}
-      onToggleArchive={(threadId) => {
-        if (archivingThreadId) {
-          return;
-        }
-        setRenamingThread(false);
-        setArchiveConfirmThreadId((current) =>
-          current === threadId ? null : threadId
-        );
-      }}
-      onToggleRename={() => {
-        setArchiveConfirmThreadId(null);
-        setRenamingThread((current) => !current);
-      }}
-      onUploadFiles={(files) => {
-        void uploadFiles(files);
-      }}
-      projectFilter={projectFilter}
-      projects={projects}
-      prompt={prompt}
-      renamingThread={renamingThread}
-      renderThreadItem={(item) => (
-        <ThreadItemView apiBasePath={resolvedApiBasePath} item={item} />
-      )}
-      search={search}
-      selectedThread={selectedThread}
-      selectedThreadId={selectedThreadId}
-      responsiveMode={activeResponsiveMode}
-      sidebarOpen={sidebarOpen}
-      status={status}
-      submitScrollToken={submitScrollToken}
-      submitting={submitting}
-      takeoverPromptOpen={takeoverPromptOpen}
-      threadNameDraft={threadNameDraft}
-      workspaceLabel={workspaceLabel}
-    />
+          onRenameCancel={() => {
+            setRenamingThread(false);
+            setThreadNameDraft(selectedThread ? getThreadLabel(selectedThread, t) : "");
+          }}
+          onRenameSave={() => void renameSelectedThread()}
+          onResolveRequest={renderRequestCard}
+          onSearchChange={setSearch}
+          onSelectThread={(thread) => {
+            if (isSidebarArchivedThread(thread, archiveFilter)) {
+              return;
+            }
+            setArchiveConfirmThreadId(null);
+            setRenamingThread(false);
+            setStageMode("thread");
+            setSelectedThreadId(thread.id);
+            setSidebarOpen(false);
+          }}
+          onSidebarClose={() => setSidebarOpen(false)}
+          onSubmitPrompt={() => void submitPrompt()}
+          onTakeoverCancel={() => setTakeoverPromptOpen(false)}
+          onTakeoverConfirm={() => void submitPrompt({ takeoverConfirmed: true })}
+          onThreadNameDraftChange={setThreadNameDraft}
+          onToggleArchive={(threadId) => {
+            if (archivingThreadId) {
+              return;
+            }
+            setRenamingThread(false);
+            setArchiveConfirmThreadId((current) =>
+              current === threadId ? null : threadId
+            );
+          }}
+          onToggleRename={() => {
+            setArchiveConfirmThreadId(null);
+            setRenamingThread((current) => !current);
+          }}
+          onToggleStageMode={() =>
+            setStageMode((current) =>
+              current === "terminal" ? "thread" : "terminal"
+            )
+          }
+          onUploadFiles={(files) => {
+            void uploadFiles(files);
+          }}
+          projectFilter={projectFilter}
+          projects={projects}
+          prompt={prompt}
+          renamingThread={renamingThread}
+          renderThreadItem={(item) => (
+            <ThreadItemView apiBasePath={resolvedApiBasePath} item={item} />
+          )}
+          search={search}
+          selectedThread={selectedThread}
+          selectedThreadId={selectedThreadId}
+          stageMode={stageMode}
+          responsiveMode={activeResponsiveMode}
+          sidebarOpen={sidebarOpen}
+          status={status}
+          submitScrollToken={submitScrollToken}
+          submitting={submitting}
+          takeoverPromptOpen={takeoverPromptOpen}
+          threadNameDraft={threadNameDraft}
+          workspaceLabel={workspaceLabel}
+        />
       </div>
-  );
+    );
 }

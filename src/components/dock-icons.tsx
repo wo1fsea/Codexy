@@ -23,6 +23,7 @@ type IconName =
   | "security"
   | "repo"
   | "desktop"
+  | "terminal"
   | "plus"
   | "logout";
 
@@ -222,6 +223,13 @@ export function AppIcon({
       return (
         <svg {...props}>
           <path d="M4.5 6.5h15v9h-15zm5.5 12h4" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.6" />
+        </svg>
+      );
+    case "terminal":
+      return (
+        <svg {...props}>
+          <path d="M5.5 7.5 9.5 11.5 5.5 15.5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
+          <path d="M11.5 16h7" stroke="currentColor" strokeLinecap="round" strokeWidth="1.7" />
         </svg>
       );
     case "plus":

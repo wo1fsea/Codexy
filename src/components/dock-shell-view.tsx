@@ -13,6 +13,7 @@ import {
 import { createPortal } from "react-dom";
 
 import { AppIcon, SIDEBAR_ITEMS } from "@/components/dock-icons";
+import { DockTerminalPane } from "@/components/dock-terminal-pane";
 import { DockSelect, type DockSelectOption } from "@/components/dock-select";
 import type {
   DockModel,
@@ -65,6 +66,7 @@ const DEFAULT_SIDEBAR_WIDTH = 296;
 const MIN_SIDEBAR_WIDTH = 248;
 const MAX_SIDEBAR_WIDTH = 480;
 const SIDEBAR_WIDTH_STORAGE_KEY = "codexy-sidebar-width";
+const TERMINAL_EXIT_ANIMATION_MS = 260;
 
 type DockShellViewProps = {
   archiveConfirmThreadId: string | null;
@@ -89,6 +91,7 @@ type DockShellViewProps = {
   search: string;
   selectedThread: DockThread | null;
   selectedThreadId: string | null;
+  stageMode: "thread" | "terminal";
   responsiveMode: "desktop" | "compact" | "mobile";
   sidebarOpen: boolean;
   status: StatusPayload | null;
@@ -97,6 +100,7 @@ type DockShellViewProps = {
   takeoverPromptOpen: boolean;
   threadNameDraft: string;
   workspaceLabel: string;
+  apiBasePath: string;
   onArchiveFilterChange: (value: ArchiveFilter) => void;
   onArchiveCancel: () => void;
   onArchiveConfirm: (threadId: string) => void;
@@ -121,6 +125,7 @@ type DockShellViewProps = {
   onTakeoverCancel: () => void;
   onTakeoverConfirm: () => void;
   onThreadNameDraftChange: (value: string) => void;
+  onToggleStageMode: () => void;
   onToggleArchive: (threadId: string) => void;
   onToggleRename: () => void;
   onUploadFiles: (files: FileList | File[] | null) => void;
@@ -448,8 +453,17 @@ export function DockShellView(props: DockShellViewProps) {
   const [archiveTooltip, setArchiveTooltip] = useState<ArchiveTooltipState | null>(
     null
   );
+  const [terminalOverlayVisible, setTerminalOverlayVisible] = useState(
+    props.stageMode === "terminal" && Boolean(props.selectedThread)
+  );
+  const [terminalOverlayExiting, setTerminalOverlayExiting] = useState(false);
+  const [terminalOverlayCwd, setTerminalOverlayCwd] = useState(
+    props.selectedThread?.cwd || props.workspaceLabel
+  );
   const resizeStateRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const heroCwdInputRef = useRef<HTMLInputElement | null>(null);
+  const composerInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const pendingComposerSelectionRef = useRef<number | null>(null);
   const stageScrollRef = useRef<HTMLElement | null>(null);
   const stageScrollBodyRef = useRef<HTMLDivElement | null>(null);
   const shouldAutoFollowRef = useRef(true);
@@ -464,6 +478,8 @@ export function DockShellView(props: DockShellViewProps) {
     : t("actions.send");
   const heroDefaultCwd = props.composerCwd || props.status?.defaults.cwd || "";
   const latestPlanItem = getLatestPlanItem(props.selectedThread);
+  const terminalModeActive =
+    props.stageMode === "terminal" && Boolean(props.selectedThread);
   const hasBottomPanels =
     props.connectionNotice ||
     props.takeoverPromptOpen ||
@@ -560,10 +576,8 @@ export function DockShellView(props: DockShellViewProps) {
         value.slice(0, selectionStart) + "\n" + value.slice(selectionEnd);
       const nextCaretPosition = selectionStart + 1;
 
+      pendingComposerSelectionRef.current = nextCaretPosition;
       props.onPromptChange(nextValue);
-      window.requestAnimationFrame(() => {
-        textarea.setSelectionRange(nextCaretPosition, nextCaretPosition);
-      });
       return;
     }
 
@@ -578,6 +592,53 @@ export function DockShellView(props: DockShellViewProps) {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!terminalModeActive) {
+      return;
+    }
+
+    setTerminalOverlayCwd(props.selectedThread?.cwd || props.workspaceLabel);
+  }, [terminalModeActive, props.selectedThread, props.workspaceLabel]);
+
+  useEffect(() => {
+    let timerId: number | null = null;
+
+    if (terminalModeActive) {
+      setTerminalOverlayVisible(true);
+      setTerminalOverlayExiting(false);
+      return;
+    }
+
+    if (!terminalOverlayVisible) {
+      return;
+    }
+
+    setTerminalOverlayExiting(true);
+    timerId = window.setTimeout(() => {
+      setTerminalOverlayVisible(false);
+      setTerminalOverlayExiting(false);
+    }, TERMINAL_EXIT_ANIMATION_MS);
+
+    return () => {
+      if (timerId !== null) {
+        window.clearTimeout(timerId);
+      }
+    };
+  }, [terminalModeActive, terminalOverlayVisible]);
+
+  useEffect(() => {
+    const nextCaretPosition = pendingComposerSelectionRef.current;
+    if (nextCaretPosition === null || !composerInputRef.current) {
+      return;
+    }
+
+    composerInputRef.current.setSelectionRange(
+      nextCaretPosition,
+      nextCaretPosition
+    );
+    pendingComposerSelectionRef.current = null;
+  }, [props.prompt]);
 
   useEffect(() => {
     const savedWidth = window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
@@ -1179,6 +1240,28 @@ export function DockShellView(props: DockShellViewProps) {
             <div className="dock-stage-toolbar">
               {props.selectedThread ? (
                 <button
+                  aria-label={
+                    terminalModeActive
+                      ? t("actions.showThread")
+                      : t("actions.showTerminal")
+                  }
+                  className={clsx(
+                    "dock-icon-button",
+                    terminalModeActive && "is-armed"
+                  )}
+                  onClick={props.onToggleStageMode}
+                  title={
+                    terminalModeActive
+                      ? t("actions.showThread")
+                      : t("actions.showTerminal")
+                  }
+                  type="button"
+                >
+                  <AppIcon className="dock-inline-icon" name="terminal" />
+                </button>
+              ) : null}
+              {props.selectedThread ? (
+                <button
                   className="dock-icon-button"
                   onClick={props.onToggleRename}
                   type="button"
@@ -1204,7 +1287,7 @@ export function DockShellView(props: DockShellViewProps) {
             </div>
           </header>
 
-          {props.selectedThread && props.renamingThread ? (
+          {props.selectedThread && props.renamingThread && !terminalModeActive ? (
             <section className="dock-rename-strip">
               <input
                 className="dock-sidebar-input"
@@ -1227,227 +1310,235 @@ export function DockShellView(props: DockShellViewProps) {
             </section>
           ) : null}
 
-          <section className="dock-stage-scroll" ref={stageScrollRef}>
-            <div className="dock-stage-scroll-body" ref={stageScrollBodyRef}>
-              {props.loadingThread ? (
-                <div className="dock-empty-state">{t("stage.loadingThread")}</div>
-              ) : null}
+          <div className="dock-stage-body">
+            <div
+              aria-hidden={terminalModeActive}
+              className={clsx(
+                "dock-stage-thread-shell",
+                terminalModeActive && "is-under-terminal"
+              )}
+            >
+              <section className="dock-stage-scroll" ref={stageScrollRef}>
+                <div className="dock-stage-scroll-body" ref={stageScrollBodyRef}>
+                  {props.loadingThread ? (
+                    <div className="dock-empty-state">{t("stage.loadingThread")}</div>
+                  ) : null}
 
-              {!props.selectedThread && !props.loadingThread ? (
-                <div className={clsx("dock-hero", heroCwdOpen && "is-cwd-open")}>
-                  <div className="dock-hero-wordmark">Codexy</div>
-                  <strong>{t("stage.startBuilding")}</strong>
-                  <div className="dock-hero-project">{props.workspaceLabel}</div>
-                  <div className="dock-hero-actions">
-                    <button
-                      className="dock-ghost-action dock-hero-action"
-                      onClick={() => {
-                        if (!heroCwdOpen) {
-                          setHeroCwdDraft(heroDefaultCwd);
+                  {!props.selectedThread && !props.loadingThread ? (
+                    <div className={clsx("dock-hero", heroCwdOpen && "is-cwd-open")}>
+                      <div className="dock-hero-wordmark">Codexy</div>
+                      <strong>{t("stage.startBuilding")}</strong>
+                      <div className="dock-hero-project">{props.workspaceLabel}</div>
+                      <div className="dock-hero-actions">
+                        <button
+                          className="dock-ghost-action dock-hero-action"
+                          onClick={() => {
+                            if (!heroCwdOpen) {
+                              setHeroCwdDraft(heroDefaultCwd);
+                            }
+                            setHeroCwdOpen((current) => !current);
+                          }}
+                          type="button"
+                        >
+                          <AppIcon className="dock-inline-icon" name="folder" />
+                          {t("actions.choosePath")}
+                        </button>
+                      </div>
+                      <div
+                        aria-hidden={!heroCwdOpen}
+                        className={clsx(
+                          "dock-hero-cwd-shell",
+                          heroCwdOpen && "is-open"
+                        )}
+                      >
+                        <div className="dock-hero-cwd">
+                          <label
+                            className="dock-hero-cwd-label"
+                            htmlFor="dock-hero-cwd-input"
+                          >
+                            {t("request.workingDirectory")}
+                          </label>
+                          <input
+                            aria-hidden={!heroCwdOpen}
+                            className="dock-sidebar-input dock-hero-input"
+                            disabled={!heroCwdOpen}
+                            id="dock-hero-cwd-input"
+                            onChange={(event) => setHeroCwdDraft(event.target.value)}
+                            onKeyDown={handleHeroCwdKeyDown}
+                            placeholder={t("request.workingDirectory")}
+                            ref={heroCwdInputRef}
+                            tabIndex={heroCwdOpen ? 0 : -1}
+                            value={heroCwdDraft}
+                          />
+                          <div className="dock-hero-cwd-actions">
+                            <button
+                              className="dock-request-action is-primary"
+                              disabled={!heroCwdDraft.trim()}
+                              onClick={handleHeroCwdSubmit}
+                              tabIndex={heroCwdOpen ? 0 : -1}
+                              type="button"
+                            >
+                              {t("actions.usePath")}
+                            </button>
+                            <button
+                              className="dock-ghost-action is-muted"
+                              onClick={() => setHeroCwdOpen(false)}
+                              tabIndex={heroCwdOpen ? 0 : -1}
+                              type="button"
+                            >
+                              {t("actions.cancel")}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {props.selectedThread ? (
+                    <div className="dock-transcript">
+                      {props.selectedThread.turns.map((turn) => {
+                        const transcriptEntries = getTranscriptEntries(turn);
+                        const showThinkingState = shouldShowThinkingState(turn);
+
+                        if (!transcriptEntries.length && !showThinkingState) {
+                          return null;
                         }
-                        setHeroCwdOpen((current) => !current);
+
+                        return (
+                          <section className="dock-turn" key={turn.id}>
+                            <div className="dock-turn-head">
+                              <span>{getTurnStatusLabel(turn.status, t)}</span>
+                              <code>{turn.id.slice(0, 8)}</code>
+                            </div>
+                            <div className="dock-turn-items">
+                              {transcriptEntries.map((entry) => {
+                                if (entry.type === "processed") {
+                                  const isExpanded =
+                                    expandedProcessedEntries[entry.id] ??
+                                    (turn.status === "inProgress");
+
+                                  return (
+                                    <div
+                                      className="dock-turn-item is-processed"
+                                      key={entry.id}
+                                    >
+                                      <div className="dock-processed-block">
+                                        <button
+                                          aria-expanded={isExpanded}
+                                          aria-label={t("aria.toggleProcessedSteps")}
+                                          className={clsx(
+                                            "dock-processed-summary",
+                                            isExpanded && "is-expanded"
+                                          )}
+                                          onClick={() =>
+                                            setExpandedProcessedEntries((current) => ({
+                                              ...current,
+                                              [entry.id]: !isExpanded
+                                            }))
+                                          }
+                                          type="button"
+                                        >
+                                          <span className="dock-processed-line" />
+                                          <span className="dock-processed-label-group">
+                                            <span className="dock-processed-label">
+                                              {getProcessedEntryLabel(turn, t)}
+                                            </span>
+                                            <span
+                                              aria-hidden="true"
+                                              className="dock-processed-toggle"
+                                            >
+                                              <AppIcon
+                                                className="dock-processed-toggle-icon"
+                                                name="chevron"
+                                              />
+                                            </span>
+                                          </span>
+                                          <span className="dock-processed-line" />
+                                        </button>
+                                        {isExpanded ? (
+                                          <div className="dock-processed-items">
+                                            {entry.items.map((item) => (
+                                              <div
+                                                className={clsx(
+                                                  "dock-processed-item",
+                                                  item.type === "agentMessage" && "is-agent"
+                                                )}
+                                                key={item.id}
+                                              >
+                                                {props.renderThreadItem(item)}
+                                              </div>
+                                            ))}
+                                          </div>
+                                        ) : null}
+                                      </div>
+                                    </div>
+                                  );
+                                }
+
+                                const item = entry.item;
+
+                                return (
+                                  <div
+                                    className={clsx(
+                                      "dock-turn-item",
+                                      item.type === "userMessage" && "is-user",
+                                      item.type === "agentMessage" && "is-agent",
+                                      item.type === "reasoning" && "is-reasoning"
+                                    )}
+                                    key={item.id}
+                                  >
+                                    {props.renderThreadItem(item)}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            {showThinkingState ? (
+                              <div
+                                aria-live="polite"
+                                className="dock-thinking-status"
+                                role="status"
+                              >
+                                <span className="dock-thinking-label">{t("thinking.label")}</span>
+                                <span
+                                  aria-hidden="true"
+                                  className="dock-thinking-ellipsis"
+                                >
+                                  <span>.</span>
+                                  <span>.</span>
+                                  <span>.</span>
+                                </span>
+                              </div>
+                            ) : null}
+                          </section>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+                {showScrollToBottom ? (
+                  <div className="dock-stage-scroll-jump">
+                    <button
+                      aria-label={t("aria.jumpToBottom")}
+                      className="dock-scroll-bottom-button"
+                      onClick={() => {
+                        shouldAutoFollowRef.current = true;
+                        setShowScrollToBottom(false);
+                        stageScrollRef.current?.scrollTo({
+                          top: stageScrollRef.current.scrollHeight,
+                          behavior: "smooth"
+                        });
                       }}
                       type="button"
                     >
-                      <AppIcon className="dock-inline-icon" name="folder" />
-                      {t("actions.choosePath")}
+                      <AppIcon className="dock-scroll-bottom-icon" name="chevron" />
                     </button>
                   </div>
-                  <div
-                    aria-hidden={!heroCwdOpen}
-                    className={clsx(
-                      "dock-hero-cwd-shell",
-                      heroCwdOpen && "is-open"
-                    )}
-                  >
-                    <div className="dock-hero-cwd">
-                      <label
-                        className="dock-hero-cwd-label"
-                        htmlFor="dock-hero-cwd-input"
-                      >
-                        {t("request.workingDirectory")}
-                      </label>
-                      <input
-                        aria-hidden={!heroCwdOpen}
-                        className="dock-sidebar-input dock-hero-input"
-                        disabled={!heroCwdOpen}
-                        id="dock-hero-cwd-input"
-                        onChange={(event) => setHeroCwdDraft(event.target.value)}
-                        onKeyDown={handleHeroCwdKeyDown}
-                        placeholder={t("request.workingDirectory")}
-                        ref={heroCwdInputRef}
-                        tabIndex={heroCwdOpen ? 0 : -1}
-                        value={heroCwdDraft}
-                      />
-                      <div className="dock-hero-cwd-actions">
-                        <button
-                          className="dock-request-action is-primary"
-                          disabled={!heroCwdDraft.trim()}
-                          onClick={handleHeroCwdSubmit}
-                          tabIndex={heroCwdOpen ? 0 : -1}
-                          type="button"
-                        >
-                          {t("actions.usePath")}
-                        </button>
-                        <button
-                          className="dock-ghost-action is-muted"
-                          onClick={() => setHeroCwdOpen(false)}
-                          tabIndex={heroCwdOpen ? 0 : -1}
-                          type="button"
-                        >
-                          {t("actions.cancel")}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
+                ) : null}
+              </section>
 
-              {props.selectedThread ? (
-                <div className="dock-transcript">
-                  {props.selectedThread.turns.map((turn) => {
-                    const transcriptEntries = getTranscriptEntries(turn);
-                    const showThinkingState = shouldShowThinkingState(turn);
-
-                    if (!transcriptEntries.length && !showThinkingState) {
-                      return null;
-                    }
-
-                    return (
-                      <section className="dock-turn" key={turn.id}>
-                        <div className="dock-turn-head">
-                          <span>{getTurnStatusLabel(turn.status, t)}</span>
-                          <code>{turn.id.slice(0, 8)}</code>
-                        </div>
-                        <div className="dock-turn-items">
-                          {transcriptEntries.map((entry) => {
-                            if (entry.type === "processed") {
-                              const isExpanded =
-                                expandedProcessedEntries[entry.id] ??
-                                (turn.status === "inProgress");
-
-                              return (
-                                <div
-                                  className="dock-turn-item is-processed"
-                                  key={entry.id}
-                                >
-                                  <div className="dock-processed-block">
-                                    <button
-                                      aria-expanded={isExpanded}
-                                      aria-label={t("aria.toggleProcessedSteps")}
-                                      className={clsx(
-                                        "dock-processed-summary",
-                                        isExpanded && "is-expanded"
-                                      )}
-                                      onClick={() =>
-                                        setExpandedProcessedEntries((current) => ({
-                                          ...current,
-                                          [entry.id]: !isExpanded
-                                        }))
-                                      }
-                                      type="button"
-                                    >
-                                      <span className="dock-processed-line" />
-                                      <span className="dock-processed-label-group">
-                                        <span className="dock-processed-label">
-                                          {getProcessedEntryLabel(turn, t)}
-                                        </span>
-                                        <span
-                                          aria-hidden="true"
-                                          className="dock-processed-toggle"
-                                        >
-                                          <AppIcon
-                                            className="dock-processed-toggle-icon"
-                                            name="chevron"
-                                          />
-                                        </span>
-                                      </span>
-                                      <span className="dock-processed-line" />
-                                    </button>
-                                    {isExpanded ? (
-                                      <div className="dock-processed-items">
-                                        {entry.items.map((item) => (
-                                          <div
-                                            className={clsx(
-                                              "dock-processed-item",
-                                              item.type === "agentMessage" && "is-agent"
-                                            )}
-                                            key={item.id}
-                                          >
-                                            {props.renderThreadItem(item)}
-                                          </div>
-                                        ))}
-                                      </div>
-                                    ) : null}
-                                  </div>
-                                </div>
-                              );
-                            }
-
-                            const item = entry.item;
-
-                            return (
-                              <div
-                                className={clsx(
-                                  "dock-turn-item",
-                                  item.type === "userMessage" && "is-user",
-                                  item.type === "agentMessage" && "is-agent",
-                                  item.type === "reasoning" && "is-reasoning"
-                                )}
-                                key={item.id}
-                              >
-                                {props.renderThreadItem(item)}
-                              </div>
-                            );
-                          })}
-                        </div>
-                        {showThinkingState ? (
-                          <div
-                            aria-live="polite"
-                            className="dock-thinking-status"
-                            role="status"
-                          >
-                            <span className="dock-thinking-label">{t("thinking.label")}</span>
-                            <span
-                              aria-hidden="true"
-                              className="dock-thinking-ellipsis"
-                            >
-                              <span>.</span>
-                              <span>.</span>
-                              <span>.</span>
-                            </span>
-                          </div>
-                        ) : null}
-                      </section>
-                    );
-                  })}
-                </div>
-              ) : null}
-            </div>
-            {showScrollToBottom ? (
-              <div className="dock-stage-scroll-jump">
-                <button
-                  aria-label={t("aria.jumpToBottom")}
-                  className="dock-scroll-bottom-button"
-                  onClick={() => {
-                    shouldAutoFollowRef.current = true;
-                    setShowScrollToBottom(false);
-                    stageScrollRef.current?.scrollTo({
-                      top: stageScrollRef.current.scrollHeight,
-                      behavior: "smooth"
-                    });
-                  }}
-                  type="button"
-                >
-                  <AppIcon className="dock-scroll-bottom-icon" name="chevron" />
-                </button>
-              </div>
-            ) : null}
-          </section>
-
-          <section className="dock-bottom-dock">
-            <div className="dock-bottom-center">
-              <div className="dock-composer-shell">
+              <section className="dock-bottom-dock">
+                <div className="dock-bottom-center">
+                  <div className="dock-composer-shell">
                 {hasBottomPanels ? (
                   <div className="dock-bottom-panels">
                     {props.connectionNotice ? (
@@ -1522,6 +1613,7 @@ export function DockShellView(props: DockShellViewProps) {
                     onKeyDown={handleComposerKeyDown}
                     onPaste={handleComposerPaste}
                     placeholder={t("composer.placeholder")}
+                    ref={composerInputRef}
                     rows={2}
                     value={props.prompt}
                   />
@@ -1585,39 +1677,57 @@ export function DockShellView(props: DockShellViewProps) {
                     </div>
                   </div>
                 </div>
-              </div>
+                  </div>
 
-              <div className="dock-status-footer">
-                <div className="dock-status-group">
-                  <DockSelect
-                    ariaLabel={t("aria.permissionPreset")}
-                    className={clsx(
-                      "dock-status-select-shell",
-                      props.composerPermissionPreset === "danger-full-access" &&
-                        "is-danger"
-                    )}
-                    onChange={(value) =>
-                      props.onComposerPermissionPresetChange(
-                        value as DockPermissionPreset
-                      )
-                    }
-                    options={permissionPresetOptions}
-                    placement="top"
-                    prefix={<AppIcon className="dock-inline-icon" name="security" />}
-                    value={props.composerPermissionPreset}
-                  />
+                  <div className="dock-status-footer">
+                    <div className="dock-status-group">
+                      <DockSelect
+                        ariaLabel={t("aria.permissionPreset")}
+                        className={clsx(
+                          "dock-status-select-shell",
+                          props.composerPermissionPreset === "danger-full-access" &&
+                            "is-danger"
+                        )}
+                        onChange={(value) =>
+                          props.onComposerPermissionPresetChange(
+                            value as DockPermissionPreset
+                          )
+                        }
+                        options={permissionPresetOptions}
+                        placement="top"
+                        prefix={<AppIcon className="dock-inline-icon" name="security" />}
+                        value={props.composerPermissionPreset}
+                      />
+                    </div>
+                    <div className="dock-status-group">
+                      <span className="dock-status-pill dock-tailnet-pill">
+                        {props.status?.tailscale.tailnetUrl ||
+                          props.status?.tailscale.ips[0] ||
+                          props.status?.tailscale.dnsName ||
+                          t("status.tailnet")}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div className="dock-status-group">
-                  <span className="dock-status-pill dock-tailnet-pill">
-                    {props.status?.tailscale.tailnetUrl ||
-                      props.status?.tailscale.ips[0] ||
-                      props.status?.tailscale.dnsName ||
-                      t("status.tailnet")}
-                  </span>
-                </div>
-              </div>
+              </section>
             </div>
-          </section>
+
+            {terminalOverlayVisible ? (
+              <div
+                aria-hidden={!terminalModeActive}
+                className={clsx(
+                  "dock-stage-terminal-layer",
+                  terminalOverlayExiting && "is-exiting"
+                )}
+              >
+                <DockTerminalPane
+                  apiBasePath={props.apiBasePath}
+                  className={clsx(terminalOverlayExiting && "is-exiting")}
+                  cwd={terminalOverlayCwd}
+                />
+              </div>
+            ) : null}
+          </div>
         </main>
       </div>
       {mounted && archiveTooltip

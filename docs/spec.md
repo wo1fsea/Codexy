@@ -16,6 +16,7 @@ Codexy is a Tailscale-first web control plane for Codex on a host machine. The o
 - approving command execution and file changes from the web UI
 - surfacing `request_user_input` prompts
 - warning when the web client is about to take over a thread that may already be active elsewhere
+- opening a host terminal for the selected thread workspace without leaving the current stage
 - opening a linked node workspace from cloud mode without requiring the node to expose a directly reachable browser address
 - authenticating self-hosted cloud dashboard access and node linking with a single Google Authenticator-compatible 6-digit code model
 
@@ -93,6 +94,11 @@ codexy/
 │  │  │  ├─ models/route.ts
 │  │  │  ├─ requests/[requestId]/route.ts
 │  │  │  ├─ status/route.ts
+│  │  │  ├─ terminal/sessions/route.ts
+│  │  │  ├─ terminal/sessions/[sessionId]/route.ts
+│  │  │  ├─ terminal/sessions/[sessionId]/events/route.ts
+│  │  │  ├─ terminal/sessions/[sessionId]/input/route.ts
+│  │  │  ├─ terminal/sessions/[sessionId]/interrupt/route.ts
 │  │  │  ├─ threads/route.ts
 │  │  │  ├─ threads/[threadId]/route.ts
 │  │  │  ├─ threads/[threadId]/interrupt/route.ts
@@ -176,6 +182,14 @@ codexy/
 4. Server maps the selected permission preset onto the underlying approval-policy and sandbox settings for the resumed thread / new turn so continued threads honor the current web control settings.
 5. Server calls `turn/start`.
 6. UI renders `item/started`, delta notifications, approval requests, then `item/completed` and `turn/completed`.
+
+### Stage Terminal
+
+1. User opens a thread and toggles terminal mode from the stage header.
+2. Browser creates a host terminal session through `/api/terminal/sessions`.
+3. Browser switches the stage body from transcript/composer mode to the embedded terminal surface with a directional slide-in that stays inside the same stage plane.
+4. Browser streams terminal events from `/api/terminal/sessions/{sessionId}/events` and posts command input back through the terminal session routes.
+5. Leaving terminal mode runs a matching slide-out transition before closing that host terminal session and restoring the normal thread stage.
 
 ### Archived Thread
 

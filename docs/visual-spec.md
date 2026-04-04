@@ -132,6 +132,7 @@ The product should not rely on only `primary / muted / soft`. It needs a stable 
   - bottom dock
 - Only the transcript region scrolls.
 - The bottom dock remains visually pinned to the bottom edge of the stage.
+- When stage terminal mode is active for a selected thread, the transcript scroll area and bottom dock are replaced by one full-height terminal surface below the same stage header.
 
 ### Width Alignment
 
@@ -194,6 +195,8 @@ The product should not rely on only `primary / muted / soft`. It needs a stable 
 - Subtitle size: `12px`
 - Toolbar actions use `28px to 32px` hit areas
 - Thread archive and unarchive actions are not owned by the stage header.
+- Selected-thread header chrome may expose one inline terminal toggle. Its active state must stay inside the same icon-button language as rename and refresh.
+- Toggling terminal mode should feel like a stage-surface swap, not a route change. Entering terminal slides the terminal surface in; leaving terminal slides it back out before it disappears.
 - On phone widths, collapse stage subtitle before wrapping the header into multiple tall rows.
 
 ### Transcript
@@ -207,6 +210,8 @@ The product should not rely on only `primary / muted / soft`. It needs a stable 
 - Artifact/request card radius: `12px`
 - Long text uses `1.5` to `1.6` line height
 - Empty and loading states should stay compact. Avoid large hero cards or dashed placeholder boxes.
+- Embedded terminal mode should reuse the same width target as the transcript column, keep its own solid dark shell, and avoid introducing a second page frame inside the stage.
+- The terminal surface transition should stay directional and confined to the stage body. Do not hard-cut the surface on close unless motion is reduced by user preference.
 
 ### Composer
 

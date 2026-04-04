@@ -109,6 +109,11 @@ Required verification:
   - `git status --short`
 - Baseline changes: `npm run verify`
 - Frontend layout or interaction changes: `npm run verify:e2e`
+- New or changed user-facing functionality must also be exercised in a real browser:
+  - use a real browser session against the local app, not only mocked assertions or static code review
+  - confirm the changed behavior end to end in the browser
+  - save at least one artifact under `output/playwright/`
+  - record the browser verification in `output/tasks/<task-id>/`
 
 Completion gate:
 

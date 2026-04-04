@@ -138,6 +138,109 @@ test("pressing Enter in the composer sends the prompt", async ({ page }) => {
   await expect(page.locator(".dock-transcript")).toContainText(prompt);
 });
 
+test("stage terminal toggle swaps the thread surface in place", async ({ page }) => {
+  await installDockApiMock(page);
+
+  const prompt = `terminal toggle ${Date.now()}`;
+
+  await gotoDock(page);
+  await page.locator("textarea.dock-composer-input").fill(prompt);
+  await page.locator("button.dock-send-button").click();
+
+  await expect(page.locator(".dock-stage-title")).toContainText(prompt);
+  await expect(page.locator(".dock-composer-shell")).toBeVisible();
+
+  await page.getByRole("button", { name: "Show terminal" }).click();
+  await expect(page.locator(".dock-stage-terminal")).toBeVisible();
+  await expect(page.locator(".dock-stage-terminal")).toContainText("Host shell");
+  await expect(page.locator(".dock-composer-shell")).not.toBeVisible();
+  await expect(page.locator(".dock-transcript")).not.toBeVisible();
+
+  await page.getByRole("button", { name: "Show thread" }).click();
+  await expect(page.locator(".dock-composer-shell")).toBeVisible();
+  await expect(page.locator(".dock-transcript")).toBeVisible();
+  await expect(page.locator(".dock-stage-terminal")).toHaveCount(0);
+});
+
+test("terminal line editing keeps arrow keys out of submitted input", async ({
+  page
+}) => {
+  await installDockApiMock(page);
+
+  const prompt = `terminal arrows ${Date.now()}`;
+
+  await gotoDock(page);
+  await page.locator("textarea.dock-composer-input").fill(prompt);
+  await page.locator("button.dock-send-button").click();
+
+  await page.getByRole("button", { name: "Show terminal" }).click();
+  await expect(page.locator(".dock-stage-terminal")).toBeVisible();
+
+  const firstTerminalInputRequest = page.waitForRequest((request) => {
+    const url = new URL(request.url());
+    return (
+      /\/api\/terminal\/sessions\/[^/]+\/input$/.test(url.pathname) &&
+      request.method() === "POST"
+    );
+  });
+
+  await page.locator(".dock-stage-terminal-screen").click({
+    position: { x: 32, y: 32 }
+  });
+  await page.keyboard.type("echo ab");
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.type("X");
+  await page.keyboard.press("Enter");
+
+  const firstRequest = await firstTerminalInputRequest;
+  expect(firstRequest.postDataJSON()).toMatchObject({
+    data: "echo aXb"
+  });
+
+  const secondTerminalInputRequest = page.waitForRequest((request) => {
+    const url = new URL(request.url());
+    return (
+      /\/api\/terminal\/sessions\/[^/]+\/input$/.test(url.pathname) &&
+      request.method() === "POST" &&
+      request !== firstRequest
+    );
+  });
+
+  await page.keyboard.type("placeholder");
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("Enter");
+
+  const secondRequest = await secondTerminalInputRequest;
+  expect(secondRequest.postDataJSON()).toMatchObject({
+    data: "echo aXb"
+  });
+});
+
+test("terminal remains mounted briefly while exit animation plays", async ({
+  page
+}) => {
+  await installDockApiMock(page);
+
+  const prompt = `terminal exit animation ${Date.now()}`;
+
+  await gotoDock(page);
+  await page.locator("textarea.dock-composer-input").fill(prompt);
+  await page.locator("button.dock-send-button").click();
+
+  await page.getByRole("button", { name: "Show terminal" }).click();
+  const terminal = page.locator(".dock-stage-terminal");
+  await expect(terminal).toBeVisible();
+
+  await page.getByRole("button", { name: "Show thread" }).click();
+  await expect(terminal).toBeVisible();
+  await expect(terminal).toHaveClass(/is-exiting/);
+
+  await page.waitForTimeout(320);
+  await expect(terminal).toHaveCount(0);
+  await expect(page.locator(".dock-composer-shell")).toBeVisible();
+  await expect(page.locator(".dock-transcript")).toBeVisible();
+});
+
 test("pressing Alt+Enter in the composer inserts a newline without sending", async ({
   page
 }) => {
