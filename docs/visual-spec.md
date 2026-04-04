@@ -110,6 +110,7 @@ The product should not rely on only `primary / muted / soft`. It needs a stable 
 
 - App uses full viewport height.
 - `html`, `body`, and the root shell must not vertically scroll.
+- Installed iOS launches must use standalone web app metadata and keep the status bar visually aligned with the stage surface.
 - Desktop shell uses two columns:
   - left column: resizable sidebar, default `296px`, min `248px`, max `480px`
   - right column: stage

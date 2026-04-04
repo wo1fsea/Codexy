@@ -2,11 +2,11 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 
 import "@/app/globals.css";
+import { APP_THEME_COLOR, getAppMetadata } from "@/lib/web-app";
 
-export const metadata: Metadata = {
-  title: "Codexy",
-  description: "Tailscale-first remote control plane for Codex."
-};
+export function generateMetadata(): Metadata {
+  return getAppMetadata();
+}
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -14,7 +14,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   viewportFit: "cover",
   colorScheme: "dark",
-  themeColor: "#141416"
+  themeColor: APP_THEME_COLOR
 };
 
 export default function RootLayout({

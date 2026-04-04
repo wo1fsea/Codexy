@@ -22,6 +22,8 @@ Codexy is a Tailscale-first web control plane for Codex on a host machine. The o
 
 The canonical UI contract lives in [visual-spec.md](./visual-spec.md). Product and engineering changes that affect presentation must follow that document.
 
+- Both node and cloud runtimes must expose installable standalone web app metadata so phones can launch Codexy without Safari browser chrome after adding it to the home screen.
+
 ## Non-Goals For The First Slice
 
 - multi-user access control

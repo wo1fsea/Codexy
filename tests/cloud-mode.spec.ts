@@ -11,6 +11,10 @@ const repoRoot = process.cwd();
 const cliScript = path.join(repoRoot, "scripts", "codexy.mjs");
 const BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 
+test.describe.configure({
+  timeout: 180_000
+});
+
 function runNodeCli(
   args: string[],
   homeDir: string,
@@ -618,6 +622,76 @@ test("cloud mode can open a linked node workspace through the proxy", async ({ p
     runNodeCli(["stop"], nodeHome, 20_000);
     runNodeCli(["cloud", "stop"], cloudHome, 20_000);
     rmSync(nodeHome, { recursive: true, force: true });
+    rmSync(cloudHome, { recursive: true, force: true });
+  }
+});
+
+test("cloud runtime exposes standalone web app metadata", async ({ page }) => {
+  const cloudHome = makeTempDir("codexy-cloud-pwa-home-");
+  const cloudPort = await getFreePort();
+  const runtimeSuffix = Date.now().toString();
+
+  try {
+    const startResult = runNodeCli(
+      ["cloud", "start", "--port", String(cloudPort)],
+      cloudHome,
+      180_000,
+      {
+        NEXT_DIST_DIR: `.next-runtime-cloud-playwright-${runtimeSuffix}`
+      }
+    );
+
+    expect(
+      startResult.status,
+      `${startResult.stdout}\n${startResult.stderr}`
+    ).toBe(0);
+
+    const cloudUrl = `http://127.0.0.1:${cloudPort}`;
+    const manifestResponse = await page.request.get(
+      `${cloudUrl}/manifest.webmanifest`
+    );
+    expect(manifestResponse.ok()).toBeTruthy();
+
+    const manifest = (await manifestResponse.json()) as {
+      display?: string;
+      name?: string;
+      shortcuts?: Array<{ url: string }>;
+    };
+
+    expect(manifest.display).toBe("standalone");
+    expect(manifest.name).toBe("Codexy Cloud");
+    expect(
+      manifest.shortcuts?.some((shortcut) => shortcut.url === "/wall")
+    ).toBeTruthy();
+
+    await page.goto(`${cloudUrl}/auth/setup`, {
+      waitUntil: "domcontentloaded"
+    });
+
+    const head = await page.evaluate(() => ({
+      manifestHref:
+        document.querySelector('link[rel="manifest"]')?.getAttribute("href") ??
+        null,
+      appleTouchIconHref:
+        document
+          .querySelector('link[rel="apple-touch-icon"]')
+          ?.getAttribute("href") ?? null,
+      appleCapable:
+        document
+          .querySelector('meta[name="apple-mobile-web-app-capable"]')
+          ?.getAttribute("content") ?? null,
+      appleTitle:
+        document
+          .querySelector('meta[name="apple-mobile-web-app-title"]')
+          ?.getAttribute("content") ?? null
+    }));
+
+    expect(head.manifestHref).toContain("/manifest.webmanifest");
+    expect(head.appleTouchIconHref).toContain("/apple-icon");
+    expect(head.appleCapable).toBe("yes");
+    expect(head.appleTitle).toBe("Codexy Cloud");
+  } finally {
+    runNodeCli(["cloud", "stop"], cloudHome, 20_000);
     rmSync(cloudHome, { recursive: true, force: true });
   }
 });
