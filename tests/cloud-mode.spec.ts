@@ -507,6 +507,89 @@ test("cloud dashboard refreshes when a new node links in", async ({ page }) => {
   }
 });
 
+test("cloud dashboard keeps actions in compact upper-right positions", async ({ page }) => {
+  const cloudHome = makeTempDir("codexy-cloud-compact-actions-home-");
+  const nodeHome = makeTempDir("codexy-cloud-compact-actions-node-");
+  const cloudPort = await getFreePort();
+  const cloudUrl = `http://127.0.0.1:${cloudPort}`;
+  const runtimeSuffix = Date.now().toString();
+
+  try {
+    await page.setViewportSize({
+      width: 1400,
+      height: 900
+    });
+
+    const cloudStart = runNodeCli(
+      ["cloud", "start", "--port", String(cloudPort)],
+      cloudHome,
+      180_000,
+      {
+        NEXT_DIST_DIR: `.next-runtime-cloud-playwright-${runtimeSuffix}`
+      }
+    );
+    expect(cloudStart.status, cloudStart.stdout + cloudStart.stderr).toBe(0);
+
+    await bindCloudAuthenticator(page, cloudUrl, cloudHome);
+
+    const linkResult = runNodeCli(
+      ["link", cloudUrl, "--code", generateTotpCode(readCloudAuthSecret(cloudHome))],
+      nodeHome
+    );
+    expect(linkResult.status, linkResult.stdout + linkResult.stderr).toBe(0);
+
+    const firstNodeCard = page.locator(".cloud-node-card").first();
+    await expect(firstNodeCard.getByRole("link", { name: "Open", exact: true })).toBeVisible({
+      timeout: 15_000
+    });
+
+    const overviewCardBox = await page.locator(".cloud-overview-card").boundingBox();
+    const logoutButtonBox = await page.getByRole("button", { name: "Log out" }).boundingBox();
+    const panelHeadBox = await page.locator(".cloud-panel-head").boundingBox();
+    const openWallBox = await page.getByRole("link", { name: "Open wall" }).boundingBox();
+    const nodeCardBox = await firstNodeCard.boundingBox();
+    const nodeStatusBox = await firstNodeCard.locator(".cloud-node-status").boundingBox();
+    const nodeOpenBox = await firstNodeCard.getByRole("link", { name: "Open", exact: true }).boundingBox();
+
+    expect(overviewCardBox).not.toBeNull();
+    expect(logoutButtonBox).not.toBeNull();
+    expect(panelHeadBox).not.toBeNull();
+    expect(openWallBox).not.toBeNull();
+    expect(nodeCardBox).not.toBeNull();
+    expect(nodeStatusBox).not.toBeNull();
+    expect(nodeOpenBox).not.toBeNull();
+
+    expect((logoutButtonBox?.x ?? 0) + (logoutButtonBox?.width ?? 0) / 2).toBeGreaterThan(
+      (overviewCardBox?.x ?? 0) + (overviewCardBox?.width ?? 0) * 0.78
+    );
+    expect((logoutButtonBox?.y ?? 0) + (logoutButtonBox?.height ?? 0) / 2).toBeLessThan(
+      (overviewCardBox?.y ?? 0) + (overviewCardBox?.height ?? 0) * 0.32
+    );
+
+    expect((openWallBox?.x ?? 0) + (openWallBox?.width ?? 0) / 2).toBeGreaterThan(
+      (panelHeadBox?.x ?? 0) + (panelHeadBox?.width ?? 0) * 0.8
+    );
+    expect((openWallBox?.y ?? 0) + (openWallBox?.height ?? 0) / 2).toBeLessThan(
+      (panelHeadBox?.y ?? 0) + (panelHeadBox?.height ?? 0) * 0.42
+    );
+
+    expect((nodeOpenBox?.x ?? 0) + (nodeOpenBox?.width ?? 0) / 2).toBeGreaterThan(
+      (nodeCardBox?.x ?? 0) + (nodeCardBox?.width ?? 0) * 0.82
+    );
+    expect((nodeOpenBox?.y ?? 0) + (nodeOpenBox?.height ?? 0) / 2).toBeLessThan(
+      (nodeCardBox?.y ?? 0) + (nodeCardBox?.height ?? 0) * 0.3
+    );
+    expect((nodeStatusBox?.y ?? 0) + (nodeStatusBox?.height ?? 0) / 2).toBeLessThan(
+      (nodeOpenBox?.y ?? 0) + (nodeOpenBox?.height ?? 0) / 2
+    );
+  } finally {
+    runNodeCli(["unlink"], nodeHome, 20_000);
+    runNodeCli(["cloud", "stop"], cloudHome, 20_000);
+    rmSync(nodeHome, { recursive: true, force: true });
+    rmSync(cloudHome, { recursive: true, force: true });
+  }
+});
+
 test("cloud dashboard copy button copies the link command", async ({ page }) => {
   const cloudHome = makeTempDir("codexy-cloud-copy-home-");
   const cloudPort = await getFreePort();

@@ -555,12 +555,18 @@ pre {
 }
 
 .cloud-overview-card {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: flex-start;
-  gap: 8px;
+  display: grid;
+  align-content: start;
+  gap: 10px;
   min-height: 100%;
+}
+
+.cloud-overview-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  width: 100%;
 }
 
 .cloud-overview-label,
@@ -585,16 +591,8 @@ pre {
   margin: 0;
 }
 
-.cloud-overview-actions {
-  display: flex;
-  width: 100%;
-  margin-top: auto;
-  justify-content: flex-end;
-  padding-top: 18px;
-}
-
 .cloud-overview-logout-shell {
-  align-self: flex-end;
+  justify-self: end;
 }
 
 .cloud-overview-logout-button {
@@ -621,10 +619,13 @@ pre {
   margin-bottom: 16px;
 }
 
+.cloud-panel-head-copy {
+  min-width: 0;
+}
+
 .cloud-panel-head-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
+  display: grid;
+  justify-items: end;
   gap: 10px;
   min-width: 0;
 }
@@ -678,15 +679,30 @@ pre {
 }
 
 .cloud-node-card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
   gap: 12px;
+}
+
+.cloud-node-card-copy {
+  min-width: 0;
 }
 
 .cloud-node-card-head strong {
   color: var(--text-strong);
   font-size: 17px;
+}
+
+.cloud-node-card-copy p {
+  margin: 6px 0 0;
+}
+
+.cloud-node-card-controls {
+  display: grid;
+  justify-items: end;
+  align-content: start;
+  gap: 10px;
 }
 
 .cloud-node-status {
@@ -706,11 +722,6 @@ pre {
   border-color: rgba(var(--c-warning), 0.18);
   background: rgba(var(--c-warning), 0.08);
   color: #f0c8a8;
-}
-
-.cloud-node-actions {
-  display: flex;
-  justify-content: flex-end;
 }
 
 .cloud-node-open {
@@ -4216,12 +4227,22 @@ pre {
   }
 
   .cloud-panel-head-actions {
-    justify-content: flex-start;
-    flex-wrap: wrap;
+    justify-items: start;
   }
 
   .cloud-node-grid {
     grid-template-columns: 1fr;
+  }
+
+  .cloud-node-card-head {
+    grid-template-columns: 1fr;
+  }
+
+  .cloud-node-card-controls {
+    grid-auto-flow: column;
+    justify-content: space-between;
+    justify-items: start;
+    align-items: center;
   }
 
   .cloud-remote-header {

@@ -152,12 +152,8 @@ export function CloudAppClient({
         </div>
 
         <div className="cloud-overview-card">
-          <span className="cloud-overview-label">Deployment</span>
-          <strong>{initialDeploymentName}</strong>
-          <span className="cloud-overview-count">
-            {nodes.length} linked node{nodes.length === 1 ? "" : "s"}
-          </span>
-          <div className="cloud-overview-actions">
+          <div className="cloud-overview-head">
+            <span className="cloud-overview-label">Deployment</span>
             <CloudLogoutAction
               buttonClassName="cloud-overview-logout-button"
               popoverClassName="is-upward"
@@ -165,12 +161,16 @@ export function CloudAppClient({
               shellClassName="cloud-overview-logout-shell"
             />
           </div>
+          <strong>{initialDeploymentName}</strong>
+          <span className="cloud-overview-count">
+            {nodes.length} linked node{nodes.length === 1 ? "" : "s"}
+          </span>
         </div>
       </section>
 
       <section className="cloud-panel">
         <div className="cloud-panel-head">
-          <div>
+          <div className="cloud-panel-head-copy">
             <span className="cloud-eyebrow">Node directory</span>
             <h2>Linked nodes</h2>
           </div>
@@ -187,14 +187,24 @@ export function CloudAppClient({
             {nodes.map((node) => (
               <article className="cloud-node-card" key={node.nodeId}>
                 <div className="cloud-node-card-head">
-                  <strong>{node.displayName}</strong>
-                  <span
-                    className={`cloud-node-status${node.status === "offline" ? " is-offline" : ""}`}
-                  >
-                    {node.status}
-                  </span>
+                  <div className="cloud-node-card-copy">
+                    <strong>{node.displayName}</strong>
+                    <p>{node.cloudUrl}</p>
+                  </div>
+                  <div className="cloud-node-card-controls">
+                    <span
+                      className={`cloud-node-status${node.status === "offline" ? " is-offline" : ""}`}
+                    >
+                      {node.status}
+                    </span>
+                    <Link
+                      className="cloud-node-open"
+                      href={`/nodes/${encodeURIComponent(node.nodeId)}`}
+                    >
+                      Open
+                    </Link>
+                  </div>
                 </div>
-                <p>{node.cloudUrl}</p>
                 <dl className="cloud-node-meta">
                   <div>
                     <dt>Node ID</dt>
@@ -209,11 +219,6 @@ export function CloudAppClient({
                     <dd>{formatTimestamp(node.lastHeartbeatAt)}</dd>
                   </div>
                 </dl>
-                <div className="cloud-node-actions">
-                  <Link className="cloud-node-open" href={`/nodes/${encodeURIComponent(node.nodeId)}`}>
-                    Open
-                  </Link>
-                </div>
               </article>
             ))}
           </div>
