@@ -38,7 +38,15 @@
     ".next-runtime/types/**/*.ts",
     ".next-runtime/dev/types/**/*.ts",
     ".next-runtime-node/types/**/*.ts",
-    ".next-runtime-node/dev/types/**/*.ts"
+    ".next-runtime-node/dev/types/**/*.ts",
+    ".next-runtime-cloud/types/**/*.ts",
+    ".next-runtime-cloud/dev/types/**/*.ts",
+    ".next-runtime-node-playwright-*/types/**/*.ts",
+    ".next-runtime-node-playwright-*/dev/types/**/*.ts",
+    ".next-runtime-cloud-playwright-*/types/**/*.ts",
+    ".next-runtime-cloud-playwright-*/dev/types/**/*.ts",
+    ".next-runtime-playwright-*/types/**/*.ts",
+    ".next-runtime-playwright-*/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

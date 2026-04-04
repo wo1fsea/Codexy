@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { createHmac } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
@@ -10,10 +10,39 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 const repoRoot = process.cwd();
 const cliScript = path.join(repoRoot, "scripts", "codexy.mjs");
 const BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+const PLAYWRIGHT_RUNTIME_KEY = `${process.pid}`;
+const CLOUD_NEXT_DIST_DIR = `.next-runtime-cloud-playwright-${PLAYWRIGHT_RUNTIME_KEY}`;
+const NODE_NEXT_DIST_DIR = `.next-runtime-node-playwright-${PLAYWRIGHT_RUNTIME_KEY}`;
 
 test.describe.configure({
   timeout: 120_000
 });
+
+function cleanupStalePlaywrightRuntimeDirs() {
+  const keep = new Set([CLOUD_NEXT_DIST_DIR, NODE_NEXT_DIST_DIR]);
+
+  for (const entry of readdirSync(repoRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+
+    const name = entry.name;
+    const isPlaywrightRuntimeDir =
+      name.startsWith(".next-runtime-cloud-playwright-") ||
+      name.startsWith(".next-runtime-node-playwright-");
+
+    if (!isPlaywrightRuntimeDir || keep.has(name)) {
+      continue;
+    }
+
+    rmSync(path.join(repoRoot, name), {
+      recursive: true,
+      force: true
+    });
+  }
+}
+
+cleanupStalePlaywrightRuntimeDirs();
 
 function runNodeCli(
   args: string[],
@@ -286,7 +315,6 @@ async function getSessionCookieHeader(page: Page, cloudUrl: string) {
 test("cloud mode requires TOTP setup before showing the dashboard", async ({ page }) => {
   const cloudHome = makeTempDir("codexy-cloud-playwright-home-");
   const cloudPort = await getFreePort();
-  const runtimeSuffix = Date.now().toString();
 
   try {
     const startResult = runNodeCli(
@@ -294,7 +322,7 @@ test("cloud mode requires TOTP setup before showing the dashboard", async ({ pag
       cloudHome,
       180_000,
       {
-        NEXT_DIST_DIR: `.next-runtime-cloud-playwright-${runtimeSuffix}`
+        NEXT_DIST_DIR: CLOUD_NEXT_DIST_DIR
       }
     );
     expect(startResult.status, startResult.stdout + startResult.stderr).toBe(0);
@@ -326,7 +354,6 @@ test("cloud mode requires TOTP setup before showing the dashboard", async ({ pag
 test("cloud auth setup page scrolls on mobile viewports", async ({ page }) => {
   const cloudHome = makeTempDir("codexy-cloud-mobile-auth-home-");
   const cloudPort = await getFreePort();
-  const runtimeSuffix = Date.now().toString();
 
   try {
     await page.setViewportSize({
@@ -339,7 +366,7 @@ test("cloud auth setup page scrolls on mobile viewports", async ({ page }) => {
       cloudHome,
       180_000,
       {
-        NEXT_DIST_DIR: `.next-runtime-cloud-playwright-${runtimeSuffix}`
+        NEXT_DIST_DIR: CLOUD_NEXT_DIST_DIR
       }
     );
     expect(startResult.status, startResult.stdout + startResult.stderr).toBe(0);
@@ -392,7 +419,6 @@ test("cloud auth setup page scrolls on mobile viewports", async ({ page }) => {
 test("cloud dashboard scrolls on mobile viewports", async ({ page }) => {
   const cloudHome = makeTempDir("codexy-cloud-mobile-dashboard-home-");
   const cloudPort = await getFreePort();
-  const runtimeSuffix = Date.now().toString();
 
   try {
     await page.setViewportSize({
@@ -405,7 +431,7 @@ test("cloud dashboard scrolls on mobile viewports", async ({ page }) => {
       cloudHome,
       180_000,
       {
-        NEXT_DIST_DIR: `.next-runtime-cloud-playwright-${runtimeSuffix}`
+        NEXT_DIST_DIR: CLOUD_NEXT_DIST_DIR
       }
     );
     expect(startResult.status, startResult.stdout + startResult.stderr).toBe(0);
@@ -460,7 +486,6 @@ test("cloud dashboard refreshes when a new node links in", async ({ page }) => {
   const nodeHome = makeTempDir("codexy-cloud-refresh-node-");
   const cloudPort = await getFreePort();
   const cloudUrl = `http://127.0.0.1:${cloudPort}`;
-  const runtimeSuffix = Date.now().toString();
 
   try {
     await page.setViewportSize({
@@ -473,7 +498,7 @@ test("cloud dashboard refreshes when a new node links in", async ({ page }) => {
       cloudHome,
       180_000,
       {
-        NEXT_DIST_DIR: `.next-runtime-cloud-playwright-${runtimeSuffix}`
+        NEXT_DIST_DIR: CLOUD_NEXT_DIST_DIR
       }
     );
     expect(cloudStart.status, cloudStart.stdout + cloudStart.stderr).toBe(0);
@@ -510,7 +535,6 @@ test("cloud dashboard refreshes when a new node links in", async ({ page }) => {
 test("cloud dashboard copy button copies the link command", async ({ page }) => {
   const cloudHome = makeTempDir("codexy-cloud-copy-home-");
   const cloudPort = await getFreePort();
-  const runtimeSuffix = Date.now().toString();
 
   try {
     await page.addInitScript(() => {
@@ -537,7 +561,7 @@ test("cloud dashboard copy button copies the link command", async ({ page }) => 
       cloudHome,
       180_000,
       {
-        NEXT_DIST_DIR: `.next-runtime-cloud-playwright-${runtimeSuffix}`
+        NEXT_DIST_DIR: CLOUD_NEXT_DIST_DIR
       }
     );
     expect(cloudStart.status, cloudStart.stdout + cloudStart.stderr).toBe(0);
@@ -567,7 +591,6 @@ test("cloud mode can open a linked node workspace through the proxy", async ({ p
   const cloudPort = await getFreePort();
   const nodePort = await getFreePort();
   const cloudUrl = `http://127.0.0.1:${cloudPort}`;
-  const runtimeSuffix = Date.now().toString();
 
   try {
     const cloudStart = runNodeCli(
@@ -575,7 +598,7 @@ test("cloud mode can open a linked node workspace through the proxy", async ({ p
       cloudHome,
       180_000,
       {
-        NEXT_DIST_DIR: `.next-runtime-cloud-playwright-${runtimeSuffix}`
+        NEXT_DIST_DIR: CLOUD_NEXT_DIST_DIR
       }
     );
     expect(cloudStart.status, cloudStart.stdout + cloudStart.stderr).toBe(0);
@@ -593,7 +616,7 @@ test("cloud mode can open a linked node workspace through the proxy", async ({ p
       nodeHome,
       180_000,
       {
-        NEXT_DIST_DIR: `.next-runtime-node-playwright-${runtimeSuffix}`
+        NEXT_DIST_DIR: NODE_NEXT_DIST_DIR
       }
     );
     expect(nodeStart.status, nodeStart.stdout + nodeStart.stderr).toBe(0);
@@ -634,7 +657,6 @@ test("cloud remote workspace keeps a single-line mobile header and fills the rem
   const cloudPort = await getFreePort();
   const nodePort = await getFreePort();
   const cloudUrl = `http://127.0.0.1:${cloudPort}`;
-  const runtimeSuffix = Date.now().toString();
 
   try {
     await page.setViewportSize({
@@ -647,7 +669,7 @@ test("cloud remote workspace keeps a single-line mobile header and fills the rem
       cloudHome,
       180_000,
       {
-        NEXT_DIST_DIR: `.next-runtime-cloud-playwright-${runtimeSuffix}`
+        NEXT_DIST_DIR: CLOUD_NEXT_DIST_DIR
       }
     );
     expect(cloudStart.status, cloudStart.stdout + cloudStart.stderr).toBe(0);
@@ -665,7 +687,7 @@ test("cloud remote workspace keeps a single-line mobile header and fills the rem
       nodeHome,
       180_000,
       {
-        NEXT_DIST_DIR: `.next-runtime-node-playwright-${runtimeSuffix}`
+        NEXT_DIST_DIR: NODE_NEXT_DIST_DIR
       }
     );
     expect(nodeStart.status, nodeStart.stdout + nodeStart.stderr).toBe(0);
@@ -755,7 +777,6 @@ test("cloud proxy events stream sends the initial connection event", async ({ pa
   const cloudPort = await getFreePort();
   const nodePort = await getFreePort();
   const cloudUrl = `http://127.0.0.1:${cloudPort}`;
-  const runtimeSuffix = Date.now().toString();
 
   try {
     const cloudStart = runNodeCli(
@@ -763,7 +784,7 @@ test("cloud proxy events stream sends the initial connection event", async ({ pa
       cloudHome,
       180_000,
       {
-        NEXT_DIST_DIR: `.next-runtime-cloud-playwright-${runtimeSuffix}`
+        NEXT_DIST_DIR: CLOUD_NEXT_DIST_DIR
       }
     );
     expect(cloudStart.status, cloudStart.stdout + cloudStart.stderr).toBe(0);
@@ -781,7 +802,7 @@ test("cloud proxy events stream sends the initial connection event", async ({ pa
       nodeHome,
       180_000,
       {
-        NEXT_DIST_DIR: `.next-runtime-node-playwright-${runtimeSuffix}`
+        NEXT_DIST_DIR: NODE_NEXT_DIST_DIR
       }
     );
     expect(nodeStart.status, nodeStart.stdout + nodeStart.stderr).toBe(0);
@@ -817,7 +838,6 @@ test("cloud proxy keeps buffered requests responsive while events stay open", as
   const cloudPort = await getFreePort();
   const nodePort = await getFreePort();
   const cloudUrl = `http://127.0.0.1:${cloudPort}`;
-  const runtimeSuffix = Date.now().toString();
 
   try {
     const cloudStart = runNodeCli(
@@ -825,7 +845,7 @@ test("cloud proxy keeps buffered requests responsive while events stay open", as
       cloudHome,
       180_000,
       {
-        NEXT_DIST_DIR: `.next-runtime-cloud-playwright-${runtimeSuffix}`
+        NEXT_DIST_DIR: CLOUD_NEXT_DIST_DIR
       }
     );
     expect(cloudStart.status, cloudStart.stdout + cloudStart.stderr).toBe(0);
@@ -843,7 +863,7 @@ test("cloud proxy keeps buffered requests responsive while events stay open", as
       nodeHome,
       180_000,
       {
-        NEXT_DIST_DIR: `.next-runtime-node-playwright-${runtimeSuffix}`
+        NEXT_DIST_DIR: NODE_NEXT_DIST_DIR
       }
     );
     expect(nodeStart.status, nodeStart.stdout + nodeStart.stderr).toBe(0);
@@ -896,7 +916,6 @@ test("cloud wall can show the same linked node in multiple panes", async ({ page
   const cloudPort = await getFreePort();
   const nodePort = await getFreePort();
   const cloudUrl = `http://127.0.0.1:${cloudPort}`;
-  const runtimeSuffix = Date.now().toString();
 
   try {
     const cloudStart = runNodeCli(
@@ -904,7 +923,7 @@ test("cloud wall can show the same linked node in multiple panes", async ({ page
       cloudHome,
       180_000,
       {
-        NEXT_DIST_DIR: `.next-runtime-cloud-playwright-${runtimeSuffix}`
+        NEXT_DIST_DIR: CLOUD_NEXT_DIST_DIR
       }
     );
     expect(cloudStart.status, cloudStart.stdout + cloudStart.stderr).toBe(0);
@@ -922,7 +941,7 @@ test("cloud wall can show the same linked node in multiple panes", async ({ page
       nodeHome,
       180_000,
       {
-        NEXT_DIST_DIR: `.next-runtime-node-playwright-${runtimeSuffix}`
+        NEXT_DIST_DIR: NODE_NEXT_DIST_DIR
       }
     );
     expect(nodeStart.status, nodeStart.stdout + nodeStart.stderr).toBe(0);

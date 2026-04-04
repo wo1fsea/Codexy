@@ -40,11 +40,16 @@ import {
   getCommandApprovalCwd,
   getCommandApprovalText,
   getDeclinePayload,
+  getFileApprovalReason,
+  getFileApprovalTargets,
   getSingleApprovePayload,
+  isCommandApprovalRequest,
   isCommandApprovalMethod,
+  isFileApprovalRequest,
   isFileApprovalMethod,
   isMcpElicitationRequest,
   isPermissionApprovalRequest,
+  type FileApprovalRequestEntry,
   type McpElicitationRequestEntry,
   type PermissionApprovalRequestEntry
 } from "@/lib/codex/server-requests";
@@ -1907,6 +1912,111 @@ function getRequestTitle(method: DockServerRequest["method"], t: TranslateFn) {
   return humanizeIdentifier(method);
 }
 
+function RequestApprovalActions({
+  isResolving,
+  onAllowOnce,
+  onAllowSession,
+  onDeny
+}: {
+  isResolving: boolean;
+  onAllowOnce: () => void;
+  onAllowSession: () => void;
+  onDeny: () => void;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <div className="dock-request-actions">
+      <button
+        className="dock-request-action is-primary"
+        disabled={isResolving}
+        onClick={onAllowOnce}
+        type="button"
+      >
+        {isResolving ? t("request.processing") : t("actions.allowOnce")}
+      </button>
+      <button
+        className="dock-request-action"
+        disabled={isResolving}
+        onClick={onAllowSession}
+        type="button"
+      >
+        {t("actions.allowForSession")}
+      </button>
+      <button
+        className="dock-request-action is-muted"
+        disabled={isResolving}
+        onClick={onDeny}
+        type="button"
+      >
+        {t("actions.deny")}
+      </button>
+    </div>
+  );
+}
+
+function CommandApprovalRequestView({
+  request,
+  fallbackCwd,
+  isResolving,
+  onResolve
+}: {
+  request: Extract<
+    DockServerRequest,
+    { method: "item/commandExecution/requestApproval" | "execCommandApproval" }
+  >;
+  fallbackCwd: string;
+  isResolving: boolean;
+  onResolve: (payload: Record<string, string>) => void;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <>
+      <div className="dock-request-command-shell">
+        <pre className="dock-request-command">
+          {getCommandApprovalText(request) ?? t("request.commandNeedsApproval")}
+        </pre>
+      </div>
+      <div className="dock-request-meta-row">
+        <code>{getCommandApprovalCwd(request, fallbackCwd)}</code>
+      </div>
+      <RequestApprovalActions
+        isResolving={isResolving}
+        onAllowOnce={() => onResolve(getSingleApprovePayload(request.method))}
+        onAllowSession={() => onResolve(getApprovePayload(request.method))}
+        onDeny={() => onResolve(getDeclinePayload(request.method))}
+      />
+    </>
+  );
+}
+
+function FileApprovalRequestView({
+  request,
+  isResolving,
+  onResolve
+}: {
+  request: FileApprovalRequestEntry;
+  isResolving: boolean;
+  onResolve: (payload: Record<string, string>) => void;
+}) {
+  const reason = getFileApprovalReason(request);
+  const targets = getFileApprovalTargets(request);
+
+  return (
+    <>
+      {reason ? <p className="dock-request-copy">{reason}</p> : null}
+      {targets.length ? <pre>{targets.join("\n")}</pre> : null}
+      <RequestApprovalActions
+        isResolving={isResolving}
+        onAllowOnce={() => onResolve(getSingleApprovePayload(request.method))}
+        onAllowSession={() => onResolve(getApprovePayload(request.method))}
+        onDeny={() => onResolve(getDeclinePayload(request.method))}
+      />
+    </>
+  );
+}
+
 function getGrantedPermissionsFromRequest(
   request: PermissionApprovalRequestEntry
 ) {
@@ -3359,161 +3469,21 @@ export function DockApp({
           </div>
         </div>
 
-        {request.method === "item/commandExecution/requestApproval" ? (
-          <>
-            <div className="dock-request-command-shell">
-              <pre className="dock-request-command">
-                {getCommandApprovalText(request) ?? t("request.commandNeedsApproval")}
-              </pre>
-            </div>
-            <div className="dock-request-meta-row">
-              <code>{getCommandApprovalCwd(request, selectedThread?.cwd || composerCwd)}</code>
-            </div>
-            <div className="dock-request-actions">
-                <button
-                  className="dock-request-action is-primary"
-                  disabled={isResolving}
-                  onClick={() =>
-                    void resolveRequest(request, getSingleApprovePayload(request.method))
-                  }
-                  type="button"
-                >
-                  {isResolving ? t("request.processing") : t("actions.allowOnce")}
-                </button>
-                <button
-                  className="dock-request-action"
-                  disabled={isResolving}
-                  onClick={() => void resolveRequest(request, getApprovePayload(request.method))}
-                  type="button"
-                >
-                  {t("actions.allowForSession")}
-                </button>
-                <button
-                  className="dock-request-action is-muted"
-                  disabled={isResolving}
-                  onClick={() => void resolveRequest(request, getDeclinePayload(request.method))}
-                  type="button"
-                >
-                  {t("actions.deny")}
-              </button>
-            </div>
-          </>
+        {isCommandApprovalRequest(request) ? (
+          <CommandApprovalRequestView
+            fallbackCwd={selectedThread?.cwd || composerCwd}
+            isResolving={isResolving}
+            onResolve={(payload) => void resolveRequest(request, payload)}
+            request={request}
+          />
         ) : null}
 
-        {request.method === "item/fileChange/requestApproval" ? (
-          <>
-            {(request.params as { reason?: string | null }).reason ? (
-              <p className="dock-request-copy">
-                {(request.params as { reason?: string | null }).reason}
-              </p>
-            ) : null}
-            <div className="dock-request-actions">
-                <button
-                  className="dock-request-action is-primary"
-                  disabled={isResolving}
-                  onClick={() =>
-                    void resolveRequest(request, getSingleApprovePayload(request.method))
-                  }
-                  type="button"
-                >
-                  {isResolving ? t("request.processing") : t("actions.allowOnce")}
-                </button>
-                <button
-                  className="dock-request-action"
-                  disabled={isResolving}
-                  onClick={() => void resolveRequest(request, getApprovePayload(request.method))}
-                  type="button"
-                >
-                  {t("actions.allowForSession")}
-                </button>
-                <button
-                  className="dock-request-action is-muted"
-                  disabled={isResolving}
-                  onClick={() => void resolveRequest(request, getDeclinePayload(request.method))}
-                  type="button"
-                >
-                  {t("actions.deny")}
-              </button>
-            </div>
-          </>
-        ) : null}
-
-        {request.method === "execCommandApproval" ? (
-          <>
-            <div className="dock-request-command-shell">
-              <pre className="dock-request-command">
-                {request.params.command.join(" ")}
-              </pre>
-            </div>
-            <div className="dock-request-meta-row">
-              <code>{request.params.cwd || selectedThread?.cwd || composerCwd}</code>
-            </div>
-            <div className="dock-request-actions">
-                <button
-                  className="dock-request-action is-primary"
-                  disabled={isResolving}
-                  onClick={() =>
-                    void resolveRequest(request, getSingleApprovePayload(request.method))
-                  }
-                  type="button"
-                >
-                  {isResolving ? t("request.processing") : t("actions.allowOnce")}
-                </button>
-                <button
-                  className="dock-request-action"
-                  disabled={isResolving}
-                  onClick={() => void resolveRequest(request, getApprovePayload(request.method))}
-                  type="button"
-                >
-                  {t("actions.allowForSession")}
-                </button>
-                <button
-                  className="dock-request-action is-muted"
-                  disabled={isResolving}
-                  onClick={() => void resolveRequest(request, getDeclinePayload(request.method))}
-                  type="button"
-                >
-                  {t("actions.deny")}
-              </button>
-            </div>
-          </>
-        ) : null}
-
-        {request.method === "applyPatchApproval" ? (
-          <>
-            {request.params.reason ? (
-              <p className="dock-request-copy">{request.params.reason}</p>
-            ) : null}
-            <pre>{Object.keys(request.params.fileChanges).join("\n")}</pre>
-            <div className="dock-request-actions">
-                <button
-                  className="dock-request-action is-primary"
-                  disabled={isResolving}
-                  onClick={() =>
-                    void resolveRequest(request, getSingleApprovePayload(request.method))
-                  }
-                  type="button"
-                >
-                  {isResolving ? t("request.processing") : t("actions.allowOnce")}
-                </button>
-                <button
-                  className="dock-request-action"
-                  disabled={isResolving}
-                  onClick={() => void resolveRequest(request, getApprovePayload(request.method))}
-                  type="button"
-                >
-                  {t("actions.allowForSession")}
-                </button>
-                <button
-                  className="dock-request-action is-muted"
-                  disabled={isResolving}
-                  onClick={() => void resolveRequest(request, getDeclinePayload(request.method))}
-                  type="button"
-                >
-                  {t("actions.deny")}
-              </button>
-            </div>
-          </>
+        {isFileApprovalRequest(request) ? (
+          <FileApprovalRequestView
+            isResolving={isResolving}
+            onResolve={(payload) => void resolveRequest(request, payload)}
+            request={request}
+          />
         ) : null}
 
         {request.method === "item/tool/requestUserInput" ? (

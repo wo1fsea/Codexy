@@ -5,6 +5,16 @@ export type PermissionApprovalRequestEntry = Extract<
   { method: "item/permissions/requestApproval" }
 >;
 
+export type CommandApprovalRequestEntry = Extract<
+  DockServerRequest,
+  { method: "item/commandExecution/requestApproval" | "execCommandApproval" }
+>;
+
+export type FileApprovalRequestEntry = Extract<
+  DockServerRequest,
+  { method: "item/fileChange/requestApproval" | "applyPatchApproval" }
+>;
+
 export type McpElicitationRequestEntry = Extract<
   DockServerRequest,
   { method: "mcpServer/elicitation/request" }
@@ -43,6 +53,18 @@ export function isFileApprovalMethod(
   method: DockServerRequest["method"]
 ): method is FileApprovalMethod {
   return FILE_APPROVAL_METHODS.has(method);
+}
+
+export function isCommandApprovalRequest(
+  request: DockServerRequest
+): request is CommandApprovalRequestEntry {
+  return isCommandApprovalMethod(request.method);
+}
+
+export function isFileApprovalRequest(
+  request: DockServerRequest
+): request is FileApprovalRequestEntry {
+  return isFileApprovalMethod(request.method);
 }
 
 export function getApprovePayload(method: DockServerRequest["method"]) {
@@ -94,6 +116,24 @@ export function getCommandApprovalCwd(
   }
 
   return fallbackCwd;
+}
+
+export function getFileApprovalReason(
+  request: FileApprovalRequestEntry
+): string | null {
+  if (request.method === "item/fileChange/requestApproval") {
+    return typeof request.params.reason === "string" ? request.params.reason : null;
+  }
+
+  return typeof request.params.reason === "string" ? request.params.reason : null;
+}
+
+export function getFileApprovalTargets(request: FileApprovalRequestEntry) {
+  if (request.method === "item/fileChange/requestApproval") {
+    return [];
+  }
+
+  return Object.keys(request.params.fileChanges);
 }
 
 export function isPermissionApprovalRequest(
