@@ -1,4 +1,5 @@
 import type { DockServerRequest } from "@/lib/codex/types";
+import type { TranslateFn } from "@/lib/i18n/messages";
 
 export type PermissionApprovalRequestEntry = Extract<
   DockServerRequest,
@@ -42,6 +43,81 @@ const FILE_APPROVAL_METHODS = new Set<DockServerRequest["method"]>([
   "item/fileChange/requestApproval",
   "applyPatchApproval"
 ]);
+
+export type ServerRequestFamily =
+  | "commandApproval"
+  | "fileApproval"
+  | "userInput"
+  | "permissionsApproval"
+  | "mcpElicitation"
+  | "generic";
+
+function humanizeRequestIdentifier(value: string) {
+  const withSpaces = value
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_./-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!withSpaces) {
+    return value;
+  }
+
+  return withSpaces.charAt(0).toUpperCase() + withSpaces.slice(1);
+}
+
+export function getServerRequestFamily(
+  method: DockServerRequest["method"]
+): ServerRequestFamily {
+  if (isCommandApprovalMethod(method)) {
+    return "commandApproval";
+  }
+
+  if (isFileApprovalMethod(method)) {
+    return "fileApproval";
+  }
+
+  if (method === "item/tool/requestUserInput") {
+    return "userInput";
+  }
+
+  if (method === "item/permissions/requestApproval") {
+    return "permissionsApproval";
+  }
+
+  if (method === "mcpServer/elicitation/request") {
+    return "mcpElicitation";
+  }
+
+  return "generic";
+}
+
+export function getServerRequestTitle(
+  method: DockServerRequest["method"],
+  t: TranslateFn
+) {
+  if (isCommandApprovalMethod(method)) {
+    return t("request.commandApproval");
+  }
+
+  if (isFileApprovalMethod(method)) {
+    return t("request.fileApproval");
+  }
+
+  if (method === "item/tool/requestUserInput") {
+    return t("request.userInput");
+  }
+
+  if (method === "item/permissions/requestApproval") {
+    return t("request.permissionsApproval");
+  }
+
+  if (method === "mcpServer/elicitation/request") {
+    return t("request.mcpElicitation");
+  }
+
+  return humanizeRequestIdentifier(method);
+}
 
 export function isCommandApprovalMethod(
   method: DockServerRequest["method"]

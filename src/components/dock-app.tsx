@@ -42,11 +42,10 @@ import {
   getDeclinePayload,
   getFileApprovalReason,
   getFileApprovalTargets,
+  getServerRequestTitle,
   getSingleApprovePayload,
   isCommandApprovalRequest,
-  isCommandApprovalMethod,
   isFileApprovalRequest,
-  isFileApprovalMethod,
   isMcpElicitationRequest,
   isPermissionApprovalRequest,
   type FileApprovalRequestEntry,
@@ -1888,30 +1887,6 @@ function ThreadItemView({
   return <ArtifactItemView item={item} />;
 }
 
-function getRequestTitle(method: DockServerRequest["method"], t: TranslateFn) {
-  if (isCommandApprovalMethod(method)) {
-    return t("request.commandApproval");
-  }
-
-  if (isFileApprovalMethod(method)) {
-    return t("request.fileApproval");
-  }
-
-  if (method === "item/tool/requestUserInput") {
-    return t("request.userInput");
-  }
-
-  if (method === "item/permissions/requestApproval") {
-    return t("request.permissionsApproval");
-  }
-
-  if (method === "mcpServer/elicitation/request") {
-    return t("request.mcpElicitation");
-  }
-
-  return humanizeIdentifier(method);
-}
-
 function RequestApprovalActions({
   isResolving,
   onAllowOnce,
@@ -3465,7 +3440,7 @@ export function DockApp({
       <div className="dock-request-card" key={request.requestId}>
         <div className="dock-request-head">
           <div className="dock-request-heading">
-            <strong>{getRequestTitle(request.method, t)}</strong>
+            <strong>{getServerRequestTitle(request.method, t)}</strong>
           </div>
         </div>
 
