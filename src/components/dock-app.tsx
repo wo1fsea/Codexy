@@ -35,6 +35,12 @@ import type {
   DockTurn,
   DockUserInput
 } from "@/lib/codex/types";
+import {
+  applyNotificationToThread,
+  mergeThreadPreservingRichTurns as mergeThreadFromNotification,
+  shouldRefreshThreadsForNotification,
+  shouldSyncSelectedThreadForNotification
+} from "@/lib/codex/thread-notifications";
 import { useI18n } from "@/lib/i18n/provider";
 import type { TranslateFn } from "@/lib/i18n/messages";
 import {
@@ -2480,7 +2486,7 @@ export function DockApp({
             return;
           }
           setSelectedThread((current) =>
-            mergeThreadPreservingRichTurns(current, data.thread)
+            mergeThreadFromNotification(current, data.thread)
           );
           setComposerCwd(data.thread.cwd);
           if (!suppressErrors) {
@@ -2605,14 +2611,7 @@ export function DockApp({
 
     if (event.type !== "notification") return;
 
-    if (
-      event.method === "thread/started" ||
-      event.method === "thread/name/updated" ||
-      event.method === "thread/status/changed" ||
-      event.method === "thread/archived" ||
-      event.method === "thread/unarchived" ||
-      event.method === "turn/completed"
-    ) {
+    if (shouldRefreshThreadsForNotification(event)) {
       void refreshThreads();
     }
 
@@ -2624,250 +2623,12 @@ export function DockApp({
     }
 
     if (event.method === "turn/started") {
-      const params = event.params as { turn: DockTurn };
       setTakeoverPromptOpen(false);
-      setSelectedThread((current) =>
-        current ? upsertTurn(current, params.turn) : current
-      );
-      return;
     }
 
-    if (event.method === "turn/plan/updated") {
-      const params = event.params as {
-        turnId: string;
-        explanation: string | null;
-        plan: Array<{ step: string; status: string }>;
-      };
-      setSelectedThread((current) =>
-        current
-          ? upsertTurnPlan(
-              current,
-              params.turnId,
-              params.explanation ?? null,
-              Array.isArray(params.plan) ? params.plan : []
-            )
-          : current
-      );
-      return;
-    }
+    setSelectedThread((current) => applyNotificationToThread(current, event));
 
-    if (event.method === "item/started" || event.method === "item/completed") {
-      const params = event.params as { item: DockThreadItem; turnId: string };
-      setSelectedThread((current) =>
-        current
-          ? replaceTurnItem(current, params.turnId, params.item)
-          : current
-      );
-      return;
-    }
-
-    if (event.method === "item/agentMessage/delta") {
-      const params = event.params as {
-        turnId: string;
-        itemId: string;
-        delta: string;
-      };
-      setSelectedThread((current) =>
-        current
-          ? updateItem(current, params.turnId, params.itemId, (item) => ({
-              type: "agentMessage",
-              id: params.itemId,
-              text:
-                item && item.type === "agentMessage"
-                  ? `${item.text}${params.delta}`
-                  : params.delta,
-              phase: item && item.type === "agentMessage" ? item.phase : null
-            }))
-          : current
-      );
-      return;
-    }
-
-    if (event.method === "item/plan/delta") {
-      const params = event.params as {
-        turnId: string;
-        itemId: string;
-        delta: string;
-      };
-      setSelectedThread((current) =>
-        current
-          ? updateItem(current, params.turnId, params.itemId, (item) => ({
-              type: "plan",
-              id: params.itemId,
-              text:
-                item && item.type === "plan"
-                  ? `${item.text}${params.delta}`
-                  : params.delta
-            }))
-          : current
-      );
-      return;
-    }
-
-    if (event.method === "item/reasoning/textDelta") {
-      const params = event.params as {
-        turnId: string;
-        itemId: string;
-        delta: string;
-      };
-      setSelectedThread((current) =>
-        current
-          ? updateItem(current, params.turnId, params.itemId, (item) => ({
-              type: "reasoning",
-              id: params.itemId,
-              summary:
-                item && item.type === "reasoning" ? item.summary : [],
-              content:
-                item && item.type === "reasoning"
-                  ? [...(item as Extract<DockThreadItem, { type: "reasoning" }>).content, params.delta]
-                  : [params.delta]
-            }))
-          : current
-      );
-      return;
-    }
-
-    if (event.method === "item/reasoning/summaryTextDelta") {
-      const params = event.params as {
-        turnId: string;
-        itemId: string;
-        delta: string;
-      };
-      setSelectedThread((current) =>
-        current
-          ? updateItem(current, params.turnId, params.itemId, (item) => {
-              const reasoningItem =
-                item && item.type === "reasoning"
-                  ? (item as Extract<DockThreadItem, { type: "reasoning" }>)
-                  : null;
-
-              return {
-                type: "reasoning",
-                id: params.itemId,
-                summary: reasoningItem
-                  ? [...reasoningItem.summary, params.delta]
-                  : [params.delta],
-                content: reasoningItem ? reasoningItem.content : []
-              };
-            })
-          : current
-      );
-      return;
-    }
-
-    if (event.method === "item/commandExecution/outputDelta") {
-      const params = event.params as {
-        turnId: string;
-        itemId: string;
-        delta: string;
-      };
-      setSelectedThread((current) =>
-        current
-          ? updateItem(current, params.turnId, params.itemId, (item) => ({
-              type: "commandExecution",
-              id: params.itemId,
-              command:
-                item && item.type === "commandExecution" ? item.command : "",
-              cwd: item && item.type === "commandExecution" ? item.cwd : "",
-              processId:
-                item && item.type === "commandExecution" ? item.processId : null,
-              status:
-                item && item.type === "commandExecution"
-                  ? item.status
-                  : "running",
-              commandActions:
-                item && item.type === "commandExecution"
-                  ? item.commandActions
-                  : [],
-              aggregatedOutput:
-                item && item.type === "commandExecution"
-                  ? `${item.aggregatedOutput || ""}${params.delta}`
-                  : params.delta,
-              exitCode:
-                item && item.type === "commandExecution" ? item.exitCode : null,
-              durationMs:
-                item && item.type === "commandExecution"
-                  ? item.durationMs
-                  : null
-            }))
-          : current
-      );
-      return;
-    }
-
-    if (event.method === "item/fileChange/outputDelta") {
-      const params = event.params as {
-        threadId?: string;
-        turnId: string;
-        itemId: string;
-        delta: string;
-      };
-      setSelectedThread((current) =>
-        current && (!params.threadId || current.id === params.threadId)
-          ? updateItem(current, params.turnId, params.itemId, (item) => ({
-              type: "fileChange",
-              id: params.itemId,
-              changes: item && item.type === "fileChange" ? item.changes : [],
-              status:
-                item && item.type === "fileChange" ? item.status : "completed",
-              aggregatedDiff:
-                item && item.type === "fileChange"
-                  ? item.aggregatedDiff ?? null
-                  : null,
-              aggregatedOutput:
-                item && item.type === "fileChange"
-                  ? `${item.aggregatedOutput || ""}${params.delta}`
-                  : params.delta
-            }))
-          : current
-      );
-      return;
-    }
-
-    if (event.method === "turn/diff/updated") {
-      const params = event.params as {
-        threadId?: string;
-        turnId: string;
-        diff: string;
-      };
-      setSelectedThread((current) =>
-        current && (!params.threadId || current.id === params.threadId)
-          ? updateTurn(current, params.turnId, (turn) => ({
-              ...turn,
-              diff: params.diff
-            }))
-          : current
-      );
-      return;
-    }
-
-    if (event.method === "error") {
-      const params = event.params as {
-        threadId?: string;
-        turnId: string;
-        error?: { message?: string } | null;
-        willRetry?: boolean;
-      };
-      setSelectedThread((current) =>
-        current && (!params.threadId || current.id === params.threadId)
-          ? updateTurn(current, params.turnId, (turn) => ({
-              ...turn,
-              status:
-                params.willRetry || turn.status !== "inProgress"
-                  ? turn.status
-                  : "failed",
-              error: params.error ?? turn.error
-            }))
-          : current
-      );
-      return;
-    }
-
-    if (
-      event.method === "turn/completed" ||
-      event.method === "thread/status/changed" ||
-      event.method === "thread/name/updated"
-    ) {
+    if (shouldSyncSelectedThreadForNotification(event)) {
       void syncThread(selectedThreadIdRef.current, {
         background: true,
         suppressErrors: true
