@@ -18,15 +18,23 @@ import type {
   DockApprovalPolicy,
   DockBridgeEvent,
   DockModel,
+  DockReviewDelivery,
+  DockReviewTarget,
   DockSandboxMode,
   DockServerRequest,
   DockThread,
   DockUserInput,
   ModelListResponse,
+  ReviewStartResponse,
   ResolveRequestPayload,
+  ThreadCompactStartResponse,
+  ThreadForkResponse,
   ThreadListResponse,
   ThreadReadResponse,
+  ThreadRollbackResponse,
+  ThreadShellCommandResponse,
   ThreadStartResponse,
+  TurnSteerResponse,
   TurnStartResponse
 } from "@/lib/codex/types";
 
@@ -43,8 +51,14 @@ type RpcMethod =
   | "thread/name/set"
   | "thread/archive"
   | "thread/unarchive"
+  | "thread/fork"
+  | "thread/compact/start"
+  | "thread/rollback"
+  | "thread/shellCommand"
   | "turn/start"
+  | "turn/steer"
   | "turn/interrupt"
+  | "review/start"
   | "model/list";
 
 const SOCKET_CONNECT_TIMEOUT_MS = 5_000;
@@ -410,6 +424,26 @@ function createServerRequest(
     };
   }
 
+  if (method === "item/permissions/requestApproval") {
+    return {
+      requestId,
+      rpcId,
+      method,
+      threadId,
+      params: params as any
+    };
+  }
+
+  if (method === "mcpServer/elicitation/request") {
+    return {
+      requestId,
+      rpcId,
+      method,
+      threadId,
+      params: params as any
+    };
+  }
+
   if (method === "execCommandApproval") {
     return {
       requestId,
@@ -669,6 +703,81 @@ class CodexBridge extends EventEmitter {
     await this.request("turn/interrupt", {
       threadId,
       turnId
+    });
+  }
+
+  async steerTurn(input: {
+    threadId: string;
+    expectedTurnId: string;
+    prompt: string;
+    attachmentPaths?: string[];
+  }) {
+    return this.request<TurnSteerResponse>("turn/steer", {
+      threadId: input.threadId,
+      expectedTurnId: input.expectedTurnId,
+      input: createPromptInput(input.prompt, input.attachmentPaths ?? [])
+    });
+  }
+
+  async forkThread(input: {
+    threadId: string;
+    cwd?: string | null;
+    model?: string | null;
+    approvalPolicy?: DockApprovalPolicy | null;
+    sandbox?: DockSandboxMode | null;
+  }) {
+    const response = await this.request<ThreadForkResponse>("thread/fork", {
+      threadId: input.threadId,
+      cwd: input.cwd ?? null,
+      model: input.model ?? null,
+      modelProvider: input.model ? "openai" : null,
+      approvalPolicy: input.approvalPolicy ?? null,
+      sandbox: input.sandbox ?? null,
+      persistExtendedHistory: true
+    });
+
+    this.loadedThreads.add(response.thread.id);
+    return response;
+  }
+
+  async rollbackThread(threadId: string, numTurns: number) {
+    const response = await this.request<ThreadRollbackResponse>(
+      "thread/rollback",
+      {
+        threadId,
+        numTurns
+      }
+    );
+
+    this.loadedThreads.add(response.thread.id);
+    return response;
+  }
+
+  async compactThread(threadId: string) {
+    return this.request<ThreadCompactStartResponse>("thread/compact/start", {
+      threadId
+    });
+  }
+
+  async runThreadShellCommand(input: {
+    threadId: string;
+    command: string;
+  }) {
+    return this.request<ThreadShellCommandResponse>("thread/shellCommand", {
+      threadId: input.threadId,
+      command: input.command
+    });
+  }
+
+  async startReview(input: {
+    threadId: string;
+    target: DockReviewTarget;
+    delivery?: DockReviewDelivery | null;
+  }) {
+    return this.request<ReviewStartResponse>("review/start", {
+      threadId: input.threadId,
+      target: input.target,
+      delivery: input.delivery ?? "inline"
     });
   }
 

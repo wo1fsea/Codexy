@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { getCodexBridge } from "@/lib/codex/bridge";
-import type { ResolveRequestSubmission } from "@/lib/codex/types";
+import { getRuntimeAdapter } from "@/lib/runtime/registry";
+import type { ResolveRuntimeRequestSubmission } from "@/lib/runtime/types";
 
 export const runtime = "nodejs";
 
@@ -14,10 +14,10 @@ type Params = {
 export async function POST(request: Request, context: Params) {
   try {
     const { requestId } = await context.params;
-    const body = (await request.json()) as ResolveRequestSubmission;
+    const body = (await request.json()) as ResolveRuntimeRequestSubmission;
 
-    const bridge = getCodexBridge();
-    await bridge.resolveServerRequest(requestId, body.payload, {
+    const runtime = getRuntimeAdapter();
+    await runtime.resolveServerRequest(requestId, body.payload, {
       rpcId: body.rpcId,
       threadId: body.threadId,
       method: body.method

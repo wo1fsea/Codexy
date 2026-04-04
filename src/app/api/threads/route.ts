@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 
-import { getCodexBridge } from "@/lib/codex/bridge";
 import {
   listThreadSummariesFromSessionHistory
 } from "@/lib/codex/session-history";
 import { syncSessionThreadsToBridge } from "@/lib/codex/thread-sync";
-import type { DockThread, ThreadListResponse } from "@/lib/codex/types";
+import type { RuntimeAdapter } from "@/lib/runtime/contracts";
+import { getRuntimeAdapter } from "@/lib/runtime/registry";
+import type { RuntimeThread, RuntimeThreadListResponse } from "@/lib/runtime/types";
 
 export const runtime = "nodejs";
 
@@ -67,10 +68,10 @@ function deriveInitialThreadName(input: {
 }
 
 function mergeThreadLists(
-  bridgeThreads: DockThread[],
-  sessionThreads: DockThread[]
-): DockThread[] {
-  const merged = new Map<string, DockThread>();
+  bridgeThreads: RuntimeThread[],
+  sessionThreads: RuntimeThread[]
+): RuntimeThread[] {
+  const merged = new Map<string, RuntimeThread>();
 
   for (const thread of sessionThreads) {
     merged.set(thread.id, thread);
@@ -84,19 +85,19 @@ function mergeThreadLists(
 }
 
 async function listBridgeThreads(
-  bridge: ReturnType<typeof getCodexBridge>,
+  runtime: RuntimeAdapter,
   archived: string | null,
   searchParams: URLSearchParams
-): Promise<ThreadListResponse> {
+): Promise<RuntimeThreadListResponse> {
   const input = getListInput(searchParams);
 
   if (archived === "all") {
     const [live, archivedThreads] = await Promise.all([
-      bridge.listThreads({
+      runtime.listThreads({
         ...input,
         archived: false
       }),
-      bridge.listThreads({
+      runtime.listThreads({
         ...input,
         archived: true
       })
@@ -110,7 +111,7 @@ async function listBridgeThreads(
     };
   }
 
-  return bridge.listThreads({
+  return runtime.listThreads({
     ...input,
     archived: archived === "true"
   });
@@ -118,7 +119,7 @@ async function listBridgeThreads(
 
 export async function GET(request: Request) {
   try {
-    const bridge = getCodexBridge();
+    const runtime = getRuntimeAdapter();
     const { searchParams } = new URL(request.url);
     const archived = searchParams.get("archived");
     const sessionFallback =
@@ -138,7 +139,7 @@ export async function GET(request: Request) {
 
     try {
       const response = await withTimeout(
-        listBridgeThreads(bridge, archived, searchParams),
+        listBridgeThreads(runtime, archived, searchParams),
         THREAD_LIST_TIMEOUT_MS,
         "thread/list"
       );
@@ -147,7 +148,7 @@ export async function GET(request: Request) {
 
       if (archived !== "true" && sessionFallback.length) {
         void syncSessionThreadsToBridge({
-          bridge,
+          bridge: runtime,
           bridgeThreads: response.data,
           sessionThreads: sessionFallback
         });
@@ -201,8 +202,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const bridge = getCodexBridge();
-    const result = await bridge.createThread({
+    const runtime = getRuntimeAdapter();
+    const result = await runtime.createThread({
       prompt: body.prompt ?? "",
       cwd: body.cwd ?? null,
       model: body.model ?? null,
@@ -222,7 +223,7 @@ export async function POST(request: Request) {
 
     if (initialThreadName && initialThreadName !== result.thread.name) {
       try {
-        await bridge.renameThread(result.thread.id, initialThreadName);
+        await runtime.renameThread(result.thread.id, initialThreadName);
         result.thread = {
           ...result.thread,
           name: initialThreadName,

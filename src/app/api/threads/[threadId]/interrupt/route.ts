@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getCodexBridge } from "@/lib/codex/bridge";
+import { getRuntimeAdapter } from "@/lib/runtime/registry";
 
 export const runtime = "nodejs";
 
@@ -23,8 +23,8 @@ export async function POST(request: Request, context: Params) {
     );
   }
 
-  const bridge = getCodexBridge();
-  await bridge.interruptTurn(threadId, body.turnId);
+  const runtime = getRuntimeAdapter();
+  await runtime.interruptTurn(threadId, body.turnId);
 
   return NextResponse.json({ ok: true });
 }

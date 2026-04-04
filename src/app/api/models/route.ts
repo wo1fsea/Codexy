@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 
-import { getCodexBridge } from "@/lib/codex/bridge";
+import { getRuntimeAdapter } from "@/lib/runtime/registry";
 
 export const runtime = "nodejs";
 
 export async function GET() {
   try {
-    const bridge = getCodexBridge();
-    const data = await bridge.listModels();
+    const runtime = getRuntimeAdapter();
+    const data = await runtime.listModels();
 
     return NextResponse.json({ data });
   } catch (error) {

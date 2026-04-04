@@ -74,6 +74,7 @@ type MockThread = {
 type MockOptions = {
   detailDelaysMs?: Record<string, number>;
   events?: unknown[];
+  eventsDelayMs?: number;
   models?: typeof DEFAULT_MODELS;
   status?: typeof DEFAULT_STATUS;
   threads?: MockThread[];
@@ -158,6 +159,7 @@ export async function installDockApiMock(page: Page, options: MockOptions = {}) 
   const events = clone(
     options.events ?? [{ type: "connection", status: "connected" }]
   );
+  const eventsDelayMs = options.eventsDelayMs ?? 0;
   const detailDelaysMs = options.detailDelaysMs ?? {};
   const threadStore = new Map(
     (options.threads ?? []).map((thread) => [thread.id, clone(thread)] as const)
@@ -196,6 +198,10 @@ export async function installDockApiMock(page: Page, options: MockOptions = {}) 
     }
 
     if (path === "/api/events" && method === "GET") {
+      if (eventsDelayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, eventsDelayMs));
+      }
+
       await route.fulfill({
         status: 200,
         headers: {
@@ -355,6 +361,179 @@ export async function installDockApiMock(page: Page, options: MockOptions = {}) 
       threadOrder = updateThreadOrder(threadOrder, threadId);
 
       await fulfillJson(route, { turn });
+      return;
+    }
+
+    const steerMatch = path.match(/^\/api\/threads\/([^/]+)\/steer$/);
+    if (steerMatch && method === "POST") {
+      const threadId = decodeURIComponent(steerMatch[1]);
+      const thread = threadStore.get(threadId);
+
+      if (!thread) {
+        await fulfillJson(route, { error: "Thread not found." }, 404);
+        return;
+      }
+
+      const body = (request.postDataJSON() ?? {}) as {
+        attachmentPaths?: string[];
+        expectedTurnId?: string;
+        prompt?: string;
+      };
+      const activeTurn = [...thread.turns]
+        .reverse()
+        .find((turn) => (turn as Record<string, unknown>).status === "inProgress") as
+        | {
+            id: string;
+            items: unknown[];
+          }
+        | undefined;
+
+      if (!activeTurn || activeTurn.id !== body.expectedTurnId) {
+        await fulfillJson(route, { error: "Active turn mismatch." }, 400);
+        return;
+      }
+
+      activeTurn.items.push(
+        createUserMessage(
+          activeTurn.id,
+          body.prompt ?? "",
+          body.attachmentPaths ?? []
+        )
+      );
+      thread.updatedAt += 1;
+      threadOrder = updateThreadOrder(threadOrder, threadId);
+
+      await fulfillJson(route, { turnId: activeTurn.id });
+      return;
+    }
+
+    const forkMatch = path.match(/^\/api\/threads\/([^/]+)\/fork$/);
+    if (forkMatch && method === "POST") {
+      const threadId = decodeURIComponent(forkMatch[1]);
+      const thread = threadStore.get(threadId);
+
+      if (!thread) {
+        await fulfillJson(route, { error: "Thread not found." }, 404);
+        return;
+      }
+
+      const forkId = `mock-thread-${++threadCounter}`;
+      const timestamp = 1774000000 + threadCounter;
+      const forkedThread: MockThread = {
+        ...clone(thread),
+        id: forkId,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        source: "session",
+        name: `${thread.name ?? thread.preview} (fork)`,
+        preview: `${thread.preview} (fork)`
+      };
+
+      threadStore.set(forkId, forkedThread);
+      threadOrder = updateThreadOrder(threadOrder, forkId);
+
+      await fulfillJson(route, { thread: clone(forkedThread) });
+      return;
+    }
+
+    const reviewMatch = path.match(/^\/api\/threads\/([^/]+)\/review$/);
+    if (reviewMatch && method === "POST") {
+      const threadId = decodeURIComponent(reviewMatch[1]);
+      const thread = threadStore.get(threadId);
+
+      if (!thread) {
+        await fulfillJson(route, { error: "Thread not found." }, 404);
+        return;
+      }
+
+      const turnId = `mock-turn-${++turnCounter}`;
+      const turn = {
+        id: turnId,
+        status: "inProgress",
+        error: null,
+        items: [
+          createUserMessage(turnId, "Review current changes", []),
+          {
+            type: "enteredReviewMode",
+            id: `entered-review-${turnId}`,
+            review: "current changes"
+          }
+        ]
+      };
+
+      thread.turns.push(turn);
+      thread.updatedAt += 1;
+      thread.status = { type: "active", activeFlags: [] };
+      threadOrder = updateThreadOrder(threadOrder, threadId);
+
+      await fulfillJson(route, { turn, reviewThreadId: threadId });
+      return;
+    }
+
+    const rollbackMatch = path.match(/^\/api\/threads\/([^/]+)\/rollback$/);
+    if (rollbackMatch && method === "POST") {
+      const threadId = decodeURIComponent(rollbackMatch[1]);
+      const thread = threadStore.get(threadId);
+
+      if (!thread) {
+        await fulfillJson(route, { error: "Thread not found." }, 404);
+        return;
+      }
+
+      const body = (request.postDataJSON() ?? {}) as {
+        numTurns?: number;
+      };
+      const numTurns = Math.max(1, Math.floor(Number(body.numTurns ?? 1)));
+      thread.turns.splice(Math.max(0, thread.turns.length - numTurns), numTurns);
+      thread.updatedAt += 1;
+      threadOrder = updateThreadOrder(threadOrder, threadId);
+
+      await fulfillJson(route, { thread: clone(thread) });
+      return;
+    }
+
+    const compactMatch = path.match(/^\/api\/threads\/([^/]+)\/compact$/);
+    if (compactMatch && method === "POST") {
+      const threadId = decodeURIComponent(compactMatch[1]);
+      const thread = threadStore.get(threadId);
+
+      if (!thread) {
+        await fulfillJson(route, { error: "Thread not found." }, 404);
+        return;
+      }
+
+      thread.updatedAt += 1;
+      threadOrder = updateThreadOrder(threadOrder, threadId);
+
+      await fulfillJson(route, {});
+      return;
+    }
+
+    const shellCommandMatch = path.match(
+      /^\/api\/threads\/([^/]+)\/shell-command$/
+    );
+    if (shellCommandMatch && method === "POST") {
+      const threadId = decodeURIComponent(shellCommandMatch[1]);
+      const thread = threadStore.get(threadId);
+
+      if (!thread) {
+        await fulfillJson(route, { error: "Thread not found." }, 404);
+        return;
+      }
+
+      const body = (request.postDataJSON() ?? {}) as {
+        command?: string;
+      };
+
+      if (!body.command?.trim()) {
+        await fulfillJson(route, { error: "Command is required." }, 400);
+        return;
+      }
+
+      thread.updatedAt += 1;
+      threadOrder = updateThreadOrder(threadOrder, threadId);
+
+      await fulfillJson(route, {});
       return;
     }
 

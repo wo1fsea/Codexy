@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { getCodexBridge } from "@/lib/codex/bridge";
 import {
   enrichThreadWithSessionHistory,
   readThreadFromSessionHistory
 } from "@/lib/codex/session-history";
+import { getRuntimeAdapter } from "@/lib/runtime/registry";
 
 export const runtime = "nodejs";
 
@@ -17,11 +17,11 @@ type Params = {
 export async function GET(_: Request, context: Params) {
   try {
     const { threadId } = await context.params;
-    const bridge = getCodexBridge();
+    const runtime = getRuntimeAdapter();
     let thread;
 
     try {
-      thread = await enrichThreadWithSessionHistory(await bridge.readThread(threadId));
+      thread = await enrichThreadWithSessionHistory(await runtime.readThread(threadId));
     } catch (error) {
       const fallbackThread = await readThreadFromSessionHistory(threadId);
       if (!fallbackThread) {
@@ -49,22 +49,22 @@ export async function PATCH(request: Request, context: Params) {
       name?: string;
       archived?: boolean;
     };
-    const bridge = getCodexBridge();
+    const runtime = getRuntimeAdapter();
 
     if (typeof body.name === "string") {
-      await bridge.renameThread(threadId, body.name);
+      await runtime.renameThread(threadId, body.name);
     }
 
     if (typeof body.archived === "boolean") {
       if (body.archived) {
-        await bridge.archiveThread(threadId);
+        await runtime.archiveThread(threadId);
       } else {
-        await bridge.unarchiveThread(threadId);
+        await runtime.unarchiveThread(threadId);
       }
     }
 
     const thread = await enrichThreadWithSessionHistory(
-      await bridge.readThread(threadId)
+      await runtime.readThread(threadId)
     );
     return NextResponse.json({ thread });
   } catch (error) {

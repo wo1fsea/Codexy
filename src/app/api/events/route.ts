@@ -1,24 +1,24 @@
-import { getCodexBridge } from "@/lib/codex/bridge";
-import type { DockBridgeEvent } from "@/lib/codex/types";
+import { getRuntimeAdapter } from "@/lib/runtime/registry";
+import type { RuntimeBridgeEvent } from "@/lib/runtime/types";
 
 export const runtime = "nodejs";
 
 const encoder = new TextEncoder();
 
-function writeSse(event: DockBridgeEvent) {
+function writeSse(event: RuntimeBridgeEvent) {
   return encoder.encode(`data: ${JSON.stringify(event)}\n\n`);
 }
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const threadId = searchParams.get("threadId") ?? undefined;
-  const bridge = getCodexBridge();
+  const runtime = getRuntimeAdapter();
 
-  await bridge.ensureConnected();
+  await runtime.ensureConnected();
 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
-      const pendingRequests = bridge.getPendingServerRequests(threadId);
+      const pendingRequests = runtime.getPendingServerRequests(threadId);
 
       controller.enqueue(
         writeSse({
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
         );
       }
 
-      const unsubscribe = bridge.subscribe((event) => {
+      const unsubscribe = runtime.subscribe((event) => {
         if (
           threadId &&
           event.type !== "connection" &&

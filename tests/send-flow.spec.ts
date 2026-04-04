@@ -138,6 +138,68 @@ test("pressing Enter in the composer sends the prompt", async ({ page }) => {
   await expect(page.locator(".dock-transcript")).toContainText(prompt);
 });
 
+test("active turns can accept a steered follow-up from the composer", async ({
+  page
+}) => {
+  await installDockApiMock(page, {
+    threads: [
+      {
+        id: "thread-steer-1",
+        preview: "active steer",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000000,
+        updatedAt: 1774000001,
+        status: { type: "active", activeFlags: [] },
+        path: null,
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "session",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: "active steer",
+        turns: [
+          {
+            id: "turn-steer-1",
+            status: "inProgress",
+            error: null,
+            items: [
+              {
+                type: "userMessage",
+                id: "user-steer-1",
+                content: [{ type: "text", text: "Start", text_elements: [] }]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  });
+
+  await gotoDock(page);
+  await page.locator(".dock-thread-row").first().click();
+
+  const requestPromise = page.waitForRequest((request) => {
+    const url = new URL(request.url());
+    return (
+      url.pathname === "/api/threads/thread-steer-1/steer" &&
+      request.method() === "POST"
+    );
+  });
+
+  await page.locator("textarea.dock-composer-input").fill("Focus on tests first");
+  await page.locator('[data-composer-action="steer"]').click();
+
+  const request = await requestPromise;
+  expect(request.postDataJSON()).toEqual({
+    expectedTurnId: "turn-steer-1",
+    prompt: "Focus on tests first",
+    attachmentPaths: []
+  });
+  await expect(page.locator("textarea.dock-composer-input")).toHaveValue("");
+});
+
 test("stage terminal toggle swaps the thread surface in place", async ({ page }) => {
   await installDockApiMock(page);
 
@@ -771,6 +833,251 @@ test("file change items render compact edit summaries from raw diffs", async ({ 
   );
 });
 
+test("forking a thread switches the stage to the new fork", async ({ page }) => {
+  await installDockApiMock(page, {
+    threads: [
+      {
+        id: "thread-fork-1",
+        preview: "Fork me",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000000,
+        updatedAt: 1774000200,
+        status: { type: "idle" },
+        path: null,
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "session",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: "Fork me",
+        turns: [
+          {
+            id: "turn-fork-1",
+            status: "completed",
+            error: null,
+            items: [
+              {
+                type: "userMessage",
+                id: "user-fork-1",
+                content: [{ type: "text", text: "hello", text_elements: [] }]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  });
+
+  await gotoDock(page);
+  await page.locator(".dock-thread-row").first().click();
+  await page.locator('[data-toolbar-action="fork"]').click();
+
+  await expect(page.locator(".dock-stage-title")).toContainText("Fork me (fork)");
+  await expect(
+    page.locator(".dock-thread-row", { hasText: "Fork me (fork)" })
+  ).toHaveCount(1);
+});
+
+test("review action starts an inline review turn", async ({ page }) => {
+  await installDockApiMock(page, {
+    threads: [
+      {
+        id: "thread-review-1",
+        preview: "Review me",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000000,
+        updatedAt: 1774000200,
+        status: { type: "idle" },
+        path: null,
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "session",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: "Review me",
+        turns: [
+          {
+            id: "turn-review-1",
+            status: "completed",
+            error: null,
+            items: [
+              {
+                type: "userMessage",
+                id: "user-review-1",
+                content: [{ type: "text", text: "prepare", text_elements: [] }]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  });
+
+  await gotoDock(page);
+  await page.locator(".dock-thread-row").first().click();
+  await page.locator('[data-toolbar-action="review"]').click();
+
+  await expect(page.locator(".dock-transcript")).toContainText("Review current changes");
+});
+
+test("rollback asks for confirmation and removes the latest turn", async ({ page }) => {
+  await installDockApiMock(page, {
+    threads: [
+      {
+        id: "thread-rollback-1",
+        preview: "Rollback me",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000000,
+        updatedAt: 1774000200,
+        status: { type: "idle" },
+        path: null,
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "session",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: "Rollback me",
+        turns: [
+          {
+            id: "turn-rollback-older",
+            status: "completed",
+            error: null,
+            items: [
+              {
+                type: "userMessage",
+                id: "user-rollback-older",
+                content: [{ type: "text", text: "older turn", text_elements: [] }]
+              }
+            ]
+          },
+          {
+            id: "turn-rollback-latest",
+            status: "completed",
+            error: null,
+            items: [
+              {
+                type: "userMessage",
+                id: "user-rollback-latest",
+                content: [{ type: "text", text: "latest turn", text_elements: [] }]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  });
+
+  await gotoDock(page);
+  await page.locator(".dock-thread-row").first().click();
+  await page.locator('[data-toolbar-action="rollback"]').click();
+
+  await expect(page.getByText("Rollback the latest turn?")).toBeVisible();
+  await page.getByRole("button", { name: "Rollback last turn" }).click();
+
+  await expect(page.locator(".dock-transcript")).toContainText("older turn");
+  await expect(page.locator(".dock-transcript")).not.toContainText("latest turn");
+});
+
+test("compact action sends a compaction request for the selected thread", async ({
+  page
+}) => {
+  await installDockApiMock(page, {
+    threads: [
+      {
+        id: "thread-compact-1",
+        preview: "Compact me",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000000,
+        updatedAt: 1774000200,
+        status: { type: "idle" },
+        path: null,
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "session",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: "Compact me",
+        turns: []
+      }
+    ]
+  });
+
+  await gotoDock(page);
+  await page.locator(".dock-thread-row").first().click();
+
+  const requestPromise = page.waitForRequest((request) => {
+    const url = new URL(request.url());
+    return (
+      url.pathname === "/api/threads/thread-compact-1/compact" &&
+      request.method() === "POST"
+    );
+  });
+
+  await page.locator('[data-toolbar-action="compact"]').click();
+
+  const request = await requestPromise;
+  expect(request.postData()).toBeNull();
+});
+
+test("shell command strip submits a thread command and closes", async ({
+  page
+}) => {
+  await installDockApiMock(page, {
+    threads: [
+      {
+        id: "thread-shell-command-1",
+        preview: "Shell me",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000000,
+        updatedAt: 1774000200,
+        status: { type: "idle" },
+        path: null,
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "session",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: "Shell me",
+        turns: []
+      }
+    ]
+  });
+
+  await gotoDock(page);
+  await page.locator(".dock-thread-row").first().click();
+  await page.locator('[data-toolbar-action="shell-command"]').click();
+
+  const commandInput = page.locator(".dock-rename-strip .dock-sidebar-input");
+  await expect(commandInput).toBeVisible();
+
+  const requestPromise = page.waitForRequest((request) => {
+    const url = new URL(request.url());
+    return (
+      url.pathname === "/api/threads/thread-shell-command-1/shell-command" &&
+      request.method() === "POST"
+    );
+  });
+
+  await commandInput.fill("git status --short");
+  await page.getByRole("button", { name: "Run command" }).click();
+
+  const request = await requestPromise;
+  expect(request.postDataJSON()).toEqual({
+    command: "git status --short"
+  });
+  await expect(commandInput).toHaveCount(0);
+});
+
 test("archiving the current thread jumps back to new thread and removes it from the live list", async ({
   page
 }) => {
@@ -1065,6 +1372,398 @@ test("approval buttons submit the matching server request payload", async ({ pag
     method: "item/commandExecution/requestApproval"
   });
   await expect(card).toHaveCount(0);
+});
+
+test("permissions approval submits the granted subset and scope", async ({ page }) => {
+  const requestBodies: Array<Record<string, unknown>> = [];
+
+  await installDockApiMock(page, {
+    events: [
+      { type: "connection", status: "connected" },
+      {
+        type: "server-request",
+        request: {
+          requestId: "req-permissions-1",
+          rpcId: 61,
+          method: "item/permissions/requestApproval",
+          threadId: "thread-permissions-1",
+          params: {
+            threadId: "thread-permissions-1",
+            turnId: "turn-permissions-1",
+            itemId: "call-permissions-1",
+            reason: "Select a workspace root",
+            permissions: {
+              network: null,
+              fileSystem: {
+                read: null,
+                write: [
+                  `${DEFAULT_CWD}\\workspace`,
+                  `${DEFAULT_CWD}\\shared`
+                ]
+              }
+            }
+          }
+        }
+      }
+    ],
+    threads: [
+      {
+        id: "thread-permissions-1",
+        preview: "permissions request",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000000,
+        updatedAt: 1774003600,
+        status: { type: "active", activeFlags: ["waitingOnApproval"] },
+        path: null,
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "session",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: "permissions request",
+        turns: [
+          {
+            id: "turn-permissions-1",
+            status: "inProgress",
+            error: null,
+            items: [
+              {
+                type: "userMessage",
+                id: "item-user",
+                content: [
+                  {
+                    type: "text",
+                    text: "pick a directory",
+                    text_elements: []
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  });
+
+  await page.route("**/api/requests/req-permissions-1", async (route) => {
+    requestBodies.push((route.request().postDataJSON() ?? {}) as Record<string, unknown>);
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true })
+    });
+  });
+
+  await gotoDock(page);
+  await page.locator(".dock-thread-row").first().click();
+
+  const card = page.locator(".dock-request-card").first();
+  await expect(card).toContainText("Select a workspace root");
+  await expect(card).toContainText(`${DEFAULT_CWD}\\workspace`);
+  await expect(card).toContainText(`${DEFAULT_CWD}\\shared`);
+
+  await card.getByRole("button", { name: "Allow for session" }).click();
+
+  await expect.poll(() => requestBodies.length).toBe(1);
+  expect(requestBodies[0]).toEqual({
+    payload: {
+      permissions: {
+        fileSystem: {
+          write: [`${DEFAULT_CWD}\\workspace`, `${DEFAULT_CWD}\\shared`]
+        }
+      },
+      scope: "session"
+    },
+    rpcId: 61,
+    threadId: "thread-permissions-1",
+    method: "item/permissions/requestApproval"
+  });
+});
+
+test("mcp elicitation form submits structured accept payload", async ({ page }) => {
+  const requestBodies: Array<Record<string, unknown>> = [];
+
+  await installDockApiMock(page, {
+    events: [
+      { type: "connection", status: "connected" },
+      {
+        type: "server-request",
+        request: {
+          requestId: "req-mcp-1",
+          rpcId: 77,
+          method: "mcpServer/elicitation/request",
+          threadId: "thread-mcp-1",
+          params: {
+            threadId: "thread-mcp-1",
+            turnId: "turn-mcp-1",
+            serverName: "codex_apps",
+            mode: "form",
+            _meta: null,
+            message: "Allow this request?",
+            requestedSchema: {
+              type: "object",
+              required: ["confirmed", "target"],
+              properties: {
+                confirmed: {
+                  type: "boolean",
+                  title: "Confirmed"
+                },
+                target: {
+                  type: "string",
+                  title: "Target path"
+                },
+                reason: {
+                  type: "string",
+                  title: "Reason",
+                  default: "For workspace setup"
+                }
+              }
+            }
+          }
+        }
+      }
+    ],
+    threads: [
+      {
+        id: "thread-mcp-1",
+        preview: "mcp request",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000000,
+        updatedAt: 1774003600,
+        status: { type: "active", activeFlags: ["waitingOnApproval"] },
+        path: null,
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "session",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: "mcp request",
+        turns: [
+          {
+            id: "turn-mcp-1",
+            status: "inProgress",
+            error: null,
+            items: [
+              {
+                type: "userMessage",
+                id: "item-user",
+                content: [
+                  {
+                    type: "text",
+                    text: "confirm the connector action",
+                    text_elements: []
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  });
+
+  await page.route("**/api/requests/req-mcp-1", async (route) => {
+    requestBodies.push((route.request().postDataJSON() ?? {}) as Record<string, unknown>);
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true })
+    });
+  });
+
+  await gotoDock(page);
+  await page.locator(".dock-thread-row").first().click();
+
+  const card = page.locator(".dock-request-card").first();
+  await expect(card).toContainText("Allow this request?");
+  await expect(card).toContainText("codex_apps");
+
+  await card.locator('input[type="checkbox"]').first().check();
+  await card.locator('input[type="text"]').first().fill(`${DEFAULT_CWD}\\workspace`);
+
+  await card.getByRole("button", { name: "Submit answers" }).click();
+
+  await expect.poll(() => requestBodies.length).toBe(1);
+  expect(requestBodies[0]).toEqual({
+    payload: {
+      action: "accept",
+      content: {
+        confirmed: true,
+        target: `${DEFAULT_CWD}\\workspace`,
+        reason: "For workspace setup"
+      },
+      _meta: null
+    },
+    rpcId: 77,
+    threadId: "thread-mcp-1",
+    method: "mcpServer/elicitation/request"
+  });
+});
+
+test("failed turns surface the error message in the transcript", async ({
+  page
+}) => {
+  await installDockApiMock(page, {
+    threads: [
+      {
+        id: "thread-error-1",
+        preview: "error notification",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000000,
+        updatedAt: 1774003600,
+        status: { type: "active", activeFlags: [] },
+        path: null,
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "session",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: "error notification",
+        turns: [
+          {
+            id: "turn-error-1",
+            status: "failed",
+            error: {
+              message: "Patch failed while editing LOCAL_SECRETS.md"
+            },
+            items: [
+              {
+                type: "userMessage",
+                id: "item-user",
+                content: [
+                  {
+                    type: "text",
+                    text: "apply the patch",
+                    text_elements: []
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  });
+
+  await gotoDock(page);
+  await page.locator(".dock-thread-row").first().click();
+
+  await expect(page.locator(".dock-turn-head").first()).toContainText("Failed");
+  await expect(page.locator(".dock-transcript .dock-error")).toContainText(
+    "Patch failed while editing LOCAL_SECRETS.md"
+  );
+});
+
+test("file change surfaces render turn diff notifications and raw patch output", async ({
+  page
+}) => {
+  await installDockApiMock(page, {
+    eventsDelayMs: 250,
+    events: [
+      { type: "connection", status: "connected" },
+      {
+        type: "notification",
+        method: "turn/diff/updated",
+        threadId: "thread-filechange-live",
+        params: {
+          threadId: "thread-filechange-live",
+          turnId: "turn-filechange-live",
+          diff: "@@ -1,1 +1,3 @@\n-old line\n+new line\n+second line\n"
+        }
+      }
+    ],
+    threads: [
+      {
+        id: "thread-filechange-live",
+        preview: "live file change",
+        ephemeral: false,
+        modelProvider: "openai",
+        createdAt: 1774000000,
+        updatedAt: 1774003600,
+        status: { type: "active", activeFlags: [] },
+        path: null,
+        cwd: DEFAULT_CWD,
+        cliVersion: "0.112.0",
+        source: "session",
+        agentNickname: null,
+        agentRole: null,
+        gitInfo: null,
+        name: "live file change",
+        turns: [
+          {
+            id: "turn-filechange-live",
+            status: "inProgress",
+            error: null,
+            items: [
+              {
+                type: "userMessage",
+                id: "item-user",
+                content: [
+                  {
+                    type: "text",
+                    text: "show the live patch",
+                    text_elements: []
+                  }
+                ]
+              },
+              {
+                type: "fileChange",
+                id: "item-filechange-live",
+                status: "completed",
+                aggregatedOutput:
+                  "Success. Updated the following files:\nM README.md\n",
+                changes: [
+                  {
+                    path: `${DEFAULT_CWD}\\README.md`,
+                    kind: {
+                      type: "update",
+                      move_path: null
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  });
+
+  await gotoDock(page);
+  await page.locator(".dock-thread-row").first().click();
+
+  const diffCard = page
+    .locator(".dock-filechange-card")
+    .filter({ hasText: "README.md" })
+    .first();
+  await expect(diffCard).toContainText("+2");
+  await expect(diffCard).toContainText("-1");
+  await diffCard.locator(".dock-filechange-summary").click();
+  await expect(diffCard.locator(".dock-filechange-output")).toContainText(
+    "@@ -1,1 +1,3 @@"
+  );
+  await expect(diffCard.locator(".dock-filechange-output")).toContainText(
+    "+second line"
+  );
+
+  const outputCard = page
+    .locator(".dock-filechange-card")
+    .filter({ hasText: "Apply patch" })
+    .first();
+  await expect(outputCard).toContainText("Output");
+  await outputCard.locator(".dock-filechange-summary").click();
+  await expect(outputCard.locator(".dock-filechange-output")).toContainText(
+    "Success. Updated the following files:"
+  );
+  await expect(outputCard.locator(".dock-filechange-output")).toContainText(
+    "M README.md"
+  );
 });
 
 test("command execution items keep a visible expand control and reveal output", async ({

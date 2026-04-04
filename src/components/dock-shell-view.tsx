@@ -104,6 +104,7 @@ type DockShellViewProps = {
   onArchiveFilterChange: (value: ArchiveFilter) => void;
   onArchiveCancel: () => void;
   onArchiveConfirm: (threadId: string) => void;
+  onCompactThread: () => void;
   onComposerCwdChange: (value: string) => void;
   onComposerModelChange: (value: string) => void;
   onComposerPermissionPresetChange: (value: DockPermissionPreset) => void;
@@ -115,21 +116,38 @@ type DockShellViewProps = {
   onPromptChange: (value: string) => void;
   onRefreshThreads: () => void;
   onRemoveAttachment: (id: string) => void;
+  onRollbackCancel: () => void;
+  onRollbackConfirm: () => void;
   onRenameCancel: () => void;
   onRenameSave: () => void;
   onResolveRequest: (request: DockServerRequest) => ReactNode;
   onSearchChange: (value: string) => void;
   onSelectThread: (thread: DockThread) => void;
+  onShellCommandCancel: () => void;
+  onShellCommandDraftChange: (value: string) => void;
+  onShellCommandSubmit: () => void;
   onSidebarClose: () => void;
+  onStartReview: () => void;
+  onSteerCurrentTurn: () => void;
   onSubmitPrompt: () => void;
   onTakeoverCancel: () => void;
   onTakeoverConfirm: () => void;
   onThreadNameDraftChange: (value: string) => void;
+  onToggleShellCommand: () => void;
   onToggleStageMode: () => void;
   onToggleArchive: (threadId: string) => void;
+  onToggleRollback: () => void;
   onToggleRename: () => void;
   onUploadFiles: (files: FileList | File[] | null) => void;
-  renderThreadItem: (item: DockThreadItem) => ReactNode;
+  onForkThread: () => void;
+  shellCommandDraft: string;
+  shellCommandOpen: boolean;
+  shellCommandPending: boolean;
+  rollbackConfirmOpen: boolean;
+  renderThreadItem: (
+    item: DockThreadItem,
+    context?: { turn: DockTurn }
+  ) => ReactNode;
 };
 
 function getProjectName(cwd: string) {
@@ -472,6 +490,7 @@ export function DockShellView(props: DockShellViewProps) {
   const composerReady =
     props.composerCwd.trim().length > 0 && props.composerModel.trim().length > 0;
   const canSubmit = !props.submitting && hasDraft && composerReady;
+  const canSteer = Boolean(props.currentActiveTurn) && !props.submitting && hasDraft;
   const primaryActionIsStop = Boolean(props.currentActiveTurn);
   const primaryActionLabel = primaryActionIsStop
     ? t("actions.stop")
@@ -581,12 +600,31 @@ export function DockShellView(props: DockShellViewProps) {
       return;
     }
 
+    if (props.currentActiveTurn) {
+      if (!canSteer) {
+        return;
+      }
+
+      event.preventDefault();
+      props.onSteerCurrentTurn();
+      return;
+    }
+
     if (!canSubmit) {
       return;
     }
 
     event.preventDefault();
     props.onSubmitPrompt();
+  }
+
+  function handleShellCommandKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    event.preventDefault();
+    props.onShellCommandSubmit();
   }
 
   useEffect(() => {
@@ -1240,6 +1278,69 @@ export function DockShellView(props: DockShellViewProps) {
             <div className="dock-stage-toolbar">
               {props.selectedThread ? (
                 <button
+                  aria-label={t("actions.compact")}
+                  className="dock-icon-button"
+                  data-toolbar-action="compact"
+                  onClick={props.onCompactThread}
+                  title={t("actions.compact")}
+                  type="button"
+                >
+                  <AppIcon className="dock-inline-icon" name="compact" />
+                </button>
+              ) : null}
+              {props.selectedThread ? (
+                <button
+                  aria-label={t("actions.fork")}
+                  className="dock-icon-button"
+                  data-toolbar-action="fork"
+                  onClick={props.onForkThread}
+                  title={t("actions.fork")}
+                  type="button"
+                >
+                  <AppIcon className="dock-inline-icon" name="copy" />
+                </button>
+              ) : null}
+              {props.selectedThread ? (
+                <button
+                  aria-label={t("actions.review")}
+                  className="dock-icon-button"
+                  data-toolbar-action="review"
+                  onClick={props.onStartReview}
+                  title={t("actions.review")}
+                  type="button"
+                >
+                  <AppIcon className="dock-inline-icon" name="check" />
+                </button>
+              ) : null}
+              {props.selectedThread ? (
+                <button
+                  aria-label={t("actions.rollback")}
+                  className="dock-icon-button"
+                  data-toolbar-action="rollback"
+                  onClick={props.onToggleRollback}
+                  title={t("actions.rollback")}
+                  type="button"
+                >
+                  <AppIcon className="dock-inline-icon" name="back" />
+                </button>
+              ) : null}
+              {props.selectedThread ? (
+                <button
+                  aria-label={t("actions.shellCommand")}
+                  className={clsx(
+                    "dock-icon-button",
+                    props.shellCommandOpen && "is-armed"
+                  )}
+                  data-toolbar-action="shell-command"
+                  onClick={props.onToggleShellCommand}
+                  title={t("actions.shellCommand")}
+                  type="button"
+                >
+                  <AppIcon className="dock-inline-icon" name="play" />
+                </button>
+              ) : null}
+              {props.selectedThread ? (
+                <button
                   aria-label={
                     terminalModeActive
                       ? t("actions.showThread")
@@ -1249,6 +1350,7 @@ export function DockShellView(props: DockShellViewProps) {
                     "dock-icon-button",
                     terminalModeActive && "is-armed"
                   )}
+                  data-toolbar-action="terminal"
                   onClick={props.onToggleStageMode}
                   title={
                     terminalModeActive
@@ -1263,6 +1365,7 @@ export function DockShellView(props: DockShellViewProps) {
               {props.selectedThread ? (
                 <button
                   className="dock-icon-button"
+                  data-toolbar-action="rename"
                   onClick={props.onToggleRename}
                   type="button"
                 >
@@ -1271,6 +1374,7 @@ export function DockShellView(props: DockShellViewProps) {
               ) : null}
               <button
                 className="dock-icon-button"
+                data-toolbar-action="refresh"
                 onClick={props.onRefreshThreads}
                 type="button"
               >
@@ -1306,6 +1410,76 @@ export function DockShellView(props: DockShellViewProps) {
                 >
                   {t("actions.cancel")}
                 </button>
+              </div>
+            </section>
+          ) : null}
+
+          {props.selectedThread && props.rollbackConfirmOpen && !terminalModeActive ? (
+            <section className="dock-rename-strip">
+              <div className="dock-alert-banner is-subtle">
+                <div>
+                  <strong>{t("rollback.confirmTitle")}</strong>
+                  <p>{t("rollback.confirmBody")}</p>
+                </div>
+                <div className="dock-request-actions">
+                  <button
+                    className="dock-ghost-action"
+                    onClick={props.onRollbackConfirm}
+                    type="button"
+                  >
+                    {t("actions.rollbackConfirm")}
+                  </button>
+                  <button
+                    className="dock-ghost-action is-muted"
+                    onClick={props.onRollbackCancel}
+                    type="button"
+                  >
+                    {t("actions.cancel")}
+                  </button>
+                </div>
+              </div>
+            </section>
+          ) : null}
+
+          {props.selectedThread && props.shellCommandOpen && !terminalModeActive ? (
+            <section className="dock-rename-strip">
+              <div className="dock-alert-banner is-subtle">
+                <div className="dock-stage-shell-command">
+                  <strong>{t("shellCommand.title")}</strong>
+                  <p>{t("shellCommand.body")}</p>
+                  <input
+                    className="dock-sidebar-input"
+                    onChange={(event) =>
+                      props.onShellCommandDraftChange(event.target.value)
+                    }
+                    onKeyDown={handleShellCommandKeyDown}
+                    placeholder={t("shellCommand.placeholder")}
+                    value={props.shellCommandDraft}
+                  />
+                </div>
+                <div className="dock-request-actions">
+                  <button
+                    className="dock-ghost-action"
+                    disabled={
+                      props.shellCommandPending ||
+                      !props.shellCommandDraft.trim().length
+                    }
+                    onClick={props.onShellCommandSubmit}
+                    type="button"
+                  >
+                    {props.shellCommandPending
+                      ? t("actions.archiving")
+                      : t("actions.runShellCommand")}
+                  </button>
+                  <button
+                    className="dock-ghost-action is-muted"
+                    disabled={props.shellCommandPending}
+                    onClick={props.onShellCommandCancel}
+                    type="button"
+                  >
+                    {t("actions.cancel")}
+                  </button>
+                </div>
               </div>
             </section>
           ) : null}
@@ -1399,8 +1573,13 @@ export function DockShellView(props: DockShellViewProps) {
                       {props.selectedThread.turns.map((turn) => {
                         const transcriptEntries = getTranscriptEntries(turn);
                         const showThinkingState = shouldShowThinkingState(turn);
+                        const turnError =
+                          typeof turn.error?.message === "string" &&
+                          turn.error.message.trim()
+                            ? turn.error.message.trim()
+                            : null;
 
-                        if (!transcriptEntries.length && !showThinkingState) {
+                        if (!transcriptEntries.length && !showThinkingState && !turnError) {
                           return null;
                         }
 
@@ -1465,7 +1644,7 @@ export function DockShellView(props: DockShellViewProps) {
                                                 )}
                                                 key={item.id}
                                               >
-                                                {props.renderThreadItem(item)}
+                                                {props.renderThreadItem(item, { turn })}
                                               </div>
                                             ))}
                                           </div>
@@ -1487,10 +1666,11 @@ export function DockShellView(props: DockShellViewProps) {
                                     )}
                                     key={item.id}
                                   >
-                                    {props.renderThreadItem(item)}
+                                    {props.renderThreadItem(item, { turn })}
                                   </div>
                                 );
                               })}
+                              {turnError ? <div className="dock-error">{turnError}</div> : null}
                             </div>
                             {showThinkingState ? (
                               <div
@@ -1654,6 +1834,16 @@ export function DockShellView(props: DockShellViewProps) {
                     </div>
 
                     <div className="dock-composer-actions">
+                      {canSteer ? (
+                        <button
+                          className="dock-ghost-action"
+                          data-composer-action="steer"
+                          onClick={props.onSteerCurrentTurn}
+                          type="button"
+                        >
+                          {t("actions.steer")}
+                        </button>
+                      ) : null}
                       <button
                         aria-label={primaryActionLabel}
                         className={clsx(

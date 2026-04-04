@@ -73,6 +73,23 @@ type DockAppProps = {
   responsiveModeOverride?: DockResponsiveMode;
 };
 
+type RequestAnswerValue = string | number | boolean | string[] | null;
+type RequestAnswersState = Record<string, Record<string, RequestAnswerValue>>;
+type PermissionApprovalRequestEntry = Extract<
+  DockServerRequest,
+  { method: "item/permissions/requestApproval" }
+>;
+type McpElicitationRequestEntry = Extract<
+  DockServerRequest,
+  { method: "mcpServer/elicitation/request" }
+>;
+type McpFormElicitationParams = Extract<
+  McpElicitationRequestEntry["params"],
+  { mode: "form" }
+>;
+type McpElicitationFieldSchema =
+  McpFormElicitationParams["requestedSchema"]["properties"][string];
+
 function normalizeApiBasePath(value?: string) {
   const normalized = value?.trim();
   if (!normalized || normalized === "/api") {
@@ -141,6 +158,12 @@ function updateThreadListWithArchiveState(
   );
 }
 
+function upsertThreadInList(threads: DockThread[], nextThread: DockThread) {
+  return [...threads.filter((thread) => thread.id !== nextThread.id), nextThread].sort(
+    (left, right) => right.updatedAt - left.updatedAt
+  );
+}
+
 function isThreadActive(thread: DockThread | null) {
   return thread?.status.type === "active";
 }
@@ -187,6 +210,20 @@ function localizeRuntimeMessage(message: string, t: TranslateFn) {
       return t("error.turnIdRequired");
     case "Failed to append turn.":
       return t("error.appendTurnFailed");
+    case "Failed to send update.":
+      return t("error.steerFailed");
+    case "Failed to fork thread.":
+      return t("error.forkFailed");
+    case "Failed to compact thread.":
+      return t("error.compactFailed");
+    case "Failed to start review.":
+      return t("error.reviewFailed");
+    case "Failed to rollback thread.":
+      return t("error.rollbackFailed");
+    case "Failed to run shell command.":
+      return t("error.shellCommandFailed");
+    case "Command is required.":
+      return t("error.shellCommandRequired");
     case "No files uploaded.":
       return t("error.noFilesUploaded");
     case "Failed to store files.":
@@ -244,9 +281,11 @@ function withTurnTimingMetadata(turn: DockTurn, previousTurn?: DockTurn | null) 
     (startedAt !== null && completedAt !== null && completedAt >= startedAt
       ? completedAt - startedAt
       : null);
+  const diff = turn.diff ?? previousTurn?.diff ?? null;
 
   return {
     ...turn,
+    diff,
     startedAt,
     completedAt,
     durationMs
@@ -534,6 +573,48 @@ function mergeTurnPreservingAuxiliaryItems(
       return mergeNarrativeTurnItem(currentItem, incomingItem);
     }
 
+    if (incomingItem.type === "commandExecution") {
+      const incomingCommandItem = incomingItem as Extract<
+        DockThreadItem,
+        { type: "commandExecution" }
+      >;
+      const currentCommandItem = currentItem as Extract<
+        DockThreadItem,
+        { type: "commandExecution" }
+      >;
+
+      return {
+        ...incomingCommandItem,
+        aggregatedOutput:
+          incomingCommandItem.aggregatedOutput ??
+          currentCommandItem.aggregatedOutput ??
+          null
+      };
+    }
+
+    if (incomingItem.type === "fileChange") {
+      const incomingFileChangeItem = incomingItem as Extract<
+        DockThreadItem,
+        { type: "fileChange" }
+      >;
+      const currentFileChangeItem = currentItem as Extract<
+        DockThreadItem,
+        { type: "fileChange" }
+      >;
+
+      return {
+        ...incomingFileChangeItem,
+        aggregatedDiff:
+          incomingFileChangeItem.aggregatedDiff ??
+          currentFileChangeItem.aggregatedDiff ??
+          null,
+        aggregatedOutput:
+          incomingFileChangeItem.aggregatedOutput ??
+          currentFileChangeItem.aggregatedOutput ??
+          null
+      };
+    }
+
     return incomingItem;
   });
   const mergedItemIds = new Set(mergedItems.map((item) => item.id));
@@ -624,6 +705,32 @@ function updateItem(
       items
     };
   });
+
+  return {
+    ...thread,
+    turns
+  };
+}
+
+function createOptimisticSteerItem(
+  turnId: string,
+  prompt: string,
+  attachmentPaths: string[]
+): Extract<DockThreadItem, { type: "userMessage" }> {
+  return {
+    ...createOptimisticUserItem(turnId, prompt, attachmentPaths),
+    id: `optimistic-steer:${turnId}:${Date.now()}`
+  };
+}
+
+function updateTurn(
+  thread: DockThread,
+  turnId: string,
+  update: (turn: DockTurn) => DockTurn
+) {
+  const turns = thread.turns.map((turn) =>
+    turn.id === turnId ? withTurnTimingMetadata(update(turn), turn) : turn
+  );
 
   return {
     ...thread,
@@ -820,6 +927,16 @@ function getFirstFiniteNumber(...values: Array<number | null | undefined>) {
   return null;
 }
 
+function getFirstNonEmptyString(...values: unknown[]) {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
 function getFileChangeDiff(change: DockFileChangeEntry) {
   const candidates = [change.diff, change.unifiedDiff, change.unified_diff];
 
@@ -865,22 +982,27 @@ function getDiffLineTone(line: string) {
 
 function getFileChangeRows(
   item: Extract<DockThreadItem, { type: "fileChange" }>,
-  t: TranslateFn
+  t: TranslateFn,
+  turnDiff: string | null = null
 ): FileChangeRow[] {
+  const aggregatedDiff = getFirstNonEmptyString(item.aggregatedDiff, turnDiff);
+
   if (!item.changes.length) {
+    const diffCounts = countDiffLines(aggregatedDiff);
+
     return [
       {
         key: `${item.id}-0`,
         action: t("status.fileEdited"),
         label: t("generic.file"),
-        additions: null,
-        deletions: null,
-        diff: null
+        additions: diffCounts.additions,
+        deletions: diffCounts.deletions,
+        diff: aggregatedDiff
       }
     ];
   }
 
-  return item.changes.map((change, index) => {
+  const rows = item.changes.map((change, index) => {
     const kind =
       typeof change.kind === "string"
         ? change.kind
@@ -946,6 +1068,36 @@ function getFileChangeRows(
       diff
     };
   });
+
+  if (!aggregatedDiff || rows.some((row) => row.diff)) {
+    return rows;
+  }
+
+  if (rows.length === 1) {
+    const diffCounts = countDiffLines(aggregatedDiff);
+
+    return [
+      {
+        ...rows[0],
+        additions: rows[0].additions ?? diffCounts.additions,
+        deletions: rows[0].deletions ?? diffCounts.deletions,
+        diff: aggregatedDiff
+      }
+    ];
+  }
+
+  const diffCounts = countDiffLines(aggregatedDiff);
+  return [
+    ...rows,
+    {
+      key: `${item.id}-aggregate`,
+      action: t("status.fileEdited"),
+      label: t("generic.file"),
+      additions: diffCounts.additions,
+      deletions: diffCounts.deletions,
+      diff: aggregatedDiff
+    }
+  ];
 }
 
 function FileChangeRowView({ change }: { change: FileChangeRow }) {
@@ -1604,10 +1756,12 @@ function AssistantImageItemView({
 
 function ThreadItemView({
   item,
-  apiBasePath
+  apiBasePath,
+  turnDiff
 }: {
   item: DockThreadItem;
   apiBasePath: string;
+  turnDiff?: string | null;
 }) {
   const { t } = useI18n();
 
@@ -1671,12 +1825,33 @@ function ThreadItemView({
 
   if (item.type === "fileChange") {
     const fileChangeItem = item as Extract<DockThreadItem, { type: "fileChange" }>;
+    const aggregatedOutput = getFirstNonEmptyString(fileChangeItem.aggregatedOutput);
 
     return (
       <div className="dock-filechange-stack">
-        {getFileChangeRows(fileChangeItem, t).map((change) => (
+        {getFileChangeRows(fileChangeItem, t, turnDiff ?? null).map((change) => (
           <FileChangeRowView change={change} key={change.key} />
         ))}
+        {aggregatedOutput ? (
+          <details className="dock-filechange-card" open={false}>
+            <summary className="dock-filechange-summary">
+              <span className="dock-filechange-meta">
+                <span className="dock-filechange-action">
+                  {humanizeIdentifier("apply_patch")}
+                </span>
+                <span className="dock-filechange-label">
+                  {humanizeIdentifier("output")}
+                </span>
+              </span>
+              <span aria-hidden="true" className="dock-filechange-toggle">
+                <AppIcon className="dock-filechange-toggle-icon" name="chevron" />
+              </span>
+            </summary>
+            <div className="dock-filechange-detail">
+              <pre className="dock-filechange-output">{aggregatedOutput}</pre>
+            </div>
+          </details>
+        ) : null}
       </div>
     );
   }
@@ -1737,6 +1912,14 @@ function getRequestTitle(method: DockServerRequest["method"], t: TranslateFn) {
     return t("request.userInput");
   }
 
+  if (method === "item/permissions/requestApproval") {
+    return t("request.permissionsApproval");
+  }
+
+  if (method === "mcpServer/elicitation/request") {
+    return t("request.mcpElicitation");
+  }
+
   return humanizeIdentifier(method);
 }
 
@@ -1771,6 +1954,313 @@ function getCommandApprovalCwd(
   return fallbackCwd;
 }
 
+function isPermissionApprovalRequest(
+  request: DockServerRequest
+): request is PermissionApprovalRequestEntry {
+  return request.method === "item/permissions/requestApproval";
+}
+
+function isMcpElicitationRequest(
+  request: DockServerRequest
+): request is McpElicitationRequestEntry {
+  return request.method === "mcpServer/elicitation/request";
+}
+
+function getGrantedPermissionsFromRequest(
+  request: PermissionApprovalRequestEntry
+) {
+  const grantedPermissions: Record<string, unknown> = {};
+
+  if (request.params.permissions.network?.enabled) {
+    grantedPermissions.network = {
+      enabled: true
+    };
+  }
+
+  const read = request.params.permissions.fileSystem?.read?.filter(Boolean) ?? [];
+  const write = request.params.permissions.fileSystem?.write?.filter(Boolean) ?? [];
+
+  if (read.length || write.length) {
+    grantedPermissions.fileSystem = {
+      ...(read.length ? { read } : {}),
+      ...(write.length ? { write } : {})
+    };
+  }
+
+  return grantedPermissions;
+}
+
+function getPermissionGrantPayload(
+  request: PermissionApprovalRequestEntry,
+  scope: "turn" | "session"
+) {
+  return {
+    permissions: getGrantedPermissionsFromRequest(request),
+    scope
+  };
+}
+
+function getDeniedPermissionsPayload() {
+  return {
+    permissions: {},
+    scope: "turn" as const
+  };
+}
+
+function getPermissionRequestSections(
+  request: PermissionApprovalRequestEntry,
+  t: TranslateFn
+) {
+  const sections: Array<{
+    label: string;
+    lines?: string[];
+    value?: string;
+  }> = [];
+
+  if (request.params.permissions.network?.enabled) {
+    sections.push({
+      label: t("request.networkAccess"),
+      value: "true"
+    });
+  }
+
+  const read = request.params.permissions.fileSystem?.read?.filter(Boolean) ?? [];
+  if (read.length) {
+    sections.push({
+      label: t("request.readAccess"),
+      lines: read
+    });
+  }
+
+  const write = request.params.permissions.fileSystem?.write?.filter(Boolean) ?? [];
+  if (write.length) {
+    sections.push({
+      label: t("request.writeAccess"),
+      lines: write
+    });
+  }
+
+  return sections;
+}
+
+function getStoredRequestAnswer(
+  requestAnswers: RequestAnswersState,
+  requestId: string,
+  key: string
+) {
+  return requestAnswers[requestId]?.[key];
+}
+
+function getTextRequestAnswer(
+  requestAnswers: RequestAnswersState,
+  requestId: string,
+  key: string
+) {
+  const value = getStoredRequestAnswer(requestAnswers, requestId, key);
+  return typeof value === "string" ? value : "";
+}
+
+function getNumberRequestAnswer(
+  requestAnswers: RequestAnswersState,
+  requestId: string,
+  key: string
+) {
+  const value = getStoredRequestAnswer(requestAnswers, requestId, key);
+  return typeof value === "number" && Number.isFinite(value) ? String(value) : "";
+}
+
+function getBooleanRequestAnswer(
+  requestAnswers: RequestAnswersState,
+  requestId: string,
+  key: string,
+  fallback = false
+) {
+  const value = getStoredRequestAnswer(requestAnswers, requestId, key);
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function getMultiSelectRequestAnswer(
+  requestAnswers: RequestAnswersState,
+  requestId: string,
+  key: string,
+  fallback: string[] = []
+) {
+  const value = getStoredRequestAnswer(requestAnswers, requestId, key);
+  return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : fallback;
+}
+
+function getMcpFieldOptions(
+  schema: McpElicitationFieldSchema
+) {
+  if ("oneOf" in schema && Array.isArray(schema.oneOf)) {
+    return schema.oneOf.map((option: { const: string; title?: string }) => ({
+      value: option.const,
+      label: option.title || option.const
+    }));
+  }
+
+  if ("enum" in schema && Array.isArray(schema.enum)) {
+    return schema.enum.map((value: string, index: number) => ({
+      value,
+      label:
+        "enumNames" in schema && Array.isArray(schema.enumNames)
+          ? schema.enumNames[index] || value
+          : value
+    }));
+  }
+
+  if ("items" in schema && schema.items && "oneOf" in schema.items && Array.isArray(schema.items.oneOf)) {
+    return schema.items.oneOf.map((option: { const: string; title?: string }) => ({
+      value: option.const,
+      label: option.title || option.const
+    }));
+  }
+
+  if ("items" in schema && schema.items && "enum" in schema.items && Array.isArray(schema.items.enum)) {
+    return schema.items.enum.map((value: string) => ({
+      value,
+      label: value
+    }));
+  }
+
+  return [];
+}
+
+function getMcpSchemaDefaultValue(
+  schema: McpElicitationFieldSchema
+): RequestAnswerValue | undefined {
+  if ("default" in schema) {
+    return schema.default as RequestAnswerValue;
+  }
+
+  return undefined;
+}
+
+function normalizeMcpFieldValue(
+  schema: McpElicitationFieldSchema,
+  value: RequestAnswerValue | undefined,
+  required: boolean
+) {
+  const resolvedValue =
+    typeof value === "undefined" ? getMcpSchemaDefaultValue(schema) : value;
+
+  switch (schema.type) {
+    case "string": {
+      if (typeof resolvedValue === "string") {
+        if (required) {
+          return resolvedValue;
+        }
+
+        return resolvedValue.trim() ? resolvedValue : undefined;
+      }
+
+      return required ? "" : undefined;
+    }
+
+    case "number":
+    case "integer":
+      return typeof resolvedValue === "number" && Number.isFinite(resolvedValue)
+        ? resolvedValue
+        : undefined;
+
+    case "boolean":
+      return typeof resolvedValue === "boolean"
+        ? resolvedValue
+        : required
+          ? false
+          : undefined;
+
+    case "array":
+      return Array.isArray(resolvedValue) && resolvedValue.length
+        ? resolvedValue
+        : required
+          ? []
+          : undefined;
+  }
+}
+
+function isMcpFieldValid(
+  propertyKey: string,
+  schema: McpElicitationFieldSchema,
+  requiredFields: string[],
+  requestAnswers: RequestAnswersState,
+  requestId: string
+) {
+  const normalized = normalizeMcpFieldValue(
+    schema,
+    getStoredRequestAnswer(requestAnswers, requestId, propertyKey),
+    requiredFields.includes(propertyKey)
+  );
+
+  if (!requiredFields.includes(propertyKey)) {
+    return true;
+  }
+
+  if (schema.type === "string") {
+    return typeof normalized === "string" && normalized.trim().length > 0;
+  }
+
+  if (schema.type === "array") {
+    return Array.isArray(normalized) && normalized.length > 0;
+  }
+
+  return typeof normalized !== "undefined";
+}
+
+function isMcpRequestSubmittable(
+  request: McpElicitationRequestEntry,
+  requestAnswers: RequestAnswersState
+) {
+  if (request.params.mode === "url") {
+    return true;
+  }
+
+  const requiredFields = request.params.requestedSchema.required ?? [];
+  return Object.entries(request.params.requestedSchema.properties).every(
+    ([propertyKey, schema]) =>
+      isMcpFieldValid(
+        propertyKey,
+        schema,
+        requiredFields,
+        requestAnswers,
+        request.requestId
+      )
+  );
+}
+
+function buildMcpElicitationPayload(
+  request: McpElicitationRequestEntry,
+  requestAnswers: RequestAnswersState
+) {
+  if (request.params.mode === "url") {
+    return {
+      action: "accept" as const,
+      content: null,
+      _meta: null
+    };
+  }
+
+  const requiredFields = request.params.requestedSchema.required ?? [];
+  const content = Object.fromEntries(
+    Object.entries(request.params.requestedSchema.properties)
+      .map(([propertyKey, schema]) => [
+        propertyKey,
+        normalizeMcpFieldValue(
+          schema,
+          getStoredRequestAnswer(requestAnswers, request.requestId, propertyKey),
+          requiredFields.includes(propertyKey)
+        )
+      ])
+      .filter(([, value]) => typeof value !== "undefined")
+  );
+
+  return {
+    action: "accept" as const,
+    content,
+    _meta: null
+  };
+}
+
 export function DockApp({
   apiBasePath = "/api",
   responsiveStrategy = "viewport",
@@ -1795,12 +2285,16 @@ export function DockApp({
   const [prompt, setPrompt] = useState("");
   const [attachments, setAttachments] = useState<UploadItem[]>([]);
   const [pendingRequests, setPendingRequests] = useState<DockServerRequest[]>([]);
-  const [requestAnswers, setRequestAnswers] = useState<Record<string, Record<string, string>>>({});
+  const [requestAnswers, setRequestAnswers] = useState<RequestAnswersState>({});
   const [resolvingRequestIds, setResolvingRequestIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [loadingThread, setLoadingThread] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [renamingThread, setRenamingThread] = useState(false);
+  const [rollbackConfirmOpen, setRollbackConfirmOpen] = useState(false);
+  const [shellCommandOpen, setShellCommandOpen] = useState(false);
+  const [shellCommandDraft, setShellCommandDraft] = useState("");
+  const [shellCommandPending, setShellCommandPending] = useState(false);
   const [stageMode, setStageMode] = useState<"thread" | "terminal">("thread");
   const [archiveConfirmThreadId, setArchiveConfirmThreadId] = useState<
     string | null
@@ -1828,6 +2322,10 @@ export function DockApp({
   useEffect(() => {
     setArchiveConfirmThreadId(null);
     setArchivingThreadId(null);
+    setRollbackConfirmOpen(false);
+    setShellCommandOpen(false);
+    setShellCommandDraft("");
+    setShellCommandPending(false);
   }, [selectedThreadId]);
 
   useEffect(() => {
@@ -2118,7 +2616,10 @@ export function DockApp({
       void refreshThreads();
     }
 
-    if (!selectedThreadId || event.threadId !== selectedThreadId || !selectedThread) {
+    if (
+      !selectedThreadIdRef.current ||
+      event.threadId !== selectedThreadIdRef.current
+    ) {
       return;
     }
 
@@ -2294,12 +2795,80 @@ export function DockApp({
       return;
     }
 
+    if (event.method === "item/fileChange/outputDelta") {
+      const params = event.params as {
+        threadId?: string;
+        turnId: string;
+        itemId: string;
+        delta: string;
+      };
+      setSelectedThread((current) =>
+        current && (!params.threadId || current.id === params.threadId)
+          ? updateItem(current, params.turnId, params.itemId, (item) => ({
+              type: "fileChange",
+              id: params.itemId,
+              changes: item && item.type === "fileChange" ? item.changes : [],
+              status:
+                item && item.type === "fileChange" ? item.status : "completed",
+              aggregatedDiff:
+                item && item.type === "fileChange"
+                  ? item.aggregatedDiff ?? null
+                  : null,
+              aggregatedOutput:
+                item && item.type === "fileChange"
+                  ? `${item.aggregatedOutput || ""}${params.delta}`
+                  : params.delta
+            }))
+          : current
+      );
+      return;
+    }
+
+    if (event.method === "turn/diff/updated") {
+      const params = event.params as {
+        threadId?: string;
+        turnId: string;
+        diff: string;
+      };
+      setSelectedThread((current) =>
+        current && (!params.threadId || current.id === params.threadId)
+          ? updateTurn(current, params.turnId, (turn) => ({
+              ...turn,
+              diff: params.diff
+            }))
+          : current
+      );
+      return;
+    }
+
+    if (event.method === "error") {
+      const params = event.params as {
+        threadId?: string;
+        turnId: string;
+        error?: { message?: string } | null;
+        willRetry?: boolean;
+      };
+      setSelectedThread((current) =>
+        current && (!params.threadId || current.id === params.threadId)
+          ? updateTurn(current, params.turnId, (turn) => ({
+              ...turn,
+              status:
+                params.willRetry || turn.status !== "inProgress"
+                  ? turn.status
+                  : "failed",
+              error: params.error ?? turn.error
+            }))
+          : current
+      );
+      return;
+    }
+
     if (
       event.method === "turn/completed" ||
       event.method === "thread/status/changed" ||
       event.method === "thread/name/updated"
     ) {
-      void syncThread(selectedThreadId, {
+      void syncThread(selectedThreadIdRef.current, {
         background: true,
         suppressErrors: true
       });
@@ -2643,6 +3212,246 @@ export function DockApp({
     }
   }
 
+  async function steerCurrentTurn() {
+    if (
+      submitting ||
+      !selectedThreadId ||
+      !currentActiveTurn ||
+      (!prompt.trim() && !attachments.length)
+    ) {
+      return;
+    }
+
+    const attachmentPaths = attachments.map((attachment) => attachment.path);
+    const optimisticItem = createOptimisticSteerItem(
+      currentActiveTurn.id,
+      prompt,
+      attachmentPaths
+    );
+
+    setSubmitting(true);
+    setError(null);
+    setSelectedThread((current) =>
+      current
+        ? updateItem(current, currentActiveTurn.id, optimisticItem.id, () => optimisticItem)
+        : current
+    );
+
+    try {
+      await fetchJson<{ turnId: string }>(`/threads/${selectedThreadId}/steer`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          expectedTurnId: currentActiveTurn.id,
+          prompt,
+          attachmentPaths
+        })
+      });
+
+      setPrompt("");
+      setSubmitScrollToken((current) => current + 1);
+      setAttachments((current) => {
+        for (const attachment of current) {
+          if (attachment.previewUrl) {
+            URL.revokeObjectURL(attachment.previewUrl);
+          }
+        }
+        return [];
+      });
+    } catch (cause) {
+      setSelectedThread((current) =>
+        current
+          ? updateTurn(current, currentActiveTurn.id, (turn) => ({
+              ...turn,
+              items: turn.items.filter((item) => item.id !== optimisticItem.id)
+            }))
+          : current
+      );
+      setError(
+        cause instanceof Error
+          ? localizeRuntimeMessage(cause.message, t)
+          : t("error.steerFailed")
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function forkSelectedThread() {
+    if (!selectedThreadId) {
+      return;
+    }
+
+    setError(null);
+
+    try {
+      const data = await fetchJson<{ thread: DockThread }>(
+        `/threads/${selectedThreadId}/fork`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          }
+        }
+      );
+
+      setThreads((current) => upsertThreadInList(current, data.thread));
+      setSelectedThreadId(data.thread.id);
+      setSelectedThread(data.thread);
+      setStageMode("thread");
+      setSidebarOpen(false);
+      setRenamingThread(false);
+      setRollbackConfirmOpen(false);
+      setShellCommandOpen(false);
+      setShellCommandDraft("");
+      setPrompt("");
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? localizeRuntimeMessage(cause.message, t)
+          : t("error.forkFailed")
+      );
+    }
+  }
+
+  async function startSelectedThreadReview() {
+    if (!selectedThreadId) {
+      return;
+    }
+
+    setError(null);
+
+    try {
+      const data = await fetchJson<{ turn: DockTurn; reviewThreadId: string }>(
+        `/threads/${selectedThreadId}/review`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            delivery: "inline",
+            target: { type: "uncommittedChanges" }
+          })
+        }
+      );
+
+      if (data.reviewThreadId === selectedThreadId) {
+        setSelectedThread((current) =>
+          current ? upsertTurn(current, data.turn) : current
+        );
+      } else {
+        setSelectedThreadId(data.reviewThreadId);
+        void loadThread(data.reviewThreadId);
+      }
+
+      void refreshThreads().catch(() => {});
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? localizeRuntimeMessage(cause.message, t)
+          : t("error.reviewFailed")
+      );
+    }
+  }
+
+  async function rollbackSelectedThread() {
+    if (!selectedThreadId) {
+      return;
+    }
+
+    setError(null);
+
+    try {
+      const data = await fetchJson<{ thread: DockThread }>(
+        `/threads/${selectedThreadId}/rollback`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            numTurns: 1
+          })
+        }
+      );
+
+      setSelectedThread(data.thread);
+      setThreads((current) => upsertThreadInList(current, data.thread));
+      setRollbackConfirmOpen(false);
+      setShellCommandOpen(false);
+      setStageMode("thread");
+      void refreshThreads().catch(() => {});
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? localizeRuntimeMessage(cause.message, t)
+          : t("error.rollbackFailed")
+      );
+    }
+  }
+
+  async function compactSelectedThread() {
+    if (!selectedThreadId) {
+      return;
+    }
+
+    setError(null);
+
+    try {
+      await fetchJson(`/threads/${selectedThreadId}/compact`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        }
+      });
+
+      setShellCommandOpen(false);
+      void refreshThreads().catch(() => {});
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? localizeRuntimeMessage(cause.message, t)
+          : t("error.compactFailed")
+      );
+    }
+  }
+
+  async function runSelectedThreadShellCommand() {
+    if (!selectedThreadId || !shellCommandDraft.trim()) {
+      return;
+    }
+
+    setError(null);
+    setShellCommandPending(true);
+
+    try {
+      await fetchJson(`/threads/${selectedThreadId}/shell-command`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          command: shellCommandDraft.trim()
+        })
+      });
+
+      setShellCommandDraft("");
+      setShellCommandOpen(false);
+      void refreshThreads().catch(() => {});
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? localizeRuntimeMessage(cause.message, t)
+          : t("error.shellCommandFailed")
+      );
+    } finally {
+      setShellCommandPending(false);
+    }
+  }
+
   async function uploadFiles(fileList: FileList | File[] | null) {
     if (!fileList?.length) return;
 
@@ -2833,6 +3642,10 @@ export function DockApp({
     setTakeoverPromptOpen(false);
     setArchiveConfirmThreadId(null);
     setRenamingThread(false);
+    setRollbackConfirmOpen(false);
+    setShellCommandOpen(false);
+    setShellCommandDraft("");
+    setShellCommandPending(false);
     setThreadNameDraft("");
     if (nextCwd) {
       setComposerCwd(nextCwd);
@@ -3036,7 +3849,11 @@ export function DockApp({
                       )
                     ]}
                     placeholder={t("request.select")}
-                    value={requestAnswers[request.requestId]?.[question.id] || ""}
+                    value={getTextRequestAnswer(
+                      requestAnswers,
+                      request.requestId,
+                      question.id
+                    )}
                   />
                 ) : (
                   <input
@@ -3051,7 +3868,11 @@ export function DockApp({
                       }))
                     }
                     type={question.isSecret ? "password" : "text"}
-                    value={requestAnswers[request.requestId]?.[question.id] || ""}
+                    value={getTextRequestAnswer(
+                      requestAnswers,
+                      request.requestId,
+                      question.id
+                    )}
                   />
                 )}
               </label>
@@ -3065,7 +3886,13 @@ export function DockApp({
                       request.params.questions.map((question) => [
                         question.id,
                       {
-                        answers: [requestAnswers[request.requestId]?.[question.id] || ""]
+                        answers: [
+                          getTextRequestAnswer(
+                            requestAnswers,
+                            request.requestId,
+                            question.id
+                          )
+                        ]
                       }
                     ])
                   )
@@ -3075,6 +3902,381 @@ export function DockApp({
               >
                 {isResolving ? t("request.processing") : t("actions.submitAnswers")}
               </button>
+          </div>
+        ) : null}
+
+        {isPermissionApprovalRequest(request) ? (
+          <>
+            {request.params.reason ? (
+              <p className="dock-request-copy">{request.params.reason}</p>
+            ) : null}
+            <div className="dock-question-stack">
+              {getPermissionRequestSections(request, t).map((section) => (
+                <div className="dock-question" key={section.label}>
+                  <span>{section.label}</span>
+                  {section.lines?.length ? (
+                    <div className="dock-request-command-shell">
+                      <pre className="dock-request-command">
+                        {section.lines.join("\n")}
+                      </pre>
+                    </div>
+                  ) : (
+                    <code>{section.value}</code>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="dock-request-actions">
+              <button
+                className="dock-request-action is-primary"
+                disabled={isResolving}
+                onClick={() =>
+                  void resolveRequest(
+                    request,
+                    getPermissionGrantPayload(request, "turn")
+                  )
+                }
+                type="button"
+              >
+                {isResolving ? t("request.processing") : t("actions.allowOnce")}
+              </button>
+              <button
+                className="dock-request-action"
+                disabled={isResolving}
+                onClick={() =>
+                  void resolveRequest(
+                    request,
+                    getPermissionGrantPayload(request, "session")
+                  )
+                }
+                type="button"
+              >
+                {t("actions.allowForSession")}
+              </button>
+              <button
+                className="dock-request-action is-muted"
+                disabled={isResolving}
+                onClick={() =>
+                  void resolveRequest(request, getDeniedPermissionsPayload())
+                }
+                type="button"
+              >
+                {t("actions.deny")}
+              </button>
+            </div>
+          </>
+        ) : null}
+
+        {isMcpElicitationRequest(request) ? (
+          <div className="dock-question-stack">
+            <p className="dock-request-copy">{request.params.message}</p>
+            <div className="dock-request-meta-row">
+              <span className="dock-request-meta-label">{t("request.serverName")}</span>
+              <code>{request.params.serverName}</code>
+            </div>
+
+            {request.params.mode === "url" ? (
+              <>
+                <a
+                  className="dock-ghost-action"
+                  href={request.params.url}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  {t("actions.openLink")}
+                </a>
+                <div className="dock-request-actions">
+                  <button
+                    className="dock-request-action is-primary"
+                    disabled={isResolving}
+                    onClick={() =>
+                      void resolveRequest(request, buildMcpElicitationPayload(request, requestAnswers))
+                    }
+                    type="button"
+                  >
+                    {isResolving ? t("request.processing") : t("actions.confirm")}
+                  </button>
+                  <button
+                    className="dock-request-action"
+                    disabled={isResolving}
+                    onClick={() =>
+                      void resolveRequest(request, {
+                        action: "decline",
+                        content: null,
+                        _meta: null
+                      })
+                    }
+                    type="button"
+                  >
+                    {t("actions.deny")}
+                  </button>
+                  <button
+                    className="dock-request-action is-muted"
+                    disabled={isResolving}
+                    onClick={() =>
+                      void resolveRequest(request, {
+                        action: "cancel",
+                        content: null,
+                        _meta: null
+                      })
+                    }
+                    type="button"
+                  >
+                    {t("actions.cancel")}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                {(() => {
+                  const formParams = request.params as McpFormElicitationParams;
+
+                  return Object.entries(formParams.requestedSchema.properties).map(
+                  ([propertyKey, schema]) => {
+                    const optionEntries = getMcpFieldOptions(schema);
+                    const required =
+                      formParams.requestedSchema.required?.includes(propertyKey) ??
+                      false;
+
+                    if (schema.type === "boolean") {
+                      return (
+                        <label className="dock-question" key={propertyKey}>
+                          <span>
+                            {schema.title || humanizeIdentifier(propertyKey)}
+                            {required ? " *" : ""}
+                          </span>
+                          {schema.description ? <span>{schema.description}</span> : null}
+                          <label>
+                            <input
+                              checked={getBooleanRequestAnswer(
+                                requestAnswers,
+                                request.requestId,
+                                propertyKey,
+                                schema.default ?? false
+                              )}
+                              onChange={(event) =>
+                                setRequestAnswers((current) => ({
+                                  ...current,
+                                  [request.requestId]: {
+                                    ...current[request.requestId],
+                                    [propertyKey]: event.target.checked
+                                  }
+                                }))
+                              }
+                              type="checkbox"
+                            />
+                            {" "}
+                            {schema.title || humanizeIdentifier(propertyKey)}
+                          </label>
+                        </label>
+                      );
+                    }
+
+                    if (schema.type === "array") {
+                      const selectedValues = getMultiSelectRequestAnswer(
+                        requestAnswers,
+                        request.requestId,
+                        propertyKey,
+                        schema.default ?? []
+                      );
+
+                      return (
+                        <div className="dock-question" key={propertyKey}>
+                          <span>
+                            {schema.title || humanizeIdentifier(propertyKey)}
+                            {required ? " *" : ""}
+                          </span>
+                          {schema.description ? <span>{schema.description}</span> : null}
+                          <div className="dock-question-stack">
+                            {optionEntries.map((option) => {
+                              const checked = selectedValues.includes(option.value);
+
+                              return (
+                                <label key={option.value}>
+                                  <input
+                                    checked={checked}
+                                    onChange={(event) =>
+                                      setRequestAnswers((current) => {
+                                        const currentValues = getMultiSelectRequestAnswer(
+                                          current,
+                                          request.requestId,
+                                          propertyKey,
+                                          schema.default ?? []
+                                        );
+
+                                        return {
+                                          ...current,
+                                          [request.requestId]: {
+                                            ...current[request.requestId],
+                                            [propertyKey]: event.target.checked
+                                              ? [...currentValues, option.value]
+                                              : currentValues.filter(
+                                                  (entry) => entry !== option.value
+                                                )
+                                          }
+                                        };
+                                      })
+                                    }
+                                    type="checkbox"
+                                  />
+                                  {" "}
+                                  {option.label}
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (optionEntries.length) {
+                      return (
+                        <label className="dock-question" key={propertyKey}>
+                          <span>
+                            {schema.title || humanizeIdentifier(propertyKey)}
+                            {required ? " *" : ""}
+                          </span>
+                          {schema.description ? <span>{schema.description}</span> : null}
+                          <DockSelect
+                            ariaLabel={schema.title || propertyKey}
+                            className="dock-sidebar-select"
+                            onChange={(value) =>
+                              setRequestAnswers((current) => ({
+                                ...current,
+                                [request.requestId]: {
+                                  ...current[request.requestId],
+                                  [propertyKey]: value
+                                }
+                              }))
+                            }
+                            options={[
+                              { value: "", label: t("request.select"), disabled: true },
+                              ...optionEntries
+                            ]}
+                            placeholder={t("request.select")}
+                            value={getTextRequestAnswer(
+                              requestAnswers,
+                              request.requestId,
+                              propertyKey
+                            )}
+                          />
+                        </label>
+                      );
+                    }
+
+                    if (schema.type === "number" || schema.type === "integer") {
+                      return (
+                        <label className="dock-question" key={propertyKey}>
+                          <span>
+                            {schema.title || humanizeIdentifier(propertyKey)}
+                            {required ? " *" : ""}
+                          </span>
+                          {schema.description ? <span>{schema.description}</span> : null}
+                          <input
+                            className="dock-sidebar-input"
+                            max={schema.maximum}
+                            min={schema.minimum}
+                            onChange={(event) =>
+                              setRequestAnswers((current) => ({
+                                ...current,
+                                [request.requestId]: {
+                                  ...current[request.requestId],
+                                  [propertyKey]:
+                                    event.target.value === ""
+                                      ? null
+                                      : Number(event.target.value)
+                                }
+                              }))
+                            }
+                            type="number"
+                            value={getNumberRequestAnswer(
+                              requestAnswers,
+                              request.requestId,
+                              propertyKey
+                            )}
+                          />
+                        </label>
+                      );
+                    }
+
+                    if (schema.type === "string") {
+                      return (
+                        <label className="dock-question" key={propertyKey}>
+                          <span>
+                            {schema.title || humanizeIdentifier(propertyKey)}
+                            {required ? " *" : ""}
+                          </span>
+                          {schema.description ? <span>{schema.description}</span> : null}
+                          <input
+                            className="dock-sidebar-input"
+                            maxLength={schema.maxLength}
+                            minLength={schema.minLength}
+                            onChange={(event) =>
+                              setRequestAnswers((current) => ({
+                                ...current,
+                                [request.requestId]: {
+                                  ...current[request.requestId],
+                                  [propertyKey]: event.target.value
+                                }
+                              }))
+                            }
+                            type="text"
+                            value={getTextRequestAnswer(
+                              requestAnswers,
+                              request.requestId,
+                              propertyKey
+                            )}
+                          />
+                        </label>
+                      );
+                    }
+
+                    return null;
+                  }
+                );
+                })()}
+                <div className="dock-request-actions">
+                  <button
+                    className="dock-request-action is-primary"
+                    disabled={isResolving || !isMcpRequestSubmittable(request, requestAnswers)}
+                    onClick={() =>
+                      void resolveRequest(request, buildMcpElicitationPayload(request, requestAnswers))
+                    }
+                    type="button"
+                  >
+                    {isResolving ? t("request.processing") : t("actions.submitAnswers")}
+                  </button>
+                  <button
+                    className="dock-request-action"
+                    disabled={isResolving}
+                    onClick={() =>
+                      void resolveRequest(request, {
+                        action: "decline",
+                        content: null,
+                        _meta: null
+                      })
+                    }
+                    type="button"
+                  >
+                    {t("actions.deny")}
+                  </button>
+                  <button
+                    className="dock-request-action is-muted"
+                    disabled={isResolving}
+                    onClick={() =>
+                      void resolveRequest(request, {
+                        action: "cancel",
+                        content: null,
+                        _meta: null
+                      })
+                    }
+                    type="button"
+                  >
+                    {t("actions.cancel")}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         ) : null}
       </div>
@@ -3150,6 +4352,7 @@ export function DockApp({
           }}
           onArchiveCancel={() => setArchiveConfirmThreadId(null)}
           onArchiveConfirm={(threadId) => void toggleArchiveThread(threadId)}
+          onCompactThread={() => void compactSelectedThread()}
           onComposerCwdChange={setComposerCwd}
           onComposerModelChange={setComposerModel}
           onComposerPermissionPresetChange={setComposerPermissionPreset}
@@ -3187,6 +4390,8 @@ export function DockApp({
               return next;
             })
           }
+          onRollbackCancel={() => setRollbackConfirmOpen(false)}
+          onRollbackConfirm={() => void rollbackSelectedThread()}
           onRenameCancel={() => {
             setRenamingThread(false);
             setThreadNameDraft(selectedThread ? getThreadLabel(selectedThread, t) : "");
@@ -3200,11 +4405,22 @@ export function DockApp({
             }
             setArchiveConfirmThreadId(null);
             setRenamingThread(false);
+            setRollbackConfirmOpen(false);
+            setShellCommandOpen(false);
+            setShellCommandDraft("");
             setStageMode("thread");
             setSelectedThreadId(thread.id);
             setSidebarOpen(false);
           }}
+          onShellCommandCancel={() => {
+            setShellCommandOpen(false);
+            setShellCommandDraft("");
+          }}
+          onShellCommandDraftChange={setShellCommandDraft}
+          onShellCommandSubmit={() => void runSelectedThreadShellCommand()}
           onSidebarClose={() => setSidebarOpen(false)}
+          onStartReview={() => void startSelectedThreadReview()}
+          onSteerCurrentTurn={() => void steerCurrentTurn()}
           onSubmitPrompt={() => void submitPrompt()}
           onTakeoverCancel={() => setTakeoverPromptOpen(false)}
           onTakeoverConfirm={() => void submitPrompt({ takeoverConfirmed: true })}
@@ -3214,13 +4430,29 @@ export function DockApp({
               return;
             }
             setRenamingThread(false);
+            setRollbackConfirmOpen(false);
+            setShellCommandOpen(false);
             setArchiveConfirmThreadId((current) =>
               current === threadId ? null : threadId
             );
           }}
+          onToggleRollback={() => {
+            setArchiveConfirmThreadId(null);
+            setRenamingThread(false);
+            setShellCommandOpen(false);
+            setRollbackConfirmOpen((current) => !current);
+          }}
           onToggleRename={() => {
             setArchiveConfirmThreadId(null);
+            setRollbackConfirmOpen(false);
+            setShellCommandOpen(false);
             setRenamingThread((current) => !current);
+          }}
+          onToggleShellCommand={() => {
+            setArchiveConfirmThreadId(null);
+            setRenamingThread(false);
+            setRollbackConfirmOpen(false);
+            setShellCommandOpen((current) => !current);
           }}
           onToggleStageMode={() =>
             setStageMode((current) =>
@@ -3230,12 +4462,21 @@ export function DockApp({
           onUploadFiles={(files) => {
             void uploadFiles(files);
           }}
+          onForkThread={() => void forkSelectedThread()}
           projectFilter={projectFilter}
           projects={projects}
           prompt={prompt}
           renamingThread={renamingThread}
-          renderThreadItem={(item) => (
-            <ThreadItemView apiBasePath={resolvedApiBasePath} item={item} />
+          rollbackConfirmOpen={rollbackConfirmOpen}
+          shellCommandDraft={shellCommandDraft}
+          shellCommandOpen={shellCommandOpen}
+          shellCommandPending={shellCommandPending}
+          renderThreadItem={(item, context) => (
+            <ThreadItemView
+              apiBasePath={resolvedApiBasePath}
+              item={item}
+              turnDiff={context?.turn.diff ?? null}
+            />
           )}
           search={search}
           selectedThread={selectedThread}

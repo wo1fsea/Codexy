@@ -123,6 +123,8 @@ export type DockThreadItem =
       id: string;
       changes: DockFileChangeEntry[];
       status: string;
+      aggregatedDiff?: string | null;
+      aggregatedOutput?: string | null;
       [key: string]: unknown;
     }
   | {
@@ -152,10 +154,19 @@ export type DockTurn = {
   items: DockThreadItem[];
   status: "completed" | "interrupted" | "failed" | "inProgress";
   error: { message?: string } | null;
+  diff?: string | null;
   startedAt?: number | null;
   completedAt?: number | null;
   durationMs?: number | null;
 };
+
+export type DockReviewTarget =
+  | { type: "uncommittedChanges" }
+  | { type: "baseBranch"; branch: string }
+  | { type: "commit"; sha: string; title?: string | null }
+  | { type: "custom"; instructions: string };
+
+export type DockReviewDelivery = "inline" | "detached";
 
 export type DockThread = {
   id: string;
@@ -269,6 +280,130 @@ export type ToolRequest = {
   questions: ToolRequestQuestion[];
 };
 
+export type DockJsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | DockJsonValue[]
+  | { [key: string]: DockJsonValue };
+
+export type AdditionalNetworkPermissions = {
+  enabled?: boolean | null;
+  [key: string]: unknown;
+};
+
+export type AdditionalFileSystemPermissions = {
+  read?: string[] | null;
+  write?: string[] | null;
+  [key: string]: unknown;
+};
+
+export type RequestPermissionProfile = {
+  network?: AdditionalNetworkPermissions | null;
+  fileSystem?: AdditionalFileSystemPermissions | null;
+  [key: string]: unknown;
+};
+
+export type GrantedPermissionProfile = {
+  network?: AdditionalNetworkPermissions;
+  fileSystem?: AdditionalFileSystemPermissions;
+  [key: string]: unknown;
+};
+
+export type PermissionGrantScope = "turn" | "session";
+
+export type PermissionsApprovalRequest = {
+  threadId: string;
+  turnId: string;
+  itemId: string;
+  reason?: string | null;
+  permissions: RequestPermissionProfile;
+  [key: string]: unknown;
+};
+
+export type McpElicitationConstOption = {
+  const: string;
+  title?: string;
+};
+
+export type McpElicitationPrimitiveSchema =
+  | {
+      type: "string";
+      title?: string;
+      description?: string;
+      minLength?: number;
+      maxLength?: number;
+      format?: string;
+      default?: string;
+      enum?: string[];
+      enumNames?: string[];
+      oneOf?: McpElicitationConstOption[];
+    }
+  | {
+      type: "number" | "integer";
+      title?: string;
+      description?: string;
+      minimum?: number;
+      maximum?: number;
+      default?: number;
+    }
+  | {
+      type: "boolean";
+      title?: string;
+      description?: string;
+      default?: boolean;
+    }
+  | {
+      type: "array";
+      title?: string;
+      description?: string;
+      minItems?: number;
+      maxItems?: number;
+      items:
+        | {
+            enum?: string[];
+          }
+        | {
+            oneOf?: McpElicitationConstOption[];
+          };
+      default?: string[];
+    };
+
+export type McpElicitationSchema = {
+  $schema?: string;
+  type: "object";
+  properties: Record<string, McpElicitationPrimitiveSchema>;
+  required?: string[];
+};
+
+export type McpServerElicitationRequest =
+  | {
+      threadId: string;
+      turnId: string | null;
+      serverName: string;
+      mode: "form";
+      _meta?: DockJsonValue | null;
+      message: string;
+      requestedSchema: McpElicitationSchema;
+    }
+  | {
+      threadId: string;
+      turnId: string | null;
+      serverName: string;
+      mode: "url";
+      _meta?: DockJsonValue | null;
+      message: string;
+      url: string;
+      elicitationId: string;
+    };
+
+export type McpServerElicitationResponse = {
+  action: "accept" | "decline" | "cancel";
+  content: DockJsonValue | null;
+  _meta?: DockJsonValue | null;
+};
+
 export type DockServerRequest =
   | {
       requestId: string;
@@ -290,6 +425,20 @@ export type DockServerRequest =
       method: "item/tool/requestUserInput";
       threadId?: string;
       params: ToolRequest;
+    }
+  | {
+      requestId: string;
+      rpcId: string | number;
+      method: "item/permissions/requestApproval";
+      threadId?: string;
+      params: PermissionsApprovalRequest;
+    }
+  | {
+      requestId: string;
+      rpcId: string | number;
+      method: "mcpServer/elicitation/request";
+      threadId?: string;
+      params: McpServerElicitationRequest;
     }
   | {
       requestId: string;
@@ -349,6 +498,31 @@ export type TurnStartResponse = {
   turn: DockTurn;
 };
 
+export type TurnSteerResponse = {
+  turnId: string;
+};
+
+export type ThreadForkResponse = {
+  thread: DockThread;
+  model: string;
+  modelProvider: string;
+  cwd: string;
+  approvalPolicy: DockApprovalPolicy;
+};
+
+export type ThreadRollbackResponse = {
+  thread: DockThread;
+};
+
+export type ReviewStartResponse = {
+  turn: DockTurn;
+  reviewThreadId: string;
+};
+
+export type ThreadCompactStartResponse = Record<string, never>;
+
+export type ThreadShellCommandResponse = Record<string, never>;
+
 export type ModelListResponse = {
   data: DockModel[];
   nextCursor: string | null;
@@ -365,6 +539,14 @@ export type ResolveRequestPayload =
     }
   | {
       answers: Record<string, { answers: string[] }>;
+    }
+  | {
+      permissions: GrantedPermissionProfile;
+      scope: PermissionGrantScope;
+    }
+  | McpServerElicitationResponse
+  | {
+      [key: string]: DockJsonValue;
     };
 
 export type ResolveRequestSubmission = {
