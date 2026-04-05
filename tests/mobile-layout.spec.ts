@@ -131,10 +131,10 @@ test("mobile bottom dock stays inside the viewport", async ({ page }) => {
   expect(metrics!.appBottom).toBeLessThanOrEqual(metrics!.viewportHeight);
   expect(metrics!.shellBottom).toBeLessThanOrEqual(metrics!.viewportHeight);
   expect(metrics!.bottomDockBottom).toBeLessThanOrEqual(metrics!.viewportHeight);
-  expect(metrics!.bottomDockPaddingBottom).toBe(34);
+  expect(metrics!.bottomDockPaddingBottom).toBe(8);
   expect(metrics!.composerBottom).toBeLessThanOrEqual(metrics!.viewportHeight);
   expect(metrics!.statusBottom).toBeLessThanOrEqual(metrics!.viewportHeight);
-  expect(metrics!.statusBottomGap).toBeLessThanOrEqual(35);
+  expect(metrics!.statusBottomGap).toBeLessThanOrEqual(9);
 });
 
 test("mobile idle hero does not scroll into blank space", async ({ page }) => {

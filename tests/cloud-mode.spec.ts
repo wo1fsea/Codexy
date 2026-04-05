@@ -524,6 +524,29 @@ test("cloud dashboard scrolls on mobile viewports", async ({ page }) => {
     expect(controlsBox).not.toBeNull();
     expect(controlsBox?.x ?? 0).toBeGreaterThan((copyBox?.x ?? 0) + (copyBox?.width ?? 0) * 0.72);
     expect(Math.abs((controlsBox?.y ?? 0) - (copyBox?.y ?? 0))).toBeLessThanOrEqual(10);
+
+    await page.setViewportSize({
+      width: 390,
+      height: 844
+    });
+    const filledMetrics = await page.evaluate(() => {
+      const shell = document.querySelector(".cloud-app-shell") as HTMLElement | null;
+      const panel = document.querySelector(".cloud-panel") as HTMLElement | null;
+
+      if (!shell || !panel) {
+        return null;
+      }
+
+      return {
+        shellBottom: shell.getBoundingClientRect().bottom,
+        panelBottom: panel.getBoundingClientRect().bottom,
+        viewportHeight: window.innerHeight
+      };
+    });
+    expect(filledMetrics).not.toBeNull();
+    expect(filledMetrics!.shellBottom).toBeLessThanOrEqual(filledMetrics!.viewportHeight + 1);
+    expect(filledMetrics!.panelBottom).toBeGreaterThanOrEqual(filledMetrics!.viewportHeight - 24);
+    expect(filledMetrics!.panelBottom).toBeLessThanOrEqual(filledMetrics!.viewportHeight + 1);
   } finally {
     runNodeCli(["unlink"], nodeHome, 20_000);
     runNodeCli(["cloud", "stop"], cloudHome, 20_000);
@@ -982,7 +1005,7 @@ test("cloud remote workspace keeps a single-line mobile header and fills the rem
     expect(shellMetrics!.bottomDockBottom ?? 0).toBeLessThanOrEqual(
       shellMetrics!.viewportHeight + 1
     );
-    expect(shellMetrics!.bottomDockPaddingBottom).toBe(34);
+    expect(shellMetrics!.bottomDockPaddingBottom).toBe(8);
     expect(shellMetrics!.viewportHeight - (shellMetrics!.bottomDockBottom ?? 0)).toBeLessThanOrEqual(
       1
     );
@@ -1441,15 +1464,15 @@ test("cloud wall can show the same linked node in multiple panes", async ({ page
     });
     expect(wallSafeAreaMetrics).not.toBeNull();
     expect(wallSafeAreaMetrics!.shellPaddingTop).toBe(48);
-    expect(wallSafeAreaMetrics!.scrollPaddingBottom).toBe(34);
+    expect(wallSafeAreaMetrics!.scrollPaddingBottom).toBe(10);
     expect(wallSafeAreaMetrics!.headerTop).toBeGreaterThanOrEqual(58);
     expect(wallSafeAreaMetrics!.shellBottom).toBeLessThanOrEqual(
       wallSafeAreaMetrics!.viewportHeight + 1
     );
     expect(wallSafeAreaMetrics!.scrollTop).toBeGreaterThan(0);
-    expect(wallSafeAreaMetrics!.bottomGap).toBeGreaterThanOrEqual(34);
+    expect(wallSafeAreaMetrics!.bottomGap).toBeGreaterThanOrEqual(10);
     expect(wallSafeAreaMetrics!.lastPaneBottom).toBeLessThanOrEqual(
-      wallSafeAreaMetrics!.viewportHeight - 34 + 1
+      wallSafeAreaMetrics!.viewportHeight - 10 + 1
     );
     expect(wallSafeAreaMetrics!.firstDockAppPaddingTop).toBe(0);
   } finally {

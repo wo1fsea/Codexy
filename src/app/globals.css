@@ -215,12 +215,14 @@ pre {
 
 .cloud-app-scroll {
   height: 100%;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
-  padding: clamp(20px, 4vw, 40px) clamp(20px, 4vw, 40px)
-    max(clamp(20px, 4vw, 40px), var(--safe-area-bottom));
+  padding: clamp(20px, 4vw, 40px);
 }
 
 @supports (height: 100dvh) {
@@ -248,8 +250,7 @@ pre {
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior-y: contain;
-  padding: clamp(20px, 4vw, 40px) clamp(20px, 4vw, 40px)
-    max(clamp(20px, 4vw, 40px), var(--safe-area-bottom));
+  padding: clamp(20px, 4vw, 40px);
 }
 
 @supports (height: 100dvh) {
@@ -637,6 +638,9 @@ pre {
 }
 
 .cloud-panel {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
   padding: 18px;
 }
 
@@ -695,6 +699,7 @@ pre {
 .cloud-node-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
   gap: 14px;
 }
 
@@ -839,7 +844,7 @@ pre {
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 10px 10px max(10px, var(--safe-area-bottom));
+  padding: 10px;
 }
 
 @supports (height: 100dvh) {
@@ -3608,7 +3613,7 @@ pre {
   padding-right: var(--stage-inline-pad);
   background: var(--stage-bg);
   padding-top: 6px;
-  padding-bottom: max(8px, var(--safe-area-bottom));
+  padding-bottom: 8px;
 }
 
 .dock-bottom-center {
@@ -4426,7 +4431,7 @@ pre {
   }
 
   .dock-composer-plan-panel {
-    --dock-plan-overlap-clearance: calc(82px + var(--safe-area-bottom));
+    --dock-plan-overlap-clearance: 82px;
     max-height: min(24vh, 180px);
   }
 
