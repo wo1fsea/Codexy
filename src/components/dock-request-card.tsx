@@ -14,15 +14,18 @@ import {
   getDeclinePayload,
   getFileApprovalReason,
   getFileApprovalTargets,
+  getServerRequestFamily,
   getServerRequestTitle,
   getSingleApprovePayload,
   isCommandApprovalRequest,
   isFileApprovalRequest,
   isMcpElicitationRequest,
   isPermissionApprovalRequest,
+  isUserInputRequest,
   type FileApprovalRequestEntry,
   type McpElicitationRequestEntry,
-  type PermissionApprovalRequestEntry
+  type PermissionApprovalRequestEntry,
+  type UserInputRequestEntry
 } from "@/lib/codex/server-requests";
 import { useI18n } from "@/lib/i18n/provider";
 import type { TranslateFn } from "@/lib/i18n/messages";
@@ -169,6 +172,107 @@ function FileApprovalRequestView({
   );
 }
 
+function UserInputRequestView({
+  isResolving,
+  onResolve,
+  request,
+  requestAnswers,
+  setRequestAnswers
+}: {
+  isResolving: boolean;
+  onResolve: (payload: Record<string, unknown>) => void;
+  request: UserInputRequestEntry;
+  requestAnswers: RequestAnswersState;
+  setRequestAnswers: Dispatch<SetStateAction<RequestAnswersState>>;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <div className="dock-question-stack">
+      {request.params.questions.map((question) => (
+        <label className="dock-question" key={question.id}>
+          <span>{question.question}</span>
+          {question.options?.length ? (
+            <DockSelect
+              ariaLabel={question.header || question.question}
+              className="dock-sidebar-select"
+              onChange={(value) =>
+                setRequestAnswers((current) => ({
+                  ...current,
+                  [request.requestId]: {
+                    ...current[request.requestId],
+                    [question.id]: value
+                  }
+                }))
+              }
+              options={[
+                { value: "", label: t("request.select"), disabled: true },
+                ...question.options.map(
+                  (option): DockSelectOption => ({
+                    value: option.label,
+                    label: option.label,
+                    description: option.description
+                  })
+                )
+              ]}
+              placeholder={t("request.select")}
+              value={getTextRequestAnswer(
+                requestAnswers,
+                request.requestId,
+                question.id
+              )}
+            />
+          ) : (
+            <input
+              className="dock-sidebar-input"
+              onChange={(event) =>
+                setRequestAnswers((current) => ({
+                  ...current,
+                  [request.requestId]: {
+                    ...current[request.requestId],
+                    [question.id]: event.target.value
+                  }
+                }))
+              }
+              type={question.isSecret ? "password" : "text"}
+              value={getTextRequestAnswer(
+                requestAnswers,
+                request.requestId,
+                question.id
+              )}
+            />
+          )}
+        </label>
+      ))}
+      <button
+        className="dock-ghost-action"
+        disabled={isResolving}
+        onClick={() =>
+          onResolve({
+            answers: Object.fromEntries(
+              request.params.questions.map((question) => [
+                question.id,
+                {
+                  answers: [
+                    getTextRequestAnswer(
+                      requestAnswers,
+                      request.requestId,
+                      question.id
+                    )
+                  ]
+                }
+              ])
+            )
+          })
+        }
+        type="button"
+      >
+        {isResolving ? t("request.processing") : t("actions.submitAnswers")}
+      </button>
+    </div>
+  );
+}
+
 function getGrantedPermissionsFromRequest(
   request: PermissionApprovalRequestEntry
 ) {
@@ -244,6 +348,66 @@ function getPermissionRequestSections(
   }
 
   return sections;
+}
+
+function PermissionApprovalRequestView({
+  isResolving,
+  onResolve,
+  request
+}: {
+  isResolving: boolean;
+  onResolve: (payload: Record<string, unknown>) => void;
+  request: PermissionApprovalRequestEntry;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <>
+      {request.params.reason ? (
+        <p className="dock-request-copy">{request.params.reason}</p>
+      ) : null}
+      <div className="dock-question-stack">
+        {getPermissionRequestSections(request, t).map((section) => (
+          <div className="dock-question" key={section.label}>
+            <span>{section.label}</span>
+            {section.lines?.length ? (
+              <div className="dock-request-command-shell">
+                <pre className="dock-request-command">{section.lines.join("\n")}</pre>
+              </div>
+            ) : (
+              <code>{section.value}</code>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="dock-request-actions">
+        <button
+          className="dock-request-action is-primary"
+          disabled={isResolving}
+          onClick={() => onResolve(getPermissionGrantPayload(request, "turn"))}
+          type="button"
+        >
+          {isResolving ? t("request.processing") : t("actions.allowOnce")}
+        </button>
+        <button
+          className="dock-request-action"
+          disabled={isResolving}
+          onClick={() => onResolve(getPermissionGrantPayload(request, "session"))}
+          type="button"
+        >
+          {t("actions.allowForSession")}
+        </button>
+        <button
+          className="dock-request-action is-muted"
+          disabled={isResolving}
+          onClick={() => onResolve(getDeniedPermissionsPayload())}
+          type="button"
+        >
+          {t("actions.deny")}
+        </button>
+      </div>
+    </>
+  );
 }
 
 function getStoredRequestAnswer(
@@ -470,6 +634,330 @@ function buildMcpElicitationPayload(
   };
 }
 
+function McpElicitationRequestView({
+  isResolving,
+  onResolve,
+  request,
+  requestAnswers,
+  setRequestAnswers
+}: {
+  isResolving: boolean;
+  onResolve: (payload: Record<string, unknown>) => void;
+  request: McpElicitationRequestEntry;
+  requestAnswers: RequestAnswersState;
+  setRequestAnswers: Dispatch<SetStateAction<RequestAnswersState>>;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <div className="dock-question-stack">
+      <p className="dock-request-copy">{request.params.message}</p>
+      <div className="dock-request-meta-row">
+        <span className="dock-request-meta-label">{t("request.serverName")}</span>
+        <code>{request.params.serverName}</code>
+      </div>
+
+      {request.params.mode === "url" ? (
+        <>
+          <a
+            className="dock-ghost-action"
+            href={request.params.url}
+            rel="noreferrer"
+            target="_blank"
+          >
+            {t("actions.openLink")}
+          </a>
+          <div className="dock-request-actions">
+            <button
+              className="dock-request-action is-primary"
+              disabled={isResolving}
+              onClick={() => onResolve(buildMcpElicitationPayload(request, requestAnswers))}
+              type="button"
+            >
+              {isResolving ? t("request.processing") : t("actions.confirm")}
+            </button>
+            <button
+              className="dock-request-action"
+              disabled={isResolving}
+              onClick={() =>
+                onResolve({
+                  action: "decline",
+                  content: null,
+                  _meta: null
+                })
+              }
+              type="button"
+            >
+              {t("actions.deny")}
+            </button>
+            <button
+              className="dock-request-action is-muted"
+              disabled={isResolving}
+              onClick={() =>
+                onResolve({
+                  action: "cancel",
+                  content: null,
+                  _meta: null
+                })
+              }
+              type="button"
+            >
+              {t("actions.cancel")}
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          {(() => {
+            const formParams = request.params as McpFormElicitationParams;
+
+            return Object.entries(formParams.requestedSchema.properties).map(
+              ([propertyKey, schema]) => {
+                const optionEntries = getMcpFieldOptions(schema);
+                const required =
+                  formParams.requestedSchema.required?.includes(propertyKey) ?? false;
+
+                if (schema.type === "boolean") {
+                  return (
+                    <label className="dock-question" key={propertyKey}>
+                      <span>
+                        {schema.title || humanizeIdentifier(propertyKey)}
+                        {required ? " *" : ""}
+                      </span>
+                      {schema.description ? <span>{schema.description}</span> : null}
+                      <label>
+                        <input
+                          checked={getBooleanRequestAnswer(
+                            requestAnswers,
+                            request.requestId,
+                            propertyKey,
+                            schema.default ?? false
+                          )}
+                          onChange={(event) =>
+                            setRequestAnswers((current) => ({
+                              ...current,
+                              [request.requestId]: {
+                                ...current[request.requestId],
+                                [propertyKey]: event.target.checked
+                              }
+                            }))
+                          }
+                          type="checkbox"
+                        />
+                        {" "}
+                        {schema.title || humanizeIdentifier(propertyKey)}
+                      </label>
+                    </label>
+                  );
+                }
+
+                if (schema.type === "array") {
+                  const selectedValues = getMultiSelectRequestAnswer(
+                    requestAnswers,
+                    request.requestId,
+                    propertyKey,
+                    schema.default ?? []
+                  );
+
+                  return (
+                    <div className="dock-question" key={propertyKey}>
+                      <span>
+                        {schema.title || humanizeIdentifier(propertyKey)}
+                        {required ? " *" : ""}
+                      </span>
+                      {schema.description ? <span>{schema.description}</span> : null}
+                      <div className="dock-question-stack">
+                        {optionEntries.map((option) => {
+                          const checked = selectedValues.includes(option.value);
+
+                          return (
+                            <label key={option.value}>
+                              <input
+                                checked={checked}
+                                onChange={(event) =>
+                                  setRequestAnswers((current) => {
+                                    const currentValues = getMultiSelectRequestAnswer(
+                                      current,
+                                      request.requestId,
+                                      propertyKey,
+                                      schema.default ?? []
+                                    );
+
+                                    return {
+                                      ...current,
+                                      [request.requestId]: {
+                                        ...current[request.requestId],
+                                        [propertyKey]: event.target.checked
+                                          ? [...currentValues, option.value]
+                                          : currentValues.filter(
+                                              (entry) => entry !== option.value
+                                            )
+                                      }
+                                    };
+                                  })
+                                }
+                                type="checkbox"
+                              />
+                              {" "}
+                              {option.label}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (optionEntries.length) {
+                  return (
+                    <label className="dock-question" key={propertyKey}>
+                      <span>
+                        {schema.title || humanizeIdentifier(propertyKey)}
+                        {required ? " *" : ""}
+                      </span>
+                      {schema.description ? <span>{schema.description}</span> : null}
+                      <DockSelect
+                        ariaLabel={schema.title || propertyKey}
+                        className="dock-sidebar-select"
+                        onChange={(value) =>
+                          setRequestAnswers((current) => ({
+                            ...current,
+                            [request.requestId]: {
+                              ...current[request.requestId],
+                              [propertyKey]: value
+                            }
+                          }))
+                        }
+                        options={[
+                          { value: "", label: t("request.select"), disabled: true },
+                          ...optionEntries
+                        ]}
+                        placeholder={t("request.select")}
+                        value={getTextRequestAnswer(
+                          requestAnswers,
+                          request.requestId,
+                          propertyKey
+                        )}
+                      />
+                    </label>
+                  );
+                }
+
+                if (schema.type === "number" || schema.type === "integer") {
+                  return (
+                    <label className="dock-question" key={propertyKey}>
+                      <span>
+                        {schema.title || humanizeIdentifier(propertyKey)}
+                        {required ? " *" : ""}
+                      </span>
+                      {schema.description ? <span>{schema.description}</span> : null}
+                      <input
+                        className="dock-sidebar-input"
+                        max={schema.maximum}
+                        min={schema.minimum}
+                        onChange={(event) =>
+                          setRequestAnswers((current) => ({
+                            ...current,
+                            [request.requestId]: {
+                              ...current[request.requestId],
+                              [propertyKey]:
+                                event.target.value === ""
+                                  ? null
+                                  : Number(event.target.value)
+                            }
+                          }))
+                        }
+                        type="number"
+                        value={getNumberRequestAnswer(
+                          requestAnswers,
+                          request.requestId,
+                          propertyKey
+                        )}
+                      />
+                    </label>
+                  );
+                }
+
+                if (schema.type === "string") {
+                  return (
+                    <label className="dock-question" key={propertyKey}>
+                      <span>
+                        {schema.title || humanizeIdentifier(propertyKey)}
+                        {required ? " *" : ""}
+                      </span>
+                      {schema.description ? <span>{schema.description}</span> : null}
+                      <input
+                        className="dock-sidebar-input"
+                        maxLength={schema.maxLength}
+                        minLength={schema.minLength}
+                        onChange={(event) =>
+                          setRequestAnswers((current) => ({
+                            ...current,
+                            [request.requestId]: {
+                              ...current[request.requestId],
+                              [propertyKey]: event.target.value
+                            }
+                          }))
+                        }
+                        type="text"
+                        value={getTextRequestAnswer(
+                          requestAnswers,
+                          request.requestId,
+                          propertyKey
+                        )}
+                      />
+                    </label>
+                  );
+                }
+
+                return null;
+              }
+            );
+          })()}
+          <div className="dock-request-actions">
+            <button
+              className="dock-request-action is-primary"
+              disabled={isResolving || !isMcpRequestSubmittable(request, requestAnswers)}
+              onClick={() => onResolve(buildMcpElicitationPayload(request, requestAnswers))}
+              type="button"
+            >
+              {isResolving ? t("request.processing") : t("actions.submitAnswers")}
+            </button>
+            <button
+              className="dock-request-action"
+              disabled={isResolving}
+              onClick={() =>
+                onResolve({
+                  action: "decline",
+                  content: null,
+                  _meta: null
+                })
+              }
+              type="button"
+            >
+              {t("actions.deny")}
+            </button>
+            <button
+              className="dock-request-action is-muted"
+              disabled={isResolving}
+              onClick={() =>
+                onResolve({
+                  action: "cancel",
+                  content: null,
+                  _meta: null
+                })
+              }
+              type="button"
+            >
+              {t("actions.cancel")}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function DockRequestCard({
   fallbackCwd,
   isResolving,
@@ -479,6 +967,74 @@ export function DockRequestCard({
   setRequestAnswers
 }: DockRequestCardProps) {
   const { t } = useI18n();
+  const family = getServerRequestFamily(request.method);
+
+  let body: React.ReactNode = null;
+
+  switch (family) {
+    case "commandApproval":
+      if (isCommandApprovalRequest(request)) {
+        body = (
+          <CommandApprovalRequestView
+            fallbackCwd={fallbackCwd}
+            isResolving={isResolving}
+            onResolve={onResolve}
+            request={request}
+          />
+        );
+      }
+      break;
+    case "fileApproval":
+      if (isFileApprovalRequest(request)) {
+        body = (
+          <FileApprovalRequestView
+            isResolving={isResolving}
+            onResolve={onResolve}
+            request={request}
+          />
+        );
+      }
+      break;
+    case "userInput":
+      if (isUserInputRequest(request)) {
+        body = (
+          <UserInputRequestView
+            isResolving={isResolving}
+            onResolve={onResolve}
+            request={request}
+            requestAnswers={requestAnswers}
+            setRequestAnswers={setRequestAnswers}
+          />
+        );
+      }
+      break;
+    case "permissionsApproval":
+      if (isPermissionApprovalRequest(request)) {
+        body = (
+          <PermissionApprovalRequestView
+            isResolving={isResolving}
+            onResolve={onResolve}
+            request={request}
+          />
+        );
+      }
+      break;
+    case "mcpElicitation":
+      if (isMcpElicitationRequest(request)) {
+        body = (
+          <McpElicitationRequestView
+            isResolving={isResolving}
+            onResolve={onResolve}
+            request={request}
+            requestAnswers={requestAnswers}
+            setRequestAnswers={setRequestAnswers}
+          />
+        );
+      }
+      break;
+    default:
+      body = null;
+  }
 
   return (
     <div className="dock-request-card" key={request.requestId}>
@@ -487,470 +1043,7 @@ export function DockRequestCard({
           <strong>{getServerRequestTitle(request.method, t)}</strong>
         </div>
       </div>
-
-      {isCommandApprovalRequest(request) ? (
-        <CommandApprovalRequestView
-          fallbackCwd={fallbackCwd}
-          isResolving={isResolving}
-          onResolve={onResolve}
-          request={request}
-        />
-      ) : null}
-
-      {isFileApprovalRequest(request) ? (
-        <FileApprovalRequestView
-          isResolving={isResolving}
-          onResolve={onResolve}
-          request={request}
-        />
-      ) : null}
-
-      {request.method === "item/tool/requestUserInput" ? (
-        <div className="dock-question-stack">
-          {request.params.questions.map((question) => (
-            <label className="dock-question" key={question.id}>
-              <span>{question.question}</span>
-              {question.options?.length ? (
-                <DockSelect
-                  ariaLabel={question.header || question.question}
-                  className="dock-sidebar-select"
-                  onChange={(value) =>
-                    setRequestAnswers((current) => ({
-                      ...current,
-                      [request.requestId]: {
-                        ...current[request.requestId],
-                        [question.id]: value
-                      }
-                    }))
-                  }
-                  options={[
-                    { value: "", label: t("request.select"), disabled: true },
-                    ...question.options.map(
-                      (option): DockSelectOption => ({
-                        value: option.label,
-                        label: option.label,
-                        description: option.description
-                      })
-                    )
-                  ]}
-                  placeholder={t("request.select")}
-                  value={getTextRequestAnswer(
-                    requestAnswers,
-                    request.requestId,
-                    question.id
-                  )}
-                />
-              ) : (
-                <input
-                  className="dock-sidebar-input"
-                  onChange={(event) =>
-                    setRequestAnswers((current) => ({
-                      ...current,
-                      [request.requestId]: {
-                        ...current[request.requestId],
-                        [question.id]: event.target.value
-                      }
-                    }))
-                  }
-                  type={question.isSecret ? "password" : "text"}
-                  value={getTextRequestAnswer(
-                    requestAnswers,
-                    request.requestId,
-                    question.id
-                  )}
-                />
-              )}
-            </label>
-          ))}
-          <button
-            className="dock-ghost-action"
-            disabled={isResolving}
-            onClick={() =>
-              onResolve({
-                answers: Object.fromEntries(
-                  request.params.questions.map((question) => [
-                    question.id,
-                    {
-                      answers: [
-                        getTextRequestAnswer(
-                          requestAnswers,
-                          request.requestId,
-                          question.id
-                        )
-                      ]
-                    }
-                  ])
-                )
-              })
-            }
-            type="button"
-          >
-            {isResolving ? t("request.processing") : t("actions.submitAnswers")}
-          </button>
-        </div>
-      ) : null}
-
-      {isPermissionApprovalRequest(request) ? (
-        <>
-          {request.params.reason ? (
-            <p className="dock-request-copy">{request.params.reason}</p>
-          ) : null}
-          <div className="dock-question-stack">
-            {getPermissionRequestSections(request, t).map((section) => (
-              <div className="dock-question" key={section.label}>
-                <span>{section.label}</span>
-                {section.lines?.length ? (
-                  <div className="dock-request-command-shell">
-                    <pre className="dock-request-command">
-                      {section.lines.join("\n")}
-                    </pre>
-                  </div>
-                ) : (
-                  <code>{section.value}</code>
-                )}
-              </div>
-            ))}
-          </div>
-          <div className="dock-request-actions">
-            <button
-              className="dock-request-action is-primary"
-              disabled={isResolving}
-              onClick={() => onResolve(getPermissionGrantPayload(request, "turn"))}
-              type="button"
-            >
-              {isResolving ? t("request.processing") : t("actions.allowOnce")}
-            </button>
-            <button
-              className="dock-request-action"
-              disabled={isResolving}
-              onClick={() => onResolve(getPermissionGrantPayload(request, "session"))}
-              type="button"
-            >
-              {t("actions.allowForSession")}
-            </button>
-            <button
-              className="dock-request-action is-muted"
-              disabled={isResolving}
-              onClick={() => onResolve(getDeniedPermissionsPayload())}
-              type="button"
-            >
-              {t("actions.deny")}
-            </button>
-          </div>
-        </>
-      ) : null}
-
-      {isMcpElicitationRequest(request) ? (
-        <div className="dock-question-stack">
-          <p className="dock-request-copy">{request.params.message}</p>
-          <div className="dock-request-meta-row">
-            <span className="dock-request-meta-label">{t("request.serverName")}</span>
-            <code>{request.params.serverName}</code>
-          </div>
-
-          {request.params.mode === "url" ? (
-            <>
-              <a
-                className="dock-ghost-action"
-                href={request.params.url}
-                rel="noreferrer"
-                target="_blank"
-              >
-                {t("actions.openLink")}
-              </a>
-              <div className="dock-request-actions">
-                <button
-                  className="dock-request-action is-primary"
-                  disabled={isResolving}
-                  onClick={() =>
-                    onResolve(buildMcpElicitationPayload(request, requestAnswers))
-                  }
-                  type="button"
-                >
-                  {isResolving ? t("request.processing") : t("actions.confirm")}
-                </button>
-                <button
-                  className="dock-request-action"
-                  disabled={isResolving}
-                  onClick={() =>
-                    onResolve({
-                      action: "decline",
-                      content: null,
-                      _meta: null
-                    })
-                  }
-                  type="button"
-                >
-                  {t("actions.deny")}
-                </button>
-                <button
-                  className="dock-request-action is-muted"
-                  disabled={isResolving}
-                  onClick={() =>
-                    onResolve({
-                      action: "cancel",
-                      content: null,
-                      _meta: null
-                    })
-                  }
-                  type="button"
-                >
-                  {t("actions.cancel")}
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              {(() => {
-                const formParams = request.params as McpFormElicitationParams;
-
-                return Object.entries(formParams.requestedSchema.properties).map(
-                ([propertyKey, schema]) => {
-                  const optionEntries = getMcpFieldOptions(schema);
-                  const required =
-                    formParams.requestedSchema.required?.includes(propertyKey) ?? false;
-
-                  if (schema.type === "boolean") {
-                    return (
-                      <label className="dock-question" key={propertyKey}>
-                        <span>
-                          {schema.title || humanizeIdentifier(propertyKey)}
-                          {required ? " *" : ""}
-                        </span>
-                        {schema.description ? <span>{schema.description}</span> : null}
-                        <label>
-                          <input
-                            checked={getBooleanRequestAnswer(
-                              requestAnswers,
-                              request.requestId,
-                              propertyKey,
-                              schema.default ?? false
-                            )}
-                            onChange={(event) =>
-                              setRequestAnswers((current) => ({
-                                ...current,
-                                [request.requestId]: {
-                                  ...current[request.requestId],
-                                  [propertyKey]: event.target.checked
-                                }
-                              }))
-                            }
-                            type="checkbox"
-                          />
-                          {" "}
-                          {schema.title || humanizeIdentifier(propertyKey)}
-                        </label>
-                      </label>
-                    );
-                  }
-
-                  if (schema.type === "array") {
-                    const selectedValues = getMultiSelectRequestAnswer(
-                      requestAnswers,
-                      request.requestId,
-                      propertyKey,
-                      schema.default ?? []
-                    );
-
-                    return (
-                      <div className="dock-question" key={propertyKey}>
-                        <span>
-                          {schema.title || humanizeIdentifier(propertyKey)}
-                          {required ? " *" : ""}
-                        </span>
-                        {schema.description ? <span>{schema.description}</span> : null}
-                        <div className="dock-question-stack">
-                          {optionEntries.map((option) => {
-                            const checked = selectedValues.includes(option.value);
-
-                            return (
-                              <label key={option.value}>
-                                <input
-                                  checked={checked}
-                                  onChange={(event) =>
-                                    setRequestAnswers((current) => {
-                                      const currentValues = getMultiSelectRequestAnswer(
-                                        current,
-                                        request.requestId,
-                                        propertyKey,
-                                        schema.default ?? []
-                                      );
-
-                                      return {
-                                        ...current,
-                                        [request.requestId]: {
-                                          ...current[request.requestId],
-                                          [propertyKey]: event.target.checked
-                                            ? [...currentValues, option.value]
-                                            : currentValues.filter(
-                                                (entry) => entry !== option.value
-                                              )
-                                        }
-                                      };
-                                    })
-                                  }
-                                  type="checkbox"
-                                />
-                                {" "}
-                                {option.label}
-                              </label>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  if (optionEntries.length) {
-                    return (
-                      <label className="dock-question" key={propertyKey}>
-                        <span>
-                          {schema.title || humanizeIdentifier(propertyKey)}
-                          {required ? " *" : ""}
-                        </span>
-                        {schema.description ? <span>{schema.description}</span> : null}
-                        <DockSelect
-                          ariaLabel={schema.title || propertyKey}
-                          className="dock-sidebar-select"
-                          onChange={(value) =>
-                            setRequestAnswers((current) => ({
-                              ...current,
-                              [request.requestId]: {
-                                ...current[request.requestId],
-                                [propertyKey]: value
-                              }
-                            }))
-                          }
-                          options={[
-                            { value: "", label: t("request.select"), disabled: true },
-                            ...optionEntries
-                          ]}
-                          placeholder={t("request.select")}
-                          value={getTextRequestAnswer(
-                            requestAnswers,
-                            request.requestId,
-                            propertyKey
-                          )}
-                        />
-                      </label>
-                    );
-                  }
-
-                  if (schema.type === "number" || schema.type === "integer") {
-                    return (
-                      <label className="dock-question" key={propertyKey}>
-                        <span>
-                          {schema.title || humanizeIdentifier(propertyKey)}
-                          {required ? " *" : ""}
-                        </span>
-                        {schema.description ? <span>{schema.description}</span> : null}
-                        <input
-                          className="dock-sidebar-input"
-                          max={schema.maximum}
-                          min={schema.minimum}
-                          onChange={(event) =>
-                            setRequestAnswers((current) => ({
-                              ...current,
-                              [request.requestId]: {
-                                ...current[request.requestId],
-                                [propertyKey]:
-                                  event.target.value === ""
-                                    ? null
-                                    : Number(event.target.value)
-                              }
-                            }))
-                          }
-                          type="number"
-                          value={getNumberRequestAnswer(
-                            requestAnswers,
-                            request.requestId,
-                            propertyKey
-                          )}
-                        />
-                      </label>
-                    );
-                  }
-
-                  if (schema.type === "string") {
-                    return (
-                      <label className="dock-question" key={propertyKey}>
-                        <span>
-                          {schema.title || humanizeIdentifier(propertyKey)}
-                          {required ? " *" : ""}
-                        </span>
-                        {schema.description ? <span>{schema.description}</span> : null}
-                        <input
-                          className="dock-sidebar-input"
-                          maxLength={schema.maxLength}
-                          minLength={schema.minLength}
-                          onChange={(event) =>
-                            setRequestAnswers((current) => ({
-                              ...current,
-                              [request.requestId]: {
-                                ...current[request.requestId],
-                                [propertyKey]: event.target.value
-                              }
-                            }))
-                          }
-                          type="text"
-                          value={getTextRequestAnswer(
-                            requestAnswers,
-                            request.requestId,
-                            propertyKey
-                          )}
-                        />
-                      </label>
-                    );
-                  }
-
-                  return null;
-                }
-                );
-              })()}
-              <div className="dock-request-actions">
-                <button
-                  className="dock-request-action is-primary"
-                  disabled={isResolving || !isMcpRequestSubmittable(request, requestAnswers)}
-                  onClick={() =>
-                    onResolve(buildMcpElicitationPayload(request, requestAnswers))
-                  }
-                  type="button"
-                >
-                  {isResolving ? t("request.processing") : t("actions.submitAnswers")}
-                </button>
-                <button
-                  className="dock-request-action"
-                  disabled={isResolving}
-                  onClick={() =>
-                    onResolve({
-                      action: "decline",
-                      content: null,
-                      _meta: null
-                    })
-                  }
-                  type="button"
-                >
-                  {t("actions.deny")}
-                </button>
-                <button
-                  className="dock-request-action is-muted"
-                  disabled={isResolving}
-                  onClick={() =>
-                    onResolve({
-                      action: "cancel",
-                      content: null,
-                      _meta: null
-                    })
-                  }
-                  type="button"
-                >
-                  {t("actions.cancel")}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      ) : null}
+      {body}
     </div>
   );
 }

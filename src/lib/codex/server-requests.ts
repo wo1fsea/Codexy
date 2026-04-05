@@ -21,6 +21,11 @@ export type McpElicitationRequestEntry = Extract<
   { method: "mcpServer/elicitation/request" }
 >;
 
+export type UserInputRequestEntry = Extract<
+  DockServerRequest,
+  { method: "item/tool/requestUserInput" }
+>;
+
 type CommandApprovalMethod =
   | "item/commandExecution/requestApproval"
   | "execCommandApproval";
@@ -216,6 +221,12 @@ export function isPermissionApprovalRequest(
   request: DockServerRequest
 ): request is PermissionApprovalRequestEntry {
   return request.method === "item/permissions/requestApproval";
+}
+
+export function isUserInputRequest(
+  request: DockServerRequest
+): request is UserInputRequestEntry {
+  return request.method === "item/tool/requestUserInput";
 }
 
 export function isMcpElicitationRequest(
