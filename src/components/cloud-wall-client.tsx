@@ -223,49 +223,51 @@ export function CloudWallClient({
 
   return (
     <main className="cloud-wall-shell">
-      <header className="cloud-wall-header">
-        <div className="cloud-wall-header-copy">
-          <Link
-            aria-label="Back to dashboard"
-            className="dock-icon-button cloud-remote-icon-button"
-            href="/"
-            title="Back to dashboard"
-          >
-            <AppIcon className="cloud-remote-inline-icon" name="back" />
-          </Link>
-          <span className="cloud-eyebrow">Workspace wall</span>
-          <span className="cloud-wall-header-name">{initialDeploymentName}</span>
+      <div className="cloud-wall-scroll">
+        <header className="cloud-wall-header">
+          <div className="cloud-wall-header-copy">
+            <Link
+              aria-label="Back to dashboard"
+              className="dock-icon-button cloud-remote-icon-button"
+              href="/"
+              title="Back to dashboard"
+            >
+              <AppIcon className="cloud-remote-inline-icon" name="back" />
+            </Link>
+            <span className="cloud-eyebrow">Workspace wall</span>
+            <span className="cloud-wall-header-name">{initialDeploymentName}</span>
+          </div>
+
+          <div className="cloud-wall-header-actions">
+            <span className="cloud-wall-header-count">
+              {nodes.length} linked node{nodes.length === 1 ? "" : "s"}
+            </span>
+            <CloudLogoutAction returnTo="/auth/login" />
+          </div>
+        </header>
+
+        <div className="cloud-wall-grid">
+          {paneNodeIds.map((nodeId, index) => {
+            const node = nodeId ? nodeById.get(nodeId) ?? null : null;
+
+            return (
+              <CloudWallPane
+                index={index}
+                key={`pane-${index + 1}`}
+                node={node}
+                nodeId={nodeId}
+                nodeOptions={nodeOptions}
+                onNodeChange={(nextValue) => {
+                  setPaneNodeIds((current) =>
+                    current.map((value, nextIndex) =>
+                      nextIndex === index ? nextValue : value
+                    )
+                  );
+                }}
+              />
+            );
+          })}
         </div>
-
-        <div className="cloud-wall-header-actions">
-          <span className="cloud-wall-header-count">
-            {nodes.length} linked node{nodes.length === 1 ? "" : "s"}
-          </span>
-          <CloudLogoutAction returnTo="/auth/login" />
-        </div>
-      </header>
-
-      <div className="cloud-wall-grid">
-        {paneNodeIds.map((nodeId, index) => {
-          const node = nodeId ? nodeById.get(nodeId) ?? null : null;
-
-          return (
-            <CloudWallPane
-              index={index}
-              key={`pane-${index + 1}`}
-              node={node}
-              nodeId={nodeId}
-              nodeOptions={nodeOptions}
-              onNodeChange={(nextValue) => {
-                setPaneNodeIds((current) =>
-                  current.map((value, nextIndex) =>
-                    nextIndex === index ? nextValue : value
-                  )
-                );
-              }}
-            />
-          );
-        })}
       </div>
     </main>
   );

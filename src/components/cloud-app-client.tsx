@@ -124,114 +124,116 @@ export function CloudAppClient({
 
   return (
     <main className="cloud-app-shell">
-      <section className="cloud-hero">
-        <div className="cloud-hero-copy">
-          <span className="cloud-eyebrow">Self-hosted cloud mode</span>
-          <h1>Codexy Cloud</h1>
-          <p>Run this on the node you want to connect.</p>
-          <div className="cloud-code-fence">
-            <span className="cloud-code-fence-label">bash</span>
-            <pre className="cloud-code-fence-body">
-              <code>{linkExample}</code>
-              <button
-                aria-label={copyState === "copied" ? "Copied command" : "Copy command"}
-                className={`cloud-code-copy${copyState === "copied" ? " is-copied" : ""}`}
-                onClick={() => {
-                  void handleCopyLinkExample();
-                }}
-                title={copyState === "copied" ? "Copied" : "Copy"}
-                type="button"
-              >
-                <AppIcon
-                  className="cloud-code-copy-icon"
-                  name={copyState === "copied" ? "check" : "copy"}
-                />
-              </button>
-            </pre>
+      <div className="cloud-app-scroll">
+        <section className="cloud-hero">
+          <div className="cloud-hero-copy">
+            <span className="cloud-eyebrow">Self-hosted cloud mode</span>
+            <h1>Codexy Cloud</h1>
+            <p>Run this on the node you want to connect.</p>
+            <div className="cloud-code-fence">
+              <span className="cloud-code-fence-label">bash</span>
+              <pre className="cloud-code-fence-body">
+                <code>{linkExample}</code>
+                <button
+                  aria-label={copyState === "copied" ? "Copied command" : "Copy command"}
+                  className={`cloud-code-copy${copyState === "copied" ? " is-copied" : ""}`}
+                  onClick={() => {
+                    void handleCopyLinkExample();
+                  }}
+                  title={copyState === "copied" ? "Copied" : "Copy"}
+                  type="button"
+                >
+                  <AppIcon
+                    className="cloud-code-copy-icon"
+                    name={copyState === "copied" ? "check" : "copy"}
+                  />
+                </button>
+              </pre>
+            </div>
           </div>
-        </div>
 
-        <div className="cloud-overview-card">
-          <div className="cloud-overview-head">
-            <span className="cloud-overview-label">Deployment</span>
-            <CloudLogoutAction
-              buttonClassName="cloud-overview-logout-button"
-              popoverClassName="is-upward"
-              returnTo="/auth/login"
-              shellClassName="cloud-overview-logout-shell"
-            />
+          <div className="cloud-overview-card">
+            <div className="cloud-overview-head">
+              <span className="cloud-overview-label">Deployment</span>
+              <CloudLogoutAction
+                buttonClassName="cloud-overview-logout-button"
+                popoverClassName="is-upward"
+                returnTo="/auth/login"
+                shellClassName="cloud-overview-logout-shell"
+              />
+            </div>
+            <strong>{initialDeploymentName}</strong>
+            <span className="cloud-overview-count">
+              {nodes.length} linked node{nodes.length === 1 ? "" : "s"}
+            </span>
           </div>
-          <strong>{initialDeploymentName}</strong>
-          <span className="cloud-overview-count">
-            {nodes.length} linked node{nodes.length === 1 ? "" : "s"}
-          </span>
-        </div>
-      </section>
+        </section>
 
-      <section className="cloud-panel">
-        <div className="cloud-panel-head">
-          <div className="cloud-panel-head-copy">
-            <span className="cloud-eyebrow">Node directory</span>
-            <h2>Linked nodes</h2>
+        <section className="cloud-panel">
+          <div className="cloud-panel-head">
+            <div className="cloud-panel-head-copy">
+              <span className="cloud-eyebrow">Node directory</span>
+              <h2>Linked nodes</h2>
+            </div>
+            <div className="cloud-panel-head-actions">
+              <Link className="cloud-panel-link" href="/wall">
+                Open wall
+              </Link>
+              <code>{nodesPath}</code>
+            </div>
           </div>
-          <div className="cloud-panel-head-actions">
-            <Link className="cloud-panel-link" href="/wall">
-              Open wall
-            </Link>
-            <code>{nodesPath}</code>
-          </div>
-        </div>
 
-        {nodes.length ? (
-          <div className="cloud-node-grid">
-            {nodes.map((node) => (
-              <article className="cloud-node-card" key={node.nodeId}>
-                <div className="cloud-node-card-head">
-                  <div className="cloud-node-card-copy">
-                    <strong>{node.displayName}</strong>
-                    <p>{node.cloudUrl}</p>
+          {nodes.length ? (
+            <div className="cloud-node-grid">
+              {nodes.map((node) => (
+                <article className="cloud-node-card" key={node.nodeId}>
+                  <div className="cloud-node-card-head">
+                    <div className="cloud-node-card-copy">
+                      <strong>{node.displayName}</strong>
+                      <p>{node.cloudUrl}</p>
+                    </div>
+                    <div className="cloud-node-card-controls">
+                      <span
+                        className={`cloud-node-status${node.status === "offline" ? " is-offline" : ""}`}
+                      >
+                        {node.status}
+                      </span>
+                      <Link
+                        className="cloud-node-open"
+                        href={`/nodes/${encodeURIComponent(node.nodeId)}`}
+                      >
+                        Open
+                      </Link>
+                    </div>
                   </div>
-                  <div className="cloud-node-card-controls">
-                    <span
-                      className={`cloud-node-status${node.status === "offline" ? " is-offline" : ""}`}
-                    >
-                      {node.status}
-                    </span>
-                    <Link
-                      className="cloud-node-open"
-                      href={`/nodes/${encodeURIComponent(node.nodeId)}`}
-                    >
-                      Open
-                    </Link>
-                  </div>
-                </div>
-                <dl className="cloud-node-meta">
-                  <div>
-                    <dt>Node ID</dt>
-                    <dd>{node.nodeId}</dd>
-                  </div>
-                  <div>
-                    <dt>Linked</dt>
-                    <dd>{formatTimestamp(node.linkedAt)}</dd>
-                  </div>
-                  <div>
-                    <dt>Last heartbeat</dt>
-                    <dd>{formatTimestamp(node.lastHeartbeatAt)}</dd>
-                  </div>
-                </dl>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <div className="cloud-empty-state">
-            <strong>No nodes linked yet.</strong>
-            <p>
-              Start a node with <code>codexy start</code>, then run{" "}
-              <code>codexy link &lt;cloud-url&gt;</code> against this deployment.
-            </p>
-          </div>
-        )}
-      </section>
+                  <dl className="cloud-node-meta">
+                    <div>
+                      <dt>Node ID</dt>
+                      <dd>{node.nodeId}</dd>
+                    </div>
+                    <div>
+                      <dt>Linked</dt>
+                      <dd>{formatTimestamp(node.linkedAt)}</dd>
+                    </div>
+                    <div>
+                      <dt>Last heartbeat</dt>
+                      <dd>{formatTimestamp(node.lastHeartbeatAt)}</dd>
+                    </div>
+                  </dl>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="cloud-empty-state">
+              <strong>No nodes linked yet.</strong>
+              <p>
+                Start a node with <code>codexy start</code>, then run{" "}
+                <code>codexy link &lt;cloud-url&gt;</code> against this deployment.
+              </p>
+            </div>
+          )}
+        </section>
+      </div>
     </main>
   );
 }

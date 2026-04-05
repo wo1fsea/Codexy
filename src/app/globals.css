@@ -206,15 +206,21 @@ pre {
 .cloud-app-shell {
   height: 100vh;
   min-height: 100vh;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top left, rgba(var(--c-accent), 0.12), transparent 32%),
+    linear-gradient(180deg, #111110 0%, #151413 100%);
+  padding-top: var(--safe-area-top);
+}
+
+.cloud-app-scroll {
+  height: 100%;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
-  background:
-    radial-gradient(circle at top left, rgba(var(--c-accent), 0.12), transparent 32%),
-    linear-gradient(180deg, #111110 0%, #151413 100%);
-  padding: calc(clamp(20px, 4vw, 40px) + var(--safe-area-top)) clamp(20px, 4vw, 40px)
-    clamp(20px, 4vw, 40px);
+  padding: clamp(20px, 4vw, 40px) clamp(20px, 4vw, 40px)
+    max(clamp(20px, 4vw, 40px), var(--safe-area-bottom));
 }
 
 @supports (height: 100dvh) {
@@ -225,19 +231,32 @@ pre {
 }
 
 .cloud-auth-shell {
-  height: 100dvh;
-  min-height: 100dvh;
-  display: grid;
-  justify-items: center;
-  align-content: center;
-  padding: calc(clamp(20px, 4vw, 40px) + var(--safe-area-top)) clamp(20px, 4vw, 40px)
-    clamp(20px, 4vw, 40px);
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior-y: contain;
+  height: 100vh;
+  min-height: 100vh;
+  overflow: hidden;
+  padding-top: var(--safe-area-top);
   background:
     radial-gradient(circle at top left, rgba(var(--c-accent), 0.12), transparent 34%),
     linear-gradient(180deg, #101010 0%, #151413 100%);
+}
+
+.cloud-auth-scroll {
+  height: 100%;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  padding: clamp(20px, 4vw, 40px) clamp(20px, 4vw, 40px)
+    max(clamp(20px, 4vw, 40px), var(--safe-area-bottom));
+}
+
+@supports (height: 100dvh) {
+  .cloud-auth-shell {
+    height: 100dvh;
+    min-height: 100dvh;
+  }
 }
 
 .cloud-auth-card {
@@ -804,16 +823,30 @@ pre {
 }
 
 .cloud-wall-shell {
-  height: 100dvh;
-  min-height: 0;
+  height: 100vh;
+  min-height: 100vh;
   display: block;
   container-type: inline-size;
-  overflow-x: hidden;
-  overflow-y: auto;
-  padding: calc(10px + var(--safe-area-top)) 10px calc(10px + var(--safe-area-bottom));
+  overflow: hidden;
+  padding-top: var(--safe-area-top);
   background:
     radial-gradient(circle at top left, rgba(var(--c-accent), 0.12), transparent 24%),
     linear-gradient(180deg, #100f0e 0%, #141312 100%);
+}
+
+.cloud-wall-scroll {
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 10px 10px max(10px, var(--safe-area-bottom));
+}
+
+@supports (height: 100dvh) {
+  .cloud-wall-shell {
+    height: 100dvh;
+    min-height: 100dvh;
+  }
 }
 
 .cloud-wall-header {
@@ -3575,7 +3608,7 @@ pre {
   padding-right: var(--stage-inline-pad);
   background: var(--stage-bg);
   padding-top: 6px;
-  padding-bottom: calc(8px + var(--safe-area-bottom));
+  padding-bottom: max(8px, var(--safe-area-bottom));
 }
 
 .dock-bottom-center {

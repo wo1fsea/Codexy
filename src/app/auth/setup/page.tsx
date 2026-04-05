@@ -47,71 +47,73 @@ export default async function CloudAuthSetupPage({
 
   return (
     <main className="cloud-auth-shell">
-      <section className="cloud-auth-card">
-        <div className="cloud-auth-copy">
-          <span className="cloud-eyebrow">Self-hosted cloud setup</span>
-          <h1>Bind Google Authenticator</h1>
-          <p>
-            This deployment does not have a bound authenticator yet. Scan the QR code or
-            enter the setup key manually, then confirm with the current 6-digit code.
-          </p>
-        </div>
-
-        <div className="cloud-auth-grid">
-          <div className="cloud-auth-qr-panel">
-            <img
-              alt="Google Authenticator QR code"
-              className="cloud-auth-qr"
-              height={224}
-              src={qrCodeDataUrl}
-              width={224}
-            />
-            <p className="cloud-auth-note">
-              Issuer <code>{auth.issuer}</code> on <code>{auth.label}</code>
+      <div className="cloud-auth-scroll">
+        <section className="cloud-auth-card">
+          <div className="cloud-auth-copy">
+            <span className="cloud-eyebrow">Self-hosted cloud setup</span>
+            <h1>Bind Google Authenticator</h1>
+            <p>
+              This deployment does not have a bound authenticator yet. Scan the QR code or
+              enter the setup key manually, then confirm with the current 6-digit code.
             </p>
           </div>
 
-          <div className="cloud-auth-form-panel">
-            <div className="cloud-auth-secret">
-              <span className="cloud-auth-secret-label">Manual setup key</span>
-              <code>{auth.secretBase32}</code>
+          <div className="cloud-auth-grid">
+            <div className="cloud-auth-qr-panel">
+              <img
+                alt="Google Authenticator QR code"
+                className="cloud-auth-qr"
+                height={224}
+                src={qrCodeDataUrl}
+                width={224}
+              />
+              <p className="cloud-auth-note">
+                Issuer <code>{auth.issuer}</code> on <code>{auth.label}</code>
+              </p>
             </div>
 
-            <form action="/api/cloud/auth/setup" className="cloud-auth-form" method="post">
-              <input name="returnTo" type="hidden" value={returnTo} />
-              <label className="cloud-auth-field">
-                <span>6-digit code</span>
-                <input
-                  autoComplete="one-time-code"
-                  className="cloud-auth-input"
-                  inputMode="numeric"
-                  maxLength={6}
-                  name="code"
-                  pattern="[0-9]{6}"
-                  placeholder="123456"
-                  required
-                />
-              </label>
+            <div className="cloud-auth-form-panel">
+              <div className="cloud-auth-secret">
+                <span className="cloud-auth-secret-label">Manual setup key</span>
+                <code>{auth.secretBase32}</code>
+              </div>
 
-              {errorMessage ? <p className="cloud-auth-error">{errorMessage}</p> : null}
+              <form action="/api/cloud/auth/setup" className="cloud-auth-form" method="post">
+                <input name="returnTo" type="hidden" value={returnTo} />
+                <label className="cloud-auth-field">
+                  <span>6-digit code</span>
+                  <input
+                    autoComplete="one-time-code"
+                    className="cloud-auth-input"
+                    inputMode="numeric"
+                    maxLength={6}
+                    name="code"
+                    pattern="[0-9]{6}"
+                    placeholder="123456"
+                    required
+                  />
+                </label>
 
-              <button className="cloud-auth-submit" type="submit">
-                Bind authenticator
-              </button>
-            </form>
+                {errorMessage ? <p className="cloud-auth-error">{errorMessage}</p> : null}
 
-            <p className="cloud-auth-meta">
-              Recovery is local-only. If you lose the authenticator device, reset the
-              self-hosted cloud on the host machine and bind again.
-            </p>
+                <button className="cloud-auth-submit" type="submit">
+                  Bind authenticator
+                </button>
+              </form>
+
+              <p className="cloud-auth-meta">
+                Recovery is local-only. If you lose the authenticator device, reset the
+                self-hosted cloud on the host machine and bind again.
+              </p>
+            </div>
           </div>
-        </div>
 
-        <div className="cloud-auth-footer">
-          <Link href="/">Back</Link>
-          <code>{auth.authPath}</code>
-        </div>
-      </section>
+          <div className="cloud-auth-footer">
+            <Link href="/">Back</Link>
+            <code>{auth.authPath}</code>
+          </div>
+        </section>
+      </div>
     </main>
   );
 }

@@ -351,24 +351,41 @@ test("cloud auth setup page scrolls on mobile viewports", async ({ page }) => {
 
     await expect(page.getByRole("heading", { name: "Bind Google Authenticator" })).toBeVisible();
 
-    const authShell = page.locator(".cloud-auth-shell");
-    const initialMetrics = await authShell.evaluate((element) => {
-      const footer = element.querySelector(".cloud-auth-footer") as HTMLElement | null;
+    await page.evaluate(() => {
+      document.documentElement.style.setProperty("--safe-area-top", "48px");
+      document.documentElement.style.setProperty("--safe-area-bottom", "34px");
+    });
+
+    const authScroll = page.locator(".cloud-auth-scroll");
+    const initialMetrics = await page.evaluate(() => {
+      const shell = document.querySelector(".cloud-auth-shell") as HTMLElement | null;
+      const scroll = document.querySelector(".cloud-auth-scroll") as HTMLElement | null;
+      const footer = document.querySelector(".cloud-auth-footer") as HTMLElement | null;
+      const heading = document.querySelector(".cloud-auth-copy h1") as HTMLElement | null;
+
+      if (!shell || !scroll || !footer || !heading) {
+        return null;
+      }
 
       return {
-        clientHeight: element.clientHeight,
-        footerBottom: footer?.getBoundingClientRect().bottom ?? 0,
-        overflowY: window.getComputedStyle(element).overflowY,
-        scrollHeight: element.scrollHeight,
+        clientHeight: scroll.clientHeight,
+        footerBottom: footer.getBoundingClientRect().bottom,
+        headingTop: heading.getBoundingClientRect().top,
+        overflowY: window.getComputedStyle(scroll).overflowY,
+        shellPaddingTop: Number.parseFloat(window.getComputedStyle(shell).paddingTop) || 0,
+        scrollHeight: scroll.scrollHeight,
         viewportHeight: window.innerHeight
       };
     });
 
-    expect(initialMetrics.overflowY).toBe("auto");
-    expect(initialMetrics.scrollHeight).toBeGreaterThan(initialMetrics.clientHeight);
-    expect(initialMetrics.footerBottom).toBeGreaterThan(initialMetrics.viewportHeight);
+    expect(initialMetrics).not.toBeNull();
+    expect(initialMetrics!.shellPaddingTop).toBe(48);
+    expect(initialMetrics!.headingTop).toBeGreaterThanOrEqual(48);
+    expect(initialMetrics!.overflowY).toBe("auto");
+    expect(initialMetrics!.scrollHeight).toBeGreaterThan(initialMetrics!.clientHeight);
+    expect(initialMetrics!.footerBottom).toBeGreaterThan(initialMetrics!.viewportHeight);
 
-    const scrollState = await authShell.evaluate((element) => {
+    const scrollState = await authScroll.evaluate((element) => {
       element.scrollTo({
         top: element.scrollHeight,
         behavior: "auto"
@@ -415,27 +432,65 @@ test("cloud dashboard scrolls on mobile viewports", async ({ page }) => {
     await bindCloudAuthenticator(page, cloudUrl, cloudHome);
     await expect(page.getByRole("heading", { name: "Linked nodes" })).toBeVisible();
 
-    const dashboardShell = page.locator(".cloud-app-shell");
-    const initialMetrics = await dashboardShell.evaluate((element) => {
-      const panel = element.querySelector(".cloud-panel") as HTMLElement | null;
-      const shellRect = element.getBoundingClientRect();
+    await page.evaluate(() => {
+      document.documentElement.style.setProperty("--safe-area-top", "48px");
+      document.documentElement.style.setProperty("--safe-area-bottom", "34px");
+    });
+
+    const dashboardScroll = page.locator(".cloud-app-scroll");
+    const initialMetrics = await page.evaluate(() => {
+      const shell = document.querySelector(".cloud-app-shell") as HTMLElement | null;
+      const scroll = document.querySelector(".cloud-app-scroll") as HTMLElement | null;
+      const panel = document.querySelector(".cloud-panel") as HTMLElement | null;
+      const title = document.querySelector(".cloud-hero-copy h1") as HTMLElement | null;
+
+      if (!shell || !scroll || !panel || !title) {
+        return null;
+      }
+
+      const shellRect = shell.getBoundingClientRect();
 
       return {
-        clientHeight: element.clientHeight,
-        overflowY: window.getComputedStyle(element).overflowY,
-        panelBottom: panel?.getBoundingClientRect().bottom ?? 0,
+        clientHeight: scroll.clientHeight,
+        overflowY: window.getComputedStyle(scroll).overflowY,
+        panelBottom: panel.getBoundingClientRect().bottom,
         rectHeight: shellRect.height,
-        scrollHeight: element.scrollHeight,
+        scrollHeight: scroll.scrollHeight,
+        shellPaddingTop: Number.parseFloat(window.getComputedStyle(shell).paddingTop) || 0,
+        titleTop: title.getBoundingClientRect().top,
         viewportHeight: window.innerHeight
       };
     });
 
-    expect(initialMetrics.overflowY).toBe("auto");
-    expect(initialMetrics.rectHeight).toBeLessThanOrEqual(initialMetrics.viewportHeight + 1);
-    expect(initialMetrics.scrollHeight).toBeGreaterThan(initialMetrics.clientHeight);
-    expect(initialMetrics.panelBottom).toBeGreaterThan(initialMetrics.viewportHeight);
+    expect(initialMetrics).not.toBeNull();
+    expect(initialMetrics!.shellPaddingTop).toBe(48);
+    expect(initialMetrics!.titleTop).toBeGreaterThanOrEqual(48);
+    expect(initialMetrics!.overflowY).toBe("auto");
+    expect(initialMetrics!.rectHeight).toBeLessThanOrEqual(initialMetrics!.viewportHeight + 1);
+    expect(initialMetrics!.scrollHeight).toBeGreaterThan(initialMetrics!.clientHeight);
+    expect(initialMetrics!.panelBottom).toBeGreaterThan(initialMetrics!.viewportHeight);
 
-    const scrollState = await dashboardShell.evaluate((element) => {
+    const safeAreaScrollTop = await dashboardScroll.evaluate((element) => {
+      element.scrollTop = 72;
+      return element.scrollTop;
+    });
+
+    expect(safeAreaScrollTop).toBeGreaterThan(0);
+    const scrolledMetrics = await page.evaluate(() => {
+      const title = document.querySelector(".cloud-hero-copy h1") as HTMLElement | null;
+
+      if (!title) {
+        return null;
+      }
+
+      return {
+        titleTop: title.getBoundingClientRect().top
+      };
+    });
+    expect(scrolledMetrics).not.toBeNull();
+    expect(scrolledMetrics!.titleTop).toBeGreaterThanOrEqual(48);
+
+    const scrollState = await dashboardScroll.evaluate((element) => {
       element.scrollTo({
         top: element.scrollHeight,
         behavior: "auto"
@@ -895,8 +950,11 @@ test("cloud remote workspace keeps a single-line mobile header and fills the rem
       const dockAppElement = document.querySelector(
         ".cloud-remote-stage .dock-app"
       ) as HTMLElement | null;
+      const bottomDockElement = document.querySelector(
+        ".cloud-remote-stage .dock-bottom-dock"
+      ) as HTMLElement | null;
 
-      if (!shell || !headerElement || !stageElement || !dockAppElement) {
+      if (!shell || !headerElement || !stageElement || !dockAppElement || !bottomDockElement) {
         return null;
       }
 
@@ -910,9 +968,9 @@ test("cloud remote workspace keeps a single-line mobile header and fills the rem
         stageBottom: stageElement.getBoundingClientRect().bottom,
         dockAppHeight: dockAppElement.clientHeight,
         dockAppPaddingTop: Number.parseFloat(getComputedStyle(dockAppElement).paddingTop) || 0,
-        bottomDockBottom:
-          (document.querySelector(".cloud-remote-stage .dock-bottom-dock") as HTMLElement | null)
-            ?.getBoundingClientRect().bottom ?? null
+        bottomDockPaddingBottom:
+          Number.parseFloat(getComputedStyle(bottomDockElement).paddingBottom) || 0,
+        bottomDockBottom: bottomDockElement.getBoundingClientRect().bottom
       };
     });
 
@@ -923,6 +981,10 @@ test("cloud remote workspace keeps a single-line mobile header and fills the rem
     expect(shellMetrics!.stageBottom).toBeLessThanOrEqual(shellMetrics!.viewportHeight + 1);
     expect(shellMetrics!.bottomDockBottom ?? 0).toBeLessThanOrEqual(
       shellMetrics!.viewportHeight + 1
+    );
+    expect(shellMetrics!.bottomDockPaddingBottom).toBe(34);
+    expect(shellMetrics!.viewportHeight - (shellMetrics!.bottomDockBottom ?? 0)).toBeLessThanOrEqual(
+      1
     );
     expect(shellMetrics!.dockAppPaddingTop).toBe(0);
     expect(Math.abs(shellMetrics!.stageHeight - shellMetrics!.dockAppHeight)).toBeLessThanOrEqual(
@@ -1275,13 +1337,13 @@ test("cloud wall can show the same linked node in multiple panes", async ({ page
       "mobile"
     );
 
-    const shellScroll = await page.locator(".cloud-wall-shell").evaluate((element) => ({
+    const shellScroll = await page.locator(".cloud-wall-scroll").evaluate((element) => ({
       clientHeight: element.clientHeight,
       scrollHeight: element.scrollHeight
     }));
     expect(shellScroll.scrollHeight).toBeGreaterThan(shellScroll.clientHeight);
 
-    const shellScrollTop = await page.locator(".cloud-wall-shell").evaluate((element) => {
+    const shellScrollTop = await page.locator(".cloud-wall-scroll").evaluate((element) => {
       element.scrollTop = 240;
       return element.scrollTop;
     });
@@ -1344,6 +1406,7 @@ test("cloud wall can show the same linked node in multiple panes", async ({ page
 
     const wallSafeAreaMetrics = await page.evaluate(() => {
       const shell = document.querySelector(".cloud-wall-shell") as HTMLElement | null;
+      const scroll = document.querySelector(".cloud-wall-scroll") as HTMLElement | null;
       const headerElement = document.querySelector(".cloud-wall-header") as HTMLElement | null;
       const firstDockApp = document.querySelector(
         ".cloud-wall-pane-body .dock-app"
@@ -1353,12 +1416,12 @@ test("cloud wall can show the same linked node in multiple panes", async ({ page
       ) as HTMLElement[];
       const lastPane = panes.length > 0 ? panes[panes.length - 1] : null;
 
-      if (!shell || !headerElement || !lastPane) {
+      if (!shell || !scroll || !headerElement || !lastPane) {
         return null;
       }
 
       const headerTop = headerElement.getBoundingClientRect().top;
-      shell.scrollTop = shell.scrollHeight;
+      scroll.scrollTop = scroll.scrollHeight;
 
       const shellRect = shell.getBoundingClientRect();
       const lastPaneRect = lastPane.getBoundingClientRect();
@@ -1366,20 +1429,20 @@ test("cloud wall can show the same linked node in multiple panes", async ({ page
       return {
         viewportHeight: window.innerHeight,
         shellPaddingTop: Number.parseFloat(getComputedStyle(shell).paddingTop) || 0,
-        shellPaddingBottom: Number.parseFloat(getComputedStyle(shell).paddingBottom) || 0,
+        scrollPaddingBottom: Number.parseFloat(getComputedStyle(scroll).paddingBottom) || 0,
         headerTop,
         shellBottom: shellRect.bottom,
         lastPaneBottom: lastPaneRect.bottom,
         bottomGap: shellRect.bottom - lastPaneRect.bottom,
-        scrollTop: shell.scrollTop,
+        scrollTop: scroll.scrollTop,
         firstDockAppPaddingTop:
           firstDockApp ? Number.parseFloat(getComputedStyle(firstDockApp).paddingTop) || 0 : null
       };
     });
     expect(wallSafeAreaMetrics).not.toBeNull();
-    expect(wallSafeAreaMetrics!.shellPaddingTop).toBe(58);
-    expect(wallSafeAreaMetrics!.shellPaddingBottom).toBe(44);
-    expect(wallSafeAreaMetrics!.headerTop).toBeGreaterThanOrEqual(48);
+    expect(wallSafeAreaMetrics!.shellPaddingTop).toBe(48);
+    expect(wallSafeAreaMetrics!.scrollPaddingBottom).toBe(34);
+    expect(wallSafeAreaMetrics!.headerTop).toBeGreaterThanOrEqual(58);
     expect(wallSafeAreaMetrics!.shellBottom).toBeLessThanOrEqual(
       wallSafeAreaMetrics!.viewportHeight + 1
     );

@@ -86,6 +86,9 @@ test("mobile bottom dock stays inside the viewport", async ({ page }) => {
 
   await page.setViewportSize({ width: 390, height: 844 });
   await gotoDock(page);
+  await page.evaluate(() => {
+    document.documentElement.style.setProperty("--safe-area-bottom", "34px");
+  });
 
   const metrics = await page.evaluate(() => {
     const app = document.querySelector(".dock-app");
@@ -116,8 +119,11 @@ test("mobile bottom dock stays inside the viewport", async ({ page }) => {
       appBottom: Math.round(appBox.bottom),
       shellBottom: Math.round(shellBox.bottom),
       bottomDockBottom: Math.round(bottomDockBox.bottom),
+      bottomDockPaddingBottom:
+        Number.parseFloat(getComputedStyle(bottomDock).paddingBottom) || 0,
       composerBottom: Math.round(composerBox.bottom),
-      statusBottom: Math.round(statusBox.bottom)
+      statusBottom: Math.round(statusBox.bottom),
+      statusBottomGap: Math.round(viewportHeight - statusBox.bottom)
     };
   });
 
@@ -125,8 +131,10 @@ test("mobile bottom dock stays inside the viewport", async ({ page }) => {
   expect(metrics!.appBottom).toBeLessThanOrEqual(metrics!.viewportHeight);
   expect(metrics!.shellBottom).toBeLessThanOrEqual(metrics!.viewportHeight);
   expect(metrics!.bottomDockBottom).toBeLessThanOrEqual(metrics!.viewportHeight);
+  expect(metrics!.bottomDockPaddingBottom).toBe(34);
   expect(metrics!.composerBottom).toBeLessThanOrEqual(metrics!.viewportHeight);
   expect(metrics!.statusBottom).toBeLessThanOrEqual(metrics!.viewportHeight);
+  expect(metrics!.statusBottomGap).toBeLessThanOrEqual(35);
 });
 
 test("mobile idle hero does not scroll into blank space", async ({ page }) => {
