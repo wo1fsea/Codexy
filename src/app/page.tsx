@@ -14,7 +14,7 @@ export default async function HomePage() {
 
   return (
     <I18nProvider>
-      <DockApp />
+      <DockApp viewportSafeAreaTop />
     </I18nProvider>
   );
 }

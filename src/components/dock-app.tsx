@@ -71,6 +71,7 @@ type DockAppProps = {
   apiBasePath?: string;
   responsiveStrategy?: DockResponsiveStrategy;
   responsiveModeOverride?: DockResponsiveMode;
+  viewportSafeAreaTop?: boolean;
 };
 
 function normalizeApiBasePath(value?: string) {
@@ -1774,7 +1775,8 @@ function getCommandApprovalCwd(
 export function DockApp({
   apiBasePath = "/api",
   responsiveStrategy = "viewport",
-  responsiveModeOverride
+  responsiveModeOverride,
+  viewportSafeAreaTop = false
 }: DockAppProps) {
   const { t } = useI18n();
   const resolvedApiBasePath = normalizeApiBasePath(apiBasePath);
@@ -3125,6 +3127,7 @@ export function DockApp({
         className="dock-app"
         data-dock-responsive-mode={activeResponsiveMode}
         data-dock-responsive-strategy={responsiveStrategy}
+        data-dock-safe-area-top={viewportSafeAreaTop ? "self" : "none"}
         ref={rootRef}
       >
         <DockShellView

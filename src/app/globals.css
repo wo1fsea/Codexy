@@ -199,7 +199,7 @@ pre {
   background: transparent;
 }
 
-.dock-app[data-dock-responsive-mode="mobile"] {
+.dock-app[data-dock-safe-area-top="self"][data-dock-responsive-mode="mobile"] {
   padding-top: var(--safe-area-top);
 }
 
@@ -810,7 +810,7 @@ pre {
   container-type: inline-size;
   overflow-x: hidden;
   overflow-y: auto;
-  padding: 10px;
+  padding: calc(10px + var(--safe-area-top)) 10px calc(10px + var(--safe-area-bottom));
   background:
     radial-gradient(circle at top left, rgba(var(--c-accent), 0.12), transparent 24%),
     linear-gradient(180deg, #100f0e 0%, #141312 100%);
@@ -1049,6 +1049,7 @@ pre {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
+  padding-top: var(--safe-area-top);
   background:
     radial-gradient(circle at top right, rgba(var(--c-accent), 0.1), transparent 24%),
     linear-gradient(180deg, #100f0e 0%, #141312 100%);

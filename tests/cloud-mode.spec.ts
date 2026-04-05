@@ -874,6 +874,11 @@ test("cloud remote workspace keeps a single-line mobile header and fills the rem
     expect(lineMetrics.scrollHeight).toBeLessThanOrEqual(lineMetrics.clientHeight + 1);
     expect(lineMetrics.scrollWidth).toBeLessThanOrEqual(lineMetrics.clientWidth + 1);
 
+    await page.evaluate(() => {
+      document.documentElement.style.setProperty("--safe-area-top", "48px");
+      document.documentElement.style.setProperty("--safe-area-bottom", "34px");
+    });
+
     const headerBox = await header.boundingBox();
     const copyBox = await copy.boundingBox();
     const statusBox = await status.boundingBox();
@@ -898,22 +903,35 @@ test("cloud remote workspace keeps a single-line mobile header and fills the rem
       return {
         viewportHeight: window.innerHeight,
         shellHeight: shell.clientHeight,
+        shellPaddingTop: Number.parseFloat(getComputedStyle(shell).paddingTop) || 0,
         headerHeight: headerElement.clientHeight,
+        headerTop: headerElement.getBoundingClientRect().top,
         stageHeight: stageElement.clientHeight,
         stageBottom: stageElement.getBoundingClientRect().bottom,
-        dockAppHeight: dockAppElement.clientHeight
+        dockAppHeight: dockAppElement.clientHeight,
+        dockAppPaddingTop: Number.parseFloat(getComputedStyle(dockAppElement).paddingTop) || 0,
+        bottomDockBottom:
+          (document.querySelector(".cloud-remote-stage .dock-bottom-dock") as HTMLElement | null)
+            ?.getBoundingClientRect().bottom ?? null
       };
     });
 
     expect(shellMetrics).not.toBeNull();
+    expect(shellMetrics!.shellPaddingTop).toBe(48);
+    expect(shellMetrics!.headerTop).toBeGreaterThanOrEqual(48);
     expect(shellMetrics!.shellHeight).toBeLessThanOrEqual(shellMetrics!.viewportHeight + 1);
     expect(shellMetrics!.stageBottom).toBeLessThanOrEqual(shellMetrics!.viewportHeight + 1);
+    expect(shellMetrics!.bottomDockBottom ?? 0).toBeLessThanOrEqual(
+      shellMetrics!.viewportHeight + 1
+    );
+    expect(shellMetrics!.dockAppPaddingTop).toBe(0);
     expect(Math.abs(shellMetrics!.stageHeight - shellMetrics!.dockAppHeight)).toBeLessThanOrEqual(
       1
     );
     expect(
       Math.abs(
-        shellMetrics!.shellHeight - (shellMetrics!.headerHeight + shellMetrics!.stageHeight)
+        shellMetrics!.shellHeight -
+          (shellMetrics!.shellPaddingTop + shellMetrics!.headerHeight + shellMetrics!.stageHeight)
       )
     ).toBeLessThanOrEqual(1);
   } finally {
@@ -1311,6 +1329,66 @@ test("cloud wall can show the same linked node in multiple panes", async ({ page
     expect(wallHeaderCountMetrics.scrollHeight).toBeLessThanOrEqual(
       wallHeaderCountMetrics.clientHeight + 1
     );
+
+    await page.setViewportSize({
+      width: 390,
+      height: 844
+    });
+    await page.goto(`${cloudUrl}/wall`, {
+      waitUntil: "domcontentloaded"
+    });
+    await page.evaluate(() => {
+      document.documentElement.style.setProperty("--safe-area-top", "48px");
+      document.documentElement.style.setProperty("--safe-area-bottom", "34px");
+    });
+
+    const wallSafeAreaMetrics = await page.evaluate(() => {
+      const shell = document.querySelector(".cloud-wall-shell") as HTMLElement | null;
+      const headerElement = document.querySelector(".cloud-wall-header") as HTMLElement | null;
+      const firstDockApp = document.querySelector(
+        ".cloud-wall-pane-body .dock-app"
+      ) as HTMLElement | null;
+      const panes = Array.from(
+        document.querySelectorAll("[data-cloud-wall-pane]")
+      ) as HTMLElement[];
+      const lastPane = panes.length > 0 ? panes[panes.length - 1] : null;
+
+      if (!shell || !headerElement || !lastPane) {
+        return null;
+      }
+
+      const headerTop = headerElement.getBoundingClientRect().top;
+      shell.scrollTop = shell.scrollHeight;
+
+      const shellRect = shell.getBoundingClientRect();
+      const lastPaneRect = lastPane.getBoundingClientRect();
+
+      return {
+        viewportHeight: window.innerHeight,
+        shellPaddingTop: Number.parseFloat(getComputedStyle(shell).paddingTop) || 0,
+        shellPaddingBottom: Number.parseFloat(getComputedStyle(shell).paddingBottom) || 0,
+        headerTop,
+        shellBottom: shellRect.bottom,
+        lastPaneBottom: lastPaneRect.bottom,
+        bottomGap: shellRect.bottom - lastPaneRect.bottom,
+        scrollTop: shell.scrollTop,
+        firstDockAppPaddingTop:
+          firstDockApp ? Number.parseFloat(getComputedStyle(firstDockApp).paddingTop) || 0 : null
+      };
+    });
+    expect(wallSafeAreaMetrics).not.toBeNull();
+    expect(wallSafeAreaMetrics!.shellPaddingTop).toBe(58);
+    expect(wallSafeAreaMetrics!.shellPaddingBottom).toBe(44);
+    expect(wallSafeAreaMetrics!.headerTop).toBeGreaterThanOrEqual(48);
+    expect(wallSafeAreaMetrics!.shellBottom).toBeLessThanOrEqual(
+      wallSafeAreaMetrics!.viewportHeight + 1
+    );
+    expect(wallSafeAreaMetrics!.scrollTop).toBeGreaterThan(0);
+    expect(wallSafeAreaMetrics!.bottomGap).toBeGreaterThanOrEqual(34);
+    expect(wallSafeAreaMetrics!.lastPaneBottom).toBeLessThanOrEqual(
+      wallSafeAreaMetrics!.viewportHeight - 34 + 1
+    );
+    expect(wallSafeAreaMetrics!.firstDockAppPaddingTop).toBe(0);
   } finally {
     runNodeCli(["stop"], nodeHome, 20_000);
     runNodeCli(["cloud", "stop"], cloudHome, 20_000);
