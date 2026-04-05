@@ -391,6 +391,7 @@ test("cloud auth setup page scrolls on mobile viewports", async ({ page }) => {
 
 test("cloud dashboard scrolls on mobile viewports", async ({ page }) => {
   const cloudHome = makeTempDir("codexy-cloud-mobile-dashboard-home-");
+  const nodeHome = makeTempDir("codexy-cloud-mobile-dashboard-node-");
   const cloudPort = await getFreePort();
   const runtimeSuffix = Date.now().toString();
 
@@ -449,8 +450,29 @@ test("cloud dashboard scrolls on mobile viewports", async ({ page }) => {
     expect(scrollState.maxScrollTop).toBeGreaterThan(0);
     expect(scrollState.scrollTop).toBeGreaterThan(0);
     await expect(page.getByText("No nodes linked yet.")).toBeInViewport();
+
+    const linkResult = runNodeCli(
+      ["link", cloudUrl, "--code", generateTotpCode(readCloudAuthSecret(cloudHome))],
+      nodeHome
+    );
+    expect(linkResult.status, linkResult.stdout + linkResult.stderr).toBe(0);
+
+    const firstNodeCard = page.locator(".cloud-node-card").first();
+    await expect(firstNodeCard.getByRole("link", { name: "Open", exact: true })).toBeVisible({
+      timeout: 15_000
+    });
+
+    const copyBox = await firstNodeCard.locator(".cloud-node-card-copy").boundingBox();
+    const controlsBox = await firstNodeCard.locator(".cloud-node-card-controls").boundingBox();
+
+    expect(copyBox).not.toBeNull();
+    expect(controlsBox).not.toBeNull();
+    expect(controlsBox?.x ?? 0).toBeGreaterThan((copyBox?.x ?? 0) + (copyBox?.width ?? 0) * 0.72);
+    expect(Math.abs((controlsBox?.y ?? 0) - (copyBox?.y ?? 0))).toBeLessThanOrEqual(10);
   } finally {
+    runNodeCli(["unlink"], nodeHome, 20_000);
     runNodeCli(["cloud", "stop"], cloudHome, 20_000);
+    rmSync(nodeHome, { recursive: true, force: true });
     rmSync(cloudHome, { recursive: true, force: true });
   }
 });

@@ -41,6 +41,46 @@ test("mobile top surface matches the stage tone", async ({ page }) => {
   expect(surfaces.composerBackgroundImage).toBe("none");
 });
 
+test("mobile safe top inset keeps the stage header below the status bar", async ({ page }) => {
+  await installDockApiMock(page);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await gotoDock(page);
+  await page.evaluate(() => {
+    document.documentElement.style.setProperty("--safe-area-top", "48px");
+  });
+
+  const metrics = await page.evaluate(() => {
+    const app = document.querySelector(".dock-app");
+    const shell = document.querySelector(".dock-shell");
+    const header = document.querySelector(".dock-stage-header");
+
+    if (
+      !(app instanceof HTMLElement) ||
+      !(shell instanceof HTMLElement) ||
+      !(header instanceof HTMLElement)
+    ) {
+      return null;
+    }
+
+    const appStyle = getComputedStyle(app);
+    const shellBox = shell.getBoundingClientRect();
+    const headerBox = header.getBoundingClientRect();
+
+    return {
+      appPaddingTop: Number.parseFloat(appStyle.paddingTop) || 0,
+      shellTop: Math.round(shellBox.top),
+      headerTop: Math.round(headerBox.top)
+    };
+  });
+
+  expect(metrics).not.toBeNull();
+  expect(metrics!.appPaddingTop).toBe(48);
+  expect(metrics!.shellTop).toBeGreaterThanOrEqual(48);
+  expect(metrics!.headerTop).toBeGreaterThanOrEqual(48);
+  expect(Math.abs(metrics!.headerTop - metrics!.shellTop)).toBeLessThanOrEqual(1);
+});
+
 test("mobile bottom dock stays inside the viewport", async ({ page }) => {
   await installDockApiMock(page);
 

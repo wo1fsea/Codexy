@@ -5,6 +5,7 @@ const playwrightBaseUrl = `http://127.0.0.1:${playwrightWebPort}`;
 const shouldReuseExistingServer =
   process.env.CI !== "true" &&
   process.env.PLAYWRIGHT_REUSE_EXISTING_SERVER !== "false";
+const disableManagedWebServer = process.env.PLAYWRIGHT_DISABLE_WEBSERVER === "true";
 
 export default defineConfig({
   testDir: "./tests",
@@ -17,10 +18,12 @@ export default defineConfig({
     screenshot: "only-on-failure",
     trace: "retain-on-failure"
   },
-  webServer: {
-    command: `node scripts/next-dev.mjs --hostname 127.0.0.1 --port ${playwrightWebPort}`,
-    url: playwrightBaseUrl,
-    reuseExistingServer: shouldReuseExistingServer,
-    timeout: 120_000
-  }
+  webServer: disableManagedWebServer
+    ? undefined
+    : {
+        command: `node scripts/next-dev.mjs --hostname 127.0.0.1 --port ${playwrightWebPort}`,
+        url: playwrightBaseUrl,
+        reuseExistingServer: shouldReuseExistingServer,
+        timeout: 120_000
+      }
 });
